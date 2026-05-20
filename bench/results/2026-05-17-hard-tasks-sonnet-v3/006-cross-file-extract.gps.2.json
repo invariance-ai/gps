@@ -1,0 +1,11 @@
+{
+  "task_id": "006-cross-file-extract",
+  "arm": "gps",
+  "attempt": 2,
+  "agent_label": "sonnet",
+  "passed": true,
+  "failed_checks": [],
+  "duration_sec": 51.724,
+  "output_chars": 445,
+  "timed_out": false
+}

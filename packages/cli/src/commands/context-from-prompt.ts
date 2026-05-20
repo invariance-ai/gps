@@ -11,8 +11,8 @@ import {
   matchFeaturesInPrompt,
   matchAliasesInPrompt,
   readGlobalLessonsBody,
-} from "@invariance/dna-core";
-import type { SymbolRef } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -284,8 +284,8 @@ export function registerContextFromPrompt(program: Command): void {
     }
 
     const lines: string[] = [];
-    lines.push("<!-- dna:auto-context -->");
-    lines.push("## dna auto-loaded context");
+    lines.push("<!-- gps:auto-context -->");
+    lines.push("## gps auto-loaded context");
     lines.push("");
     lines.push("Symbols mentioned in this prompt have prior context. Respect blocking invariants.");
     lines.push("");
@@ -345,7 +345,7 @@ export function registerContextFromPrompt(program: Command): void {
       }
       lines.push("");
     }
-    lines.push("<!-- /dna:auto-context -->");
+    lines.push("<!-- /gps:auto-context -->");
     console.log(lines.join("\n"));
   });
 }

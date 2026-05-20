@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "dna gate --changed --json 2>&1 | head -200"
+            "command": "gps gate --changed --json 2>&1 | head -200"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "dna review-diff --json 2>&1 | head -200"
+            "command": "gps review-diff --json 2>&1 | head -200"
           }
         ]
       }

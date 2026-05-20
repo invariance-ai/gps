@@ -10,7 +10,7 @@ import { open, getContext, impactOf, resolveSymbol } from "./query.js";
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-core-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-core-"));
   roots.push(root);
   return root;
 }
@@ -60,7 +60,7 @@ describe("index graph", () => {
   it("returns scoped context, impact, tests, invariants, and notes", async () => {
     const root = await tempRepo();
     await mkdir(path.join(root, "src"), { recursive: true });
-    await mkdir(path.join(root, ".dna/notes"), { recursive: true });
+    await mkdir(path.join(root, ".gps/notes"), { recursive: true });
     await writeFile(
       path.join(root, "src/refunds.ts"),
       [
@@ -73,9 +73,9 @@ describe("index graph", () => {
       path.join(root, "src/refunds.test.ts"),
       "import { createRefund } from './refunds';\ntest('refund', () => createRefund());\n",
     );
-    await mkdir(path.join(root, ".dna"), { recursive: true });
+    await mkdir(path.join(root, ".gps"), { recursive: true });
     await writeFile(
-      path.join(root, ".dna/invariants.yml"),
+      path.join(root, ".gps/invariants.yml"),
       [
         "- name: High-value refunds require approval",
         "  applies_to: [createRefund]",
@@ -84,7 +84,7 @@ describe("index graph", () => {
       ].join("\n"),
     );
     await writeFile(
-      path.join(root, ".dna/notes/createRefund.yml"),
+      path.join(root, ".gps/notes/createRefund.yml"),
       [
         "- symbol: createRefund",
         "  lesson: Preserve approval ordering.",

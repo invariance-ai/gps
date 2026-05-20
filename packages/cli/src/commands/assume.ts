@@ -4,8 +4,8 @@ import {
   appendAssumption,
   loadAssumptions,
   verifyAssumption,
-} from "@invariance/dna-core";
-import type { AssumptionConfidence } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import type { AssumptionConfidence } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface AssumeOpts extends RootOption {

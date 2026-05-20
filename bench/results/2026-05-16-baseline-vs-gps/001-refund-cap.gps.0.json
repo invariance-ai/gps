@@ -1,0 +1,10 @@
+{
+  "task_id": "001-refund-cap",
+  "arm": "gps",
+  "attempt": 0,
+  "passed": true,
+  "failed_checks": [],
+  "duration_sec": 21.045,
+  "output_chars": 301,
+  "timed_out": false
+}

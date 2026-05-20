@@ -1,15 +1,15 @@
 {
-  "name": "@invariance/dna-core",
+  "name": "@invariance/gps-core",
   "version": "0.1.0",
-  "description": "Parser, resolver, graph store, and query layer for dna.",
+  "description": "Parser, resolver, graph store, and query layer for gps.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/invariance-ai/dna.git",
+    "url": "https://github.com/invariance-ai/gps.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/invariance-ai/dna#readme",
+  "homepage": "https://github.com/invariance-ai/gps#readme",
   "engines": {
     "node": ">=20"
   },
@@ -31,7 +31,7 @@
     "prepublishOnly": "tsc"
   },
   "dependencies": {
-    "@invariance/dna-schemas": "workspace:*",
+    "@invariance/gps-schemas": "workspace:*",
     "chokidar": "^4.0.0",
     "fast-glob": "^3.3.2",
     "typescript": "^5.6.0",

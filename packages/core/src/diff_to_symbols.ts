@@ -8,7 +8,7 @@ const execFile = promisify(_execFile);
  * Map a git diff to the symbols whose line ranges overlap with changed hunks.
  *
  * Lower-level than `gate()` — pure structural mapping. Used by the live
- * watch loop and by `dna review-diff` to know *which* symbols were touched
+ * watch loop and by `gps review-diff` to know *which* symbols were touched
  * (not just which files), so we can filter invariant hits to only those
  * affecting the actual changes.
  */

@@ -7,7 +7,7 @@
     "mean_output_chars": 313,
     "timed_out": 0
   },
-  "dna": {
+  "gps": {
     "pass_rate": 1,
     "mean_duration_sec": 35.31733333333333,
     "mean_output_chars": 273.44444444444446,
@@ -17,19 +17,19 @@
     {
       "task_id": "001-refund-cap",
       "baseline_pass": 1,
-      "dna_pass": 1,
+      "gps_pass": 1,
       "delta": 0
     },
     {
       "task_id": "002-add-test-coverage",
       "baseline_pass": 1,
-      "dna_pass": 1,
+      "gps_pass": 1,
       "delta": 0
     },
     {
       "task_id": "003-rename-symbol",
       "baseline_pass": 1,
-      "dna_pass": 1,
+      "gps_pass": 1,
       "delta": 0
     }
   ],

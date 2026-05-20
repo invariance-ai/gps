@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { Note, Decision } from "@invariance/dna-schemas";
+import { Note, Decision } from "@invariance/gps-schemas";
 import { isGitRepo } from "./git.js";
 
 const execFile = promisify(_execFile);
@@ -23,11 +23,11 @@ export interface SyncResult {
 }
 
 /**
- * Sync .dna/ via the repo's own git remote.
- * Strategy: fetch + merge with a union strategy on .dna/**, then dedupe note/decision YAMLs
+ * Sync .gps/ via the repo's own git remote.
+ * Strategy: fetch + merge with a union strategy on .gps/**, then dedupe note/decision YAMLs
  * by id (or by content hash when id absent).
  */
-export async function syncDna(root: string, opts: SyncOptions = {}): Promise<SyncResult> {
+export async function syncGps(root: string, opts: SyncOptions = {}): Promise<SyncResult> {
   const out: SyncResult = {
     pulled: false,
     pushed: false,
@@ -46,8 +46,8 @@ export async function syncDna(root: string, opts: SyncOptions = {}): Promise<Syn
       await git(root, ["merge", "--no-edit", `${remote}/${branch}`, "--strategy-option=union"]);
       out.pulled = true;
     } catch {
-      // merge failed — try to resolve conflicts inside .dna/ via union dedupe.
-      const conflicted = await conflictedDnaPaths(root);
+      // merge failed — try to resolve conflicts inside .gps/ via union dedupe.
+      const conflicted = await conflictedGpsPaths(root);
       out.conflicts = conflicted;
       for (const f of conflicted) {
         await dedupeYamlFile(root, f);
@@ -55,7 +55,7 @@ export async function syncDna(root: string, opts: SyncOptions = {}): Promise<Syn
       }
       if (conflicted.length > 0) {
         try {
-          await git(root, ["commit", "--no-edit", "-m", "dna: union-merge .dna/"]);
+          await git(root, ["commit", "--no-edit", "-m", "gps: union-merge .gps/"]);
           out.pulled = true;
         } catch {
           /* leave for human */
@@ -66,9 +66,9 @@ export async function syncDna(root: string, opts: SyncOptions = {}): Promise<Syn
     /* nothing to fetch */
   }
 
-  // Walk .dna/notes and .dna/decisions and dedupe entries.
-  out.merged_notes = await dedupeDir(root, ".dna/notes", parseNote);
-  out.merged_decisions = await dedupeDir(root, ".dna/decisions", parseDecision);
+  // Walk .gps/notes and .gps/decisions and dedupe entries.
+  out.merged_notes = await dedupeDir(root, ".gps/notes", parseNote);
+  out.merged_decisions = await dedupeDir(root, ".gps/decisions", parseDecision);
 
   if (opts.push) {
     try {
@@ -94,10 +94,10 @@ async function currentBranch(root: string): Promise<string> {
   }
 }
 
-async function conflictedDnaPaths(root: string): Promise<string[]> {
+async function conflictedGpsPaths(root: string): Promise<string[]> {
   try {
     const stdout = await git(root, ["diff", "--name-only", "--diff-filter=U"]);
-    return stdout.split("\n").map((s) => s.trim()).filter((s) => s.startsWith(".dna/"));
+    return stdout.split("\n").map((s) => s.trim()).filter((s) => s.startsWith(".gps/"));
   } catch {
     return [];
   }

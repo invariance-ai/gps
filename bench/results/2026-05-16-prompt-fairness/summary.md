@@ -5,11 +5,11 @@
 | arm | pass rate | mean duration (s) | mean output (chars) | timed out |
 |---|---|---|---|---|
 | baseline | 100.0% | 30.5 | 313 | 0 |
-| dna      | 100.0%      | 35.3      | 273      | 0 |
+| gps      | 100.0%      | 35.3      | 273      | 0 |
 
 ## Per task
 
-| task | baseline | dna | delta |
+| task | baseline | gps | delta |
 |---|---|---|---|
 | 001-refund-cap | 100.0% | 100.0% | 0.0pp |
 | 002-add-test-coverage | 100.0% | 100.0% | 0.0pp |

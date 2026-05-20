@@ -3,7 +3,7 @@ import { mkdir, writeFile, access } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import { stringify as yamlStringify } from "yaml";
-import { seed, ALL_SOURCE_GLOBS, SEED_TIERS, SEED_TIER_DEFAULTS, type SeedTier } from "@invariance/dna-core";
+import { seed, ALL_SOURCE_GLOBS, SEED_TIERS, SEED_TIER_DEFAULTS, type SeedTier } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 const CONFIG = `languages: [typescript, python]
@@ -23,7 +23,7 @@ strands:
   - invariants
 `;
 
-const INVARIANTS = `# .dna/invariants.yml — declarative constraints for symbols in your repo.
+const INVARIANTS = `# .gps/invariants.yml — declarative constraints for symbols in your repo.
 # Agents calling \`invariants_for(symbol)\` will receive matching rules with
 # evidence *before* they edit, so they can avoid violating them.
 
@@ -46,12 +46,12 @@ export interface InitResult {
 }
 
 export async function runInitCore(root: string, opts: InitOpts): Promise<InitResult> {
-  const dnaDir = path.join(root, ".dna");
-  await mkdir(dnaDir, { recursive: true });
+  const gpsDir = path.join(root, ".gps");
+  await mkdir(gpsDir, { recursive: true });
   const writes: InitResult["writes"] = [];
   const targets: Array<[string, string]> = [
-    [path.join(dnaDir, "config.yml"), CONFIG],
-    [path.join(dnaDir, "invariants.yml"), INVARIANTS],
+    [path.join(gpsDir, "config.yml"), CONFIG],
+    [path.join(gpsDir, "invariants.yml"), INVARIANTS],
   ];
   for (const [p, content] of targets) {
     const rel = path.relative(root, p);
@@ -93,7 +93,7 @@ export async function seedCandidates(
   );
   const notes = filtered.filter((p) => p.kind === "note");
   const invariants = filtered.filter((p) => p.kind === "invariant");
-  const dir = path.join(root, ".dna/candidates");
+  const dir = path.join(root, ".gps/candidates");
   await mkdir(dir, { recursive: true });
   const out = path.join(dir, "seed-" + new Date().toISOString().replace(/[:.]/g, "-") + ".yml");
   await writeFile(out, yamlStringify({
@@ -120,7 +120,7 @@ export function registerInit(program: Command): void {
   addRootOption(
     program
       .command("init")
-      .description("Initialize .dna/ in this directory (config + invariants)")
+      .description("Initialize .gps/ in this directory (config + invariants)")
       .option("--force", "Overwrite existing files")
       .option("--seed [tier]", "Mine repo history for candidate notes/invariants (safe|medium|aggressive, default safe)"),
   ).action(async (opts: RootOption & { force?: boolean; seed?: boolean | string }) => {
@@ -157,10 +157,10 @@ export function registerInit(program: Command): void {
           );
         }
       }
-      console.log(kleur.yellow(`\nnote: candidates are written to .dna/candidates/ for manual review — they are NOT auto-promoted.`));
-      console.log(kleur.dim(`Next: open ${r.path} to review, then run \`dna seed --apply\` to promote into .dna/notes and .dna/decisions.`));
+      console.log(kleur.yellow(`\nnote: candidates are written to .gps/candidates/ for manual review — they are NOT auto-promoted.`));
+      console.log(kleur.dim(`Next: open ${r.path} to review, then run \`gps seed --apply\` to promote into .gps/notes and .gps/decisions.`));
     }
     console.log("");
-    console.log(`Next: ${kleur.bold("dna wizard")} to wire agents, or ${kleur.bold("dna index")} to build the symbol graph.`);
+    console.log(`Next: ${kleur.bold("gps wizard")} to wire agents, or ${kleur.bold("gps index")} to build the symbol graph.`);
   });
 }

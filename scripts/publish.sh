@@ -3,7 +3,7 @@
 # branch + dirty-tree guards, and lockstep commit/tag). This script is kept for
 # muscle-memory dry-runs only: `pnpm release:dry` wraps `scripts/publish.sh --dry-run`.
 #
-# Publish dna packages to npm in dependency order.
+# Publish gps packages to npm in dependency order.
 #
 # Usage:
 #   scripts/publish.sh            # full publish
@@ -24,11 +24,11 @@ echo "==> building all packages"
 pnpm -r build
 
 PKGS=(
-  "@invariance/dna-schemas"
-  "@invariance/dna-core"
-  "@invariance/dna-llm"
-  "@invariance/dna-mcp"
-  "@invariance/dna"
+  "@invariance/gps-schemas"
+  "@invariance/gps-core"
+  "@invariance/gps-llm"
+  "@invariance/gps-mcp"
+  "@invariance/gps"
 )
 
 for pkg in "${PKGS[@]}"; do
@@ -38,4 +38,4 @@ for pkg in "${PKGS[@]}"; do
 done
 
 echo ""
-echo "done. install with: npx @invariance/dna wizard"
+echo "done. install with: npx @invariance/gps wizard"

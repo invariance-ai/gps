@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { syncDna } from "@invariance/dna-core";
+import { syncGps } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface SyncOpts extends RootOption {
@@ -14,14 +14,14 @@ export function registerSync(program: Command): void {
   addRootOption(
     program
       .command("sync")
-      .description("Fetch + merge .dna/ from the repo's git remote; dedupe notes/decisions by id")
+      .description("Fetch + merge .gps/ from the repo's git remote; dedupe notes/decisions by id")
       .option("--remote <name>", "Git remote (default origin)", "origin")
       .option("--branch <name>", "Branch (default current)")
       .option("--push", "Push after merging", false)
       .option("--json", "Emit JSON"),
   ).action(async (opts: SyncOpts) => {
     const root = resolveRoot(opts);
-    const result = await syncDna(root, {
+    const result = await syncGps(root, {
       remote: opts.remote,
       branch: opts.branch,
       push: opts.push,
@@ -35,7 +35,7 @@ export function registerSync(program: Command): void {
     console.log(head);
     console.log(kleur.dim(`merged_notes=${result.merged_notes} merged_decisions=${result.merged_decisions}`));
     if (result.conflicts.length) {
-      console.log(kleur.yellow(`\nresolved ${result.conflicts.length} .dna/ conflict file(s):`));
+      console.log(kleur.yellow(`\nresolved ${result.conflicts.length} .gps/ conflict file(s):`));
       for (const f of result.conflicts) console.log(`  • ${f}`);
     }
   });

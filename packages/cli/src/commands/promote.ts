@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { findPromotionCandidates } from "@invariance/dna-core";
+import { findPromotionCandidates } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -50,7 +50,7 @@ export function registerPromote(program: Command): void {
       }
       console.log(
         kleur.dim(
-          "Hint: run `dna postmortem --pr <n>` to author a full invariant from a recent regression, or edit .dna/invariants.yml manually.",
+          "Hint: run `gps postmortem --pr <n>` to author a full invariant from a recent regression, or edit .gps/invariants.yml manually.",
         ),
       );
     } catch (e) {

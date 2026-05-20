@@ -6,7 +6,7 @@ import {
   testsForSymbol,
   formatTestsPretty,
   diffSymbols,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface TestsOpts extends RootOption {

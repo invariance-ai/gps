@@ -1,19 +1,19 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import type { NoteScope } from "@invariance/dna-schemas";
-import { DnaLlm } from "./client.js";
+import type { NoteScope } from "@invariance/gps-schemas";
+import { GpsLlm } from "./client.js";
 
 /**
  * LLM tie-breaker for lesson scope classification. Used only when heuristic
  * confidence is low. Returns the heuristic top label on any failure so the
  * caller can never be blocked by network/auth issues.
  *
- * Cached by content-hash under .dna/cache/classify.json so repeated
+ * Cached by content-hash under .gps/cache/classify.json so repeated
  * lessons (and dry-runs) don't burn tokens.
  */
 
-const CACHE_REL = ".dna/cache/classify.json";
+const CACHE_REL = ".gps/cache/classify.json";
 
 export interface ClassifyCandidates {
   symbols: string[];
@@ -132,7 +132,7 @@ export async function llmClassify(
   heuristicFallback: ClassifyDecision,
   opts: ClassifyOptions = {},
 ): Promise<{ decision: ClassifyDecision; used_llm: boolean; model?: string }> {
-  const offline = opts.offline || process.env.DNA_CLASSIFY_OFFLINE === "1";
+  const offline = opts.offline || process.env.GPS_CLASSIFY_OFFLINE === "1";
   if (offline) return { decision: heuristicFallback, used_llm: false };
 
   const key = hashKey(lesson, candidates);
@@ -141,9 +141,9 @@ export async function llmClassify(
   if (cached) return { decision: cached, used_llm: false };
 
   const model = opts.model ?? "claude-haiku-4-5-20251001";
-  let llm: DnaLlm;
+  let llm: GpsLlm;
   try {
-    llm = new DnaLlm({ model, dryRun: !!opts.dryRun });
+    llm = new GpsLlm({ model, dryRun: !!opts.dryRun });
   } catch {
     return { decision: heuristicFallback, used_llm: false };
   }

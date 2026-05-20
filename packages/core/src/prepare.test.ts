@@ -2,7 +2,7 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it, afterEach } from "vitest";
-import { PREPARE_EDIT_SCHEMA_VERSION, PrepareEditResult } from "@invariance/dna-schemas";
+import { PREPARE_EDIT_SCHEMA_VERSION, PrepareEditResult } from "@invariance/gps-schemas";
 import { parseFile } from "./parser.js";
 import { buildIndex, writeIndex } from "./index_store.js";
 import { open, prepareEdit } from "./query.js";
@@ -10,10 +10,10 @@ import { open, prepareEdit } from "./query.js";
 const roots: string[] = [];
 
 async function fixtureRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-prepare-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-prepare-"));
   roots.push(root);
   await mkdir(path.join(root, "src"), { recursive: true });
-  await mkdir(path.join(root, ".dna"), { recursive: true });
+  await mkdir(path.join(root, ".gps"), { recursive: true });
 
   await writeFile(
     path.join(root, "src/refunds.ts"),
@@ -30,7 +30,7 @@ async function fixtureRepo(): Promise<string> {
     ].join("\n"),
   );
   await writeFile(
-    path.join(root, ".dna/invariants.yml"),
+    path.join(root, ".gps/invariants.yml"),
     [
       "- name: High-value refunds require approval",
       "  applies_to: [createRefund]",

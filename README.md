@@ -1,12 +1,12 @@
-# dna
+# gps
 
 > The repo that gets smarter every time you use it.
 
-`dna` gives coding agents — Claude Code, Codex, Cursor — the slice of repo context they'd otherwise miss: symbols, callers and callees, tests that protect each function, recent git history, declarative invariants you author once ("refunds over $1000 require finance approval"), and **lessons learned from previous edits** that agents and humans persist as they go. Anchored to symbols, recorded once, surfaced when relevant.
+`gps` gives coding agents — Claude Code, Codex, Cursor — the slice of repo context they'd otherwise miss: symbols, callers and callees, tests that protect each function, recent git history, declarative invariants you author once ("refunds over $1000 require finance approval"), and **lessons learned from previous edits** that agents and humans persist as they go. Anchored to symbols, recorded once, surfaced when relevant.
 
-In a blinded judge run against vanilla Claude Code on a real internal repo (309 source files, 10 prompts, Sonnet judge, A/B-swapped), **dna answers won 13 of 19 valid comparisons (+11% overall quality)**:
+In a blinded judge run against vanilla Claude Code on a real internal repo (309 source files, 10 prompts, Sonnet judge, A/B-swapped), **gps answers won 13 of 19 valid comparisons (+11% overall quality)**:
 
-| dimension | baseline | dna |
+| dimension | baseline | gps |
 |---|---:|---:|
 | correctness | 4.15 | **4.20** |
 | specificity | 4.15 | **4.70** |
@@ -15,14 +15,14 @@ In a blinded judge run against vanilla Claude Code on a real internal repo (309 
 
 Methodology and raw numbers: [`bench/dogfood/2026-05-12-invariance-platform.md`](bench/dogfood/2026-05-12-invariance-platform.md).
 
-**Tokens aren't the story.** `claude -p` explores via Glob/Read regardless of injected context; dna is additive there (+1.4% input tokens on the run above). The win is what the agent does *with* that exploration — dna answers cite real symbols and line numbers (`replayRun:14`, `applyMutations:58`) where baseline hand-waves at file-level.
+**Tokens aren't the story.** `claude -p` explores via Glob/Read regardless of injected context; gps is additive there (+1.4% input tokens on the run above). The win is what the agent does *with* that exploration — gps answers cite real symbols and line numbers (`replayRun:14`, `applyMutations:58`) where baseline hand-waves at file-level.
 
 Three inputs compound on a single symbol graph:
 1. **Static structure** — calls, callers, tests, provenance (the spine)
 2. **Human intent** — notes, decisions, invariants (what's worth knowing)
 3. **Agent behavior** *(v0.3)* — what they asked, what they broke (the signal)
 
-Day one, dna is useful for context. Six months in, the notes-and-invariants layer is an asset every new engineer and every new agent depends on. Operational reality, encoded and made queryable. That's the thesis.
+Day one, gps is useful for context. Six months in, the notes-and-invariants layer is an asset every new engineer and every new agent depends on. Operational reality, encoded and made queryable. That's the thesis.
 
 ## Quickstart
 
@@ -30,20 +30,20 @@ No install required — `npx` runs the latest published version each time:
 
 ```bash
 cd your-repo
-npx -y @invariance/dna init                # writes .dna/config.yml + .dna/invariants.yml
-npx -y @invariance/dna install claude      # writes CLAUDE.md + .claude skill/hooks + .mcp.json
-npx -y @invariance/dna install codex       # writes AGENTS.md + .codex/config.toml (notify + MCP)
-npx -y @invariance/dna install cursor      # writes .cursor/rules/dna.mdc + .cursor/mcp.json
-npx -y @invariance/dna index               # builds the symbol graph
-npx -y @invariance/dna learn-todos         # bootstrap notes from existing TODO/FIXME
-npx -y @invariance/dna invariant init --stack stripe   # optional: drop in a starter pack
+npx -y @invariance/gps init                # writes .gps/config.yml + .gps/invariants.yml
+npx -y @invariance/gps install claude      # writes CLAUDE.md + .claude skill/hooks + .mcp.json
+npx -y @invariance/gps install codex       # writes AGENTS.md + .codex/config.toml (notify + MCP)
+npx -y @invariance/gps install cursor      # writes .cursor/rules/gps.mdc + .cursor/mcp.json
+npx -y @invariance/gps index               # builds the symbol graph
+npx -y @invariance/gps learn-todos         # bootstrap notes from existing TODO/FIXME
+npx -y @invariance/gps invariant init --stack stripe   # optional: drop in a starter pack
 ```
 
-Prefer a global install? `npm install -g @invariance/dna`, then drop the `npx -y` prefix and pass `--use-global` to the installers so generated hooks/MCP entries call `dna` directly instead of `npx`.
+Prefer a global install? `npm install -g @invariance/gps`, then drop the `npx -y` prefix and pass `--use-global` to the installers so generated hooks/MCP entries call `gps` directly instead of `npx`.
 
 Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and [`docs/guide/agents/`](docs/guide/agents/) for per-IDE setup details.
 
-## What dna is not (yet)
+## What gps is not (yet)
 
 Honest, up-front:
 
@@ -59,11 +59,11 @@ Honest, up-front:
 The whole happy path is five commands:
 
 ```bash
-dna init                                              # 1. write .dna/config.yml + invariants.yml
-dna install claude                                    # 2. wire CLAUDE.md + .claude hooks (or: install codex)
-dna index                                             # 3. build the symbol graph
-dna prepare <symbol> --intent "<one-liner>"           # 4. ⭐ decision-ready brief before edits
-dna lessons record "<one sentence>"                   # 5. record what an edit taught you
+gps init                                              # 1. write .gps/config.yml + invariants.yml
+gps install claude                                    # 2. wire CLAUDE.md + .claude hooks (or: install codex)
+gps index                                             # 3. build the symbol graph
+gps prepare <symbol> --intent "<one-liner>"           # 4. ⭐ decision-ready brief before edits
+gps lessons record "<one sentence>"                   # 5. record what an edit taught you
 ```
 
 Everything below is the full surface for power users and automation.
@@ -72,82 +72,82 @@ Everything below is the full surface for power users and automation.
 
 ```bash
 # Reading
-dna prepare <symbol> --intent "what you'll change"   # ⭐ decision-ready brief
-dna context <symbol>                                  # multi-strand context
-dna impact <symbol>                                   # blast radius
-dna tests <symbol>                                    # tests that protect it
-dna invariants <symbol>                               # rules that apply
-dna find "<query>"                                    # fuzzy symbol search
-dna trace <symbol>                                    # git provenance
+gps prepare <symbol> --intent "what you'll change"   # ⭐ decision-ready brief
+gps context <symbol>                                  # multi-strand context
+gps impact <symbol>                                   # blast radius
+gps tests <symbol>                                    # tests that protect it
+gps invariants <symbol>                               # rules that apply
+gps find "<query>"                                    # fuzzy symbol search
+gps trace <symbol>                                    # git provenance
 
 # Writing — anchored memory
-dna lessons record "..."                              # record a lesson; auto-classified global/scoped
-dna learn <symbol> --lesson "..." [--severity low|medium|high] [--evidence <ref>]   # legacy: always symbol-scoped
-dna notes <symbol>                                    # what previous edits left behind
-dna learn-todos                                       # one-shot: lift TODO/FIXME into notes
-dna decide <symbol> --decision "..." [--rejected "..."] [--rationale "..."]
-dna decisions <symbol>                                # choices recorded, with rejected alternatives
+gps lessons record "..."                              # record a lesson; auto-classified global/scoped
+gps learn <symbol> --lesson "..." [--severity low|medium|high] [--evidence <ref>]   # legacy: always symbol-scoped
+gps notes <symbol>                                    # what previous edits left behind
+gps learn-todos                                       # one-shot: lift TODO/FIXME into notes
+gps decide <symbol> --decision "..." [--rejected "..."] [--rationale "..."]
+gps decisions <symbol>                                # choices recorded, with rejected alternatives
 
 # Server
-dna index --watch                                     # rebuild on changes
-dna serve                                             # MCP stdio server
-dna serve --observe                                   # ⚡ opt-in: record per-symbol query counts (metadata only)
-dna suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
+gps index --watch                                     # rebuild on changes
+gps serve                                             # MCP stdio server
+gps serve --observe                                   # ⚡ opt-in: record per-symbol query counts (metadata only)
+gps suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
 ```
 
-Run `dna --help` for the full 49-command surface (postmortem, promote, gate, runtime, audit, …).
+Run `gps --help` for the full 49-command surface (postmortem, promote, gate, runtime, audit, …).
 
 ### Passive observer — opt-in, metadata only
 
-`dna serve --observe` records *which symbol was queried* and *when*, into `.dna/observations.json`. **Nothing else.** No tool arguments beyond the symbol name, no tool results, no conversation content. The privacy line: dna never persists what an agent asked or what it received — only that `createRefund` was looked at 6 times this week.
+`gps serve --observe` records *which symbol was queried* and *when*, into `.gps/observations.json`. **Nothing else.** No tool arguments beyond the symbol name, no tool results, no conversation content. The privacy line: gps never persists what an agent asked or what it received — only that `createRefund` was looked at 6 times this week.
 
-`dna suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next.
+`gps suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next.
 
 All read commands accept `--json` (stable contract for tool chaining) or `--markdown` (LLM-optimal). ANSI colors auto-strip when piped.
 
 ## Claude Code, Codex, Cursor: CLI first
 
-Coding agents already have Bash. Treat `dna` like `rg`: a local command the agent runs before and after edits. This is the primary integration surface.
+Coding agents already have Bash. Treat `gps` like `rg`: a local command the agent runs before and after edits. This is the primary integration surface.
 
 For **Claude Code**, the installer wires five non-blocking hooks: `SessionStart` (rebuilds the index, prints standing preferences), `UserPromptSubmit` (auto-loads context for symbols named in your prompt), `PreToolUse` Edit/Write (refreshes the index), `PostToolUse` Bash (records failures against the last-prepared symbol), and `Stop` (distills the session into Decisions):
 
 ```bash
-npx -y @invariance/dna install claude
+npx -y @invariance/gps install claude
 ```
 
-For **Codex CLI**, the installer writes `AGENTS.md` instructions, registers `dna serve` as an MCP server, and configures a `notify` hook that distills each turn:
+For **Codex CLI**, the installer writes `AGENTS.md` instructions, registers `gps serve` as an MCP server, and configures a `notify` hook that distills each turn:
 
 ```bash
-npx -y @invariance/dna install codex
+npx -y @invariance/gps install codex
 ```
 
-For **Cursor**, the installer writes a `.cursor/rules/dna.mdc` always-attached rule and registers `dna serve` in `.cursor/mcp.json`:
+For **Cursor**, the installer writes a `.cursor/rules/gps.mdc` always-attached rule and registers `gps serve` in `.cursor/mcp.json`:
 
 ```bash
-npx -y @invariance/dna install cursor
+npx -y @invariance/gps install cursor
 ```
 
 For any other shell-based agent, add this to the repo instructions:
 
 ```text
-You have access to `dna`, a CLI that returns structured repo context.
+You have access to `gps`, a CLI that returns structured repo context.
 
 Before editing any non-trivial symbol, run:
-  dna prepare <symbol> --intent "<one-line description>"
+  gps prepare <symbol> --intent "<one-line description>"
 
 After a successful change that taught you something non-obvious, run:
-  dna lessons record "<one sentence>"
+  gps lessons record "<one sentence>"
 
 To check what tests to run after editing:
-  dna tests <symbol> --json
+  gps tests <symbol> --json
 ```
 
-MCP is optional. `dna serve` exposes the same backend for tool-native clients, but the CLI is the surface to optimize first.
+MCP is optional. `gps serve` exposes the same backend for tool-native clients, but the CLI is the surface to optimize first.
 
 ## Anchored memory in action
 
 ```text
-$ dna prepare createRefund --intent "add $5000 cap for non-enterprise"
+$ gps prepare createRefund --intent "add $5000 cap for non-enterprise"
 
 # prepare_edit: createRefund
 
@@ -187,10 +187,10 @@ The agent doesn't have to re-discover any of this. The lessons came from previou
 
 ## Invariants
 
-`dna` is the only OSS tool in its category that surfaces **author-defined invariants** alongside structural context.
+`gps` is the only OSS tool in its category that surfaces **author-defined invariants** alongside structural context.
 
 ```yaml
-# .dna/invariants.yml
+# .gps/invariants.yml
 - name: High-value refunds require approval
   applies_to:
     - createRefund
@@ -213,13 +213,13 @@ Three artifact types, one symbol anchor:
 | **Invariant** | a rule that must hold | PM / eng lead | — |
 | **Decision** | a choice with rejected alternative | human / agent now, LLM-distilled from sessions later | — |
 
-Notes "deflate" over time — recurring ones get promoted to invariants, and dna stops surfacing the note (the invariant strand picks it up instead). That's the asset-building mechanic.
+Notes "deflate" over time — recurring ones get promoted to invariants, and gps stops surfacing the note (the invariant strand picks it up instead). That's the asset-building mechanic.
 
 ## How it compares
 
 | Tool | Returns | Notes / memory? | Invariants? | License |
 |---|---|---|---|---|
-| **dna** | Decision brief: structure + tests + invariants + **notes** + risk | **✅ anchored to symbols** | **✅ first-class** | MIT |
+| **gps** | Decision brief: structure + tests + invariants + **notes** + risk | **✅ anchored to symbols** | **✅ first-class** | MIT |
 | Sverklo MCP | Ranked chunks + symbols | ❌ | ❌ | MIT |
 | CodeGraph / CodeGraphContext / code-graph-mcp | Callers, callees, impact | ❌ | ❌ | OSS |
 | Aider repomap | Token-budgeted symbol map | ❌ | ❌ | Apache-2 |
@@ -234,32 +234,32 @@ See [docs/competitive-landscape.md](docs/competitive-landscape.md) for the full 
 
 ## Native-agent prompt commands
 
-`dna` does not need to own the LLM runtime. For Claude Code and Codex, commands that need reasoning print a prompt package by default; the native agent answers using its own model/session, and `dna` records the resulting YAML or command.
+`gps` does not need to own the LLM runtime. For Claude Code and Codex, commands that need reasoning print a prompt package by default; the native agent answers using its own model/session, and `gps` records the resulting YAML or command.
 
 ```bash
 # Propose an invariant from a regression PR (prints a native-agent prompt)
-dna postmortem --pr 1287
-dna postmortem --diff-file my.diff --symbol createRefund   # offline alternative
+gps postmortem --pr 1287
+gps postmortem --diff-file my.diff --symbol createRefund   # offline alternative
 
 # Find clusters of similar notes that should become invariants
-dna promote createRefund                            # rule-based, no API key needed
+gps promote createRefund                            # rule-based, no API key needed
 
 # Distill a conversation transcript into Decision records
-dna attach --transcript path/to/transcript.txt --symbol createRefund --session "PR-1287"
+gps attach --transcript path/to/transcript.txt --symbol createRefund --session "PR-1287"
 
 # Extract Decision records from a PR's description, reviews, and comments
-dna pr-intent --pr 1287
+gps pr-intent --pr 1287
 ```
 
 API execution is an explicit opt-in for automation: pass `--call-api` plus `ANTHROPIC_API_KEY` or `--api-key`. The default path is native Claude/Codex.
 
 ## Status
 
-v0.2 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions. The current index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. It still uses a zero-native-deps regex parser for TS/JS/Python (see [What dna is not (yet)](#what-dna-is-not-yet)); tree-sitter WASM and LSP-backed reference resolution are the next accuracy step. Single-file JSON index — SQLite when repos push past ~500k LOC.
+v0.2 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions. The current index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. It still uses a zero-native-deps regex parser for TS/JS/Python (see [What gps is not (yet)](#what-gps-is-not-yet)); tree-sitter WASM and LSP-backed reference resolution are the next accuracy step. Single-file JSON index — SQLite when repos push past ~500k LOC.
 
-v0.3 roadmap: passive metadata observer (`dna observe` — symbol query frequencies only, never conversation content) + `dna suggest` for the invariant authoring queue + LLM-assisted postmortem promotion.
+v0.3 roadmap: passive metadata observer (`gps observe` — symbol query frequencies only, never conversation content) + `gps suggest` for the invariant authoring queue + LLM-assisted postmortem promotion.
 
-v0.4 roadmap: session anchoring (`dna attach --session`) — distill a Claude Code / Codex thread into structured `Decision` records attached to the symbols touched.
+v0.4 roadmap: session anchoring (`gps attach --session`) — distill a Claude Code / Codex thread into structured `Decision` records attached to the symbols touched.
 
 ## License
 

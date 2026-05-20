@@ -8,7 +8,7 @@ import {
   extractTodos,
   appendNote,
   loadNotes,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerLearnTodos(program: Command): void {

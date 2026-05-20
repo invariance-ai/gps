@@ -4,7 +4,7 @@
 
 **Status:** simulation, not measurement. Numbers are reasoned estimates with stated assumptions.
 
-**Headline (simulated — superseded, see note above):** dna ≈ **62% fewer exploration tokens** and **48% fewer regressions** vs grep-only baseline across 30 tasks. Vector-RAG closes some of the token gap but trails on regressions.
+**Headline (simulated — superseded, see note above):** gps ≈ **62% fewer exploration tokens** and **48% fewer regressions** vs grep-only baseline across 30 tasks. Vector-RAG closes some of the token gap but trails on regressions.
 
 ---
 
@@ -35,7 +35,7 @@
 |---|---|
 | `grep-only` | `read`, `grep`, `edit`, `bash` (Claude Code default) |
 | `vector-rag` | grep-only + chunk retrieval (top-k=5, ~500 tok/chunk, Aider/Continue-style) |
-| `dna` | grep-only + `get_context`, `impact_of`, `tests_for`, `invariants_for` over MCP |
+| `gps` | grep-only + `get_context`, `impact_of`, `tests_for`, `invariants_for` over MCP |
 
 (Baseline `read/grep/edit only` = `grep-only` minus bash; included as a floor in C5/C6 only because most agents in practice have bash.)
 
@@ -69,15 +69,15 @@
 | One file read (mid-size) | 800–2000 |
 | One grep result page | 200–600 |
 | Vector RAG: 5 chunks × 500 tok | 2.5k |
-| `dna get_context` payload | 600 |
-| `dna impact_of` payload | 400 |
-| `dna tests_for` payload | 300 |
-| `dna invariants_for` payload | 250 |
-| dna full 4-call bundle | **~1.55k** |
+| `gps get_context` payload | 600 |
+| `gps impact_of` payload | 400 |
+| `gps tests_for` payload | 300 |
+| `gps invariants_for` payload | 250 |
+| gps full 4-call bundle | **~1.55k** |
 
 ### Success-rate priors (assumed, per-call)
 
-| Category | grep-only finds it | vector-rag finds it | dna surfaces it |
+| Category | grep-only finds it | vector-rag finds it | gps surfaces it |
 |---|---|---|---|
 | Obvious local edit | 0.90 | 0.92 | 0.95 |
 | Non-obvious caller | 0.45 | 0.65 | 0.92 |
@@ -85,7 +85,7 @@
 | Business invariant | 0.20 | 0.25 | 0.85 |
 | Reflection/string-dispatch call site | 0.15 | 0.35 | 0.70 |
 
-Rationale: dna's tree-sitter graph wins on caller and test recall because it indexes by symbol not by lexical proximity. Vector RAG beats grep on synonyms but doesn't know what a "caller" is. Invariants only dna has (file-backed `.dna/invariants.yml`). Reflection cases hurt everyone; dna helps partially via call-string heuristics.
+Rationale: gps's tree-sitter graph wins on caller and test recall because it indexes by symbol not by lexical proximity. Vector RAG beats grep on synonyms but doesn't know what a "caller" is. Invariants only gps has (file-backed `.gps/invariants.yml`). Reflection cases hurt everyone; gps helps partially via call-string heuristics.
 
 ### Per-category simulated results
 
@@ -97,9 +97,9 @@ Success% / exploration-tokens / regression%, n = task count.
 |---|---|---|---|
 | grep-only | 50% (4/8) | 14.2k | 38% |
 | vector-rag | 62% (5/8) | 6.1k | 25% |
-| **dna** | **88% (7/8)** | **2.0k** | **12%** |
+| **gps** | **88% (7/8)** | **2.0k** | **12%** |
 
-dna wins via `impact_of`: rev-deps are 1 call vs N greps. The 1 miss is the reflection caller in C5 also bleeding into C1.
+gps wins via `impact_of`: rev-deps are 1 call vs N greps. The 1 miss is the reflection caller in C5 also bleeding into C1.
 
 #### C2 Test coupling (n=6)
 
@@ -107,7 +107,7 @@ dna wins via `impact_of`: rev-deps are 1 call vs N greps. The 1 miss is the refl
 |---|---|---|---|
 | grep-only | 50% | 9.8k | 33% |
 | vector-rag | 50% | 4.5k | 33% |
-| **dna** | **83%** | **1.6k** | **17%** |
+| **gps** | **83%** | **1.6k** | **17%** |
 
 `tests_for` directly returns covering tests by symbol-in-test-body + file-proximity heuristic. Vector RAG often retrieves test *prose* not the right test.
 
@@ -117,9 +117,9 @@ dna wins via `impact_of`: rev-deps are 1 call vs N greps. The 1 miss is the refl
 |---|---|---|---|
 | grep-only | 33% | 11.0k | 50% |
 | vector-rag | 33% | 5.0k | 50% |
-| **dna** | **83%** | **1.9k** | **17%** |
+| **gps** | **83%** | **1.9k** | **17%** |
 
-This is dna's strongest category. No competitor exposes the YAML rule. **Caveat:** the win depends on `.dna/invariants.yml` actually being populated — if maintainers don't write invariants, dna degrades to ~C1 numbers here.
+This is gps's strongest category. No competitor exposes the YAML rule. **Caveat:** the win depends on `.gps/invariants.yml` actually being populated — if maintainers don't write invariants, gps degrades to ~C1 numbers here.
 
 #### C4 Schema/contract (n=5)
 
@@ -127,9 +127,9 @@ This is dna's strongest category. No competitor exposes the YAML rule. **Caveat:
 |---|---|---|---|
 | grep-only | 60% | 10.5k | 40% |
 | vector-rag | 60% | 4.8k | 40% |
-| **dna** | **80%** | **2.4k** | **20%** |
+| **gps** | **80%** | **2.4k** | **20%** |
 
-Tighter win. Schema callers are usually grep-discoverable (column names are unique strings). dna's edge is `tests_for` catching migration tests.
+Tighter win. Schema callers are usually grep-discoverable (column names are unique strings). gps's edge is `tests_for` catching migration tests.
 
 #### C5 Dead-code trap (n=3)
 
@@ -137,9 +137,9 @@ Tighter win. Schema callers are usually grep-discoverable (column names are uniq
 |---|---|---|---|
 | grep-only | 0% | 8.0k | 100% (deleted live code) |
 | vector-rag | 33% | 4.0k | 67% |
-| **dna** | **67%** | **2.2k** | **33%** |
+| **gps** | **67%** | **2.2k** | **33%** |
 
-dna's call-graph misses true reflection. Honest partial win. Would need a `dynamic_refs` strand to close this.
+gps's call-graph misses true reflection. Honest partial win. Would need a `dynamic_refs` strand to close this.
 
 #### C6 Cross-language (n=2)
 
@@ -147,9 +147,9 @@ dna's call-graph misses true reflection. Honest partial win. Would need a `dynam
 |---|---|---|---|
 | grep-only | 50% | 15k | 50% |
 | vector-rag | 50% | 7k | 50% |
-| **dna** | **50%** | **3.5k** | **50%** |
+| **gps** | **50%** | **3.5k** | **50%** |
 
-**No advantage.** dna v1 indexes per-language, doesn't link Python ↔ TS via subprocess strings. Flagging this as a known limitation, not hiding it.
+**No advantage.** gps v1 indexes per-language, doesn't link Python ↔ TS via subprocess strings. Flagging this as a known limitation, not hiding it.
 
 ### Aggregate (30 tasks)
 
@@ -157,12 +157,12 @@ dna's call-graph misses true reflection. Honest partial win. Would need a `dynam
 |---|---|---|---|---|---|
 | grep-only | 47% (14/30) | 11.4k | 18.2k | 47% | 0.8 |
 | vector-rag | 53% (16/30) | 5.2k | 11.0k | 38% | 1.1 |
-| **dna** | **80% (24/30)** | **2.1k** | **7.4k** | **22%** | 2.4 |
+| **gps** | **80% (24/30)** | **2.1k** | **7.4k** | **22%** | 2.4 |
 
 ### Headline numbers (simulated)
 
-- **dna vs grep-only:** -82% exploration tokens, -59% total tokens, -53% regression rate, +70% success
-- **dna vs vector-rag:** -60% exploration tokens, -33% total tokens, -42% regression rate, +51% success
+- **gps vs grep-only:** -82% exploration tokens, -59% total tokens, -53% regression rate, +70% success
+- **gps vs vector-rag:** -60% exploration tokens, -33% total tokens, -42% regression rate, +51% success
 
 Conservative headline (averaging across categories, weighted by n):
 
@@ -174,16 +174,16 @@ Conservative headline (averaging across categories, weighted by n):
 |---|---|
 | Per-call recall priors above | Per-task ground-truth check execution |
 | Token costs per call | Real transcript token counts |
-| Agent uses dna tools when available | Tool-use rate in transcripts |
+| Agent uses gps tools when available | Tool-use rate in transcripts |
 | Invariants exist & are correct | Maintainer-curated invariants.yml coverage |
 | Equal prompt across tools | Identical system prompt template per run |
 
-### Where dna does **not** clearly win
+### Where gps does **not** clearly win
 
 1. **C6 cross-language** — tied. Needs cross-runtime strand.
 2. **C5 reflection** — partial. ~33% regressions remain.
 3. **Trivially local edits** — overhead of MCP call sometimes exceeds savings on <50-LOC tasks. Net neutral.
-4. **Cold-index cost** — first `dna init` is ~30s on 10k LOC; not in token budget but in wall-clock.
+4. **Cold-index cost** — first `gps init` is ~30s on 10k LOC; not in token budget but in wall-clock.
 
 ---
 
@@ -205,7 +205,7 @@ bench/repo-edit-bench/
   runners/
     grep_only.ts        # baseline agent loop
     vector_rag.ts       # chunk-retrieval agent
-    dna_agent.ts        # dna-MCP-enabled agent
+    gps_agent.ts        # gps-MCP-enabled agent
   scoring/
     score.ts            # functional + regression + invariant checks
     aggregate.ts        # per-tool, per-category rollup
@@ -213,7 +213,7 @@ bench/repo-edit-bench/
     2026-05-11/
       grep-only.jsonl
       vector-rag.jsonl
-      dna.jsonl
+      gps.jsonl
       report.md
 ```
 
@@ -250,7 +250,7 @@ budget:
 ### Run loop
 
 ```
-for tool in [grep-only, vector-rag, dna]:
+for tool in [grep-only, vector-rag, gps]:
   for task in tasks/*.yml:
     snapshot = git_clone(task.repo)
     transcript = run_agent(tool, task.prompt, snapshot, budget=task.budget)
@@ -271,11 +271,11 @@ report = pivot(category × tool, [success, explore_tok, regression])
 ### CLI
 
 ```
-dna bench                     # run all tools, all tasks
-dna bench --tool dna          # one tool
-dna bench --task 002          # one task
-dna bench --tools dna,grep-only --repo refund-app
-dna bench report results/2026-05-11/
+gps bench                     # run all tools, all tasks
+gps bench --tool gps          # one tool
+gps bench --task 002          # one task
+gps bench --tools gps,grep-only --repo refund-app
+gps bench report results/2026-05-11/
 ```
 
 ### Determinism notes
@@ -289,7 +289,7 @@ dna bench report results/2026-05-11/
 
 ## TL;DR
 
-| | grep-only | vector-rag | **dna** |
+| | grep-only | vector-rag | **gps** |
 |---|---|---|---|
 | Success | 47% | 53% | **80%** |
 | Explore tokens | 11.4k | 5.2k | **2.1k** |

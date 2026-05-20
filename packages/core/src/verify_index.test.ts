@@ -9,7 +9,7 @@ import { verifyIndex } from "./verify_index.js";
 describe("verifyIndex", () => {
   let root: string;
   beforeAll(async () => {
-    root = await mkdtemp(path.join(os.tmpdir(), "dna-verify-"));
+    root = await mkdtemp(path.join(os.tmpdir(), "gps-verify-"));
     await mkdir(path.join(root, "src"), { recursive: true });
     await writeFile(path.join(root, "tsconfig.json"), JSON.stringify({
       compilerOptions: { target: "ES2022", module: "NodeNext", moduleResolution: "NodeNext", strict: false },
@@ -24,7 +24,7 @@ describe("verifyIndex", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("reports high precision and coverage when DNA matches the type checker", async () => {
+  it("reports high precision and coverage when GPS matches the type checker", async () => {
     const parsed = await Promise.all([
       parseFile(path.join(root, "src/util.ts")),
       parseFile(path.join(root, "src/api.ts")),

@@ -20,18 +20,18 @@ import {
   switchActive,
   topSymbols,
 } from "./features.js";
-import { writeIndex, type DnaIndex } from "./index_store.js";
+import { writeIndex, type GpsIndex } from "./index_store.js";
 
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-features-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-features-"));
   roots.push(root);
   return root;
 }
 
 async function seedIndex(root: string): Promise<void> {
-  const index: DnaIndex = {
+  const index: GpsIndex = {
     version: 1,
     built_at: new Date().toISOString(),
     root,

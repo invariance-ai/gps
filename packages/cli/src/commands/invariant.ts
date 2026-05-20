@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import YAML from "yaml";
-import type { Invariant } from "@invariance/dna-schemas";
+import type { Invariant } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 import { PACKS, STACK_NAMES, type StackName } from "../install/invariant-packs.js";
 
@@ -13,8 +13,8 @@ interface InitOpts extends RootOption {
 }
 
 /**
- * `dna invariant init --stack <name>` — merge a starter pack of declarative
- * invariants into `.dna/invariants.yml`. Existing entries with the same `name`
+ * `gps invariant init --stack <name>` — merge a starter pack of declarative
+ * invariants into `.gps/invariants.yml`. Existing entries with the same `name`
  * are preserved (the file is the source of truth once authored).
  */
 export function registerInvariant(program: Command): void {
@@ -25,7 +25,7 @@ export function registerInvariant(program: Command): void {
   addRootOption(
     invariant
       .command("init")
-      .description("Append a starter pack of invariants to .dna/invariants.yml")
+      .description("Append a starter pack of invariants to .gps/invariants.yml")
       .option(
         "--stack <name>",
         `Pack to install: ${STACK_NAMES.join(" | ")}`,
@@ -45,7 +45,7 @@ export function registerInvariant(program: Command): void {
       return;
     }
     const root = resolveRoot(opts);
-    const file = path.join(root, ".dna/invariants.yml");
+    const file = path.join(root, ".gps/invariants.yml");
     const pack = PACKS[opts.stack as StackName];
 
     let existing: Invariant[] = [];

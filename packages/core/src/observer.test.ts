@@ -7,7 +7,7 @@ import { recordObservation, readObservations, suggest } from "./observer.js";
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-observer-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-observer-"));
   roots.push(root);
   return root;
 }
@@ -39,9 +39,9 @@ describe("observer", () => {
 
   it("does not suggest symbols already covered by invariants", async () => {
     const root = await tempRepo();
-    await mkdir(path.join(root, ".dna"), { recursive: true });
+    await mkdir(path.join(root, ".gps"), { recursive: true });
     await writeFile(
-      path.join(root, ".dna/invariants.yml"),
+      path.join(root, ".gps/invariants.yml"),
       [
         "- name: Refund approval",
         "  applies_to: [createRefund]",

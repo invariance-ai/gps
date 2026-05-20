@@ -1,5 +1,5 @@
 /**
- * Time helpers shared by --since filters and `dna stale`.
+ * Time helpers shared by --since filters and `gps stale`.
  *
  * Accepts ISO 8601 dates ("2026-04-01", "2026-04-01T12:00:00Z") or compact
  * relative durations: <N>d (days), <N>w (weeks), <N>mo (months), <N>y (years).

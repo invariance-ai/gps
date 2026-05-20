@@ -12,7 +12,7 @@ import {
   CSHARP_GLOB,
 } from "./parser.js";
 
-export type DnaLanguage =
+export type GpsLanguage =
   | "typescript"
   | "python"
   | "go"
@@ -21,14 +21,14 @@ export type DnaLanguage =
   | "ruby"
   | "csharp";
 
-export interface DnaConfig {
-  languages: DnaLanguage[];
+export interface GpsConfig {
+  languages: GpsLanguage[];
   exclude: string[];
   depth: number;
   strands: Array<"structural" | "tests" | "provenance" | "invariants">;
 }
 
-const GLOBS_BY_LANG: Record<DnaLanguage, string[]> = {
+const GLOBS_BY_LANG: Record<GpsLanguage, string[]> = {
   typescript: TS_GLOB,
   python: PY_GLOB,
   go: GO_GLOB,
@@ -41,15 +41,15 @@ const GLOBS_BY_LANG: Record<DnaLanguage, string[]> = {
 const DEFAULT_EXCLUDE = [
   "node_modules", "dist", "build", ".next", "out",
   "vendor", "__pycache__", ".venv", ".git", "coverage",
-  ".dna",
+  ".gps",
 ];
 
-export async function loadConfig(root: string): Promise<DnaConfig> {
+export async function loadConfig(root: string): Promise<GpsConfig> {
   try {
-    const raw = await readFile(path.join(root, ".dna/config.yml"), "utf8");
+    const raw = await readFile(path.join(root, ".gps/config.yml"), "utf8");
     const data = parseYaml(raw) ?? {};
     return {
-      languages: data.languages ?? (["typescript", "python", "go", "rust", "java", "ruby", "csharp"] as DnaLanguage[]),
+      languages: data.languages ?? (["typescript", "python", "go", "rust", "java", "ruby", "csharp"] as GpsLanguage[]),
       exclude: [...DEFAULT_EXCLUDE, ...(data.exclude ?? [])],
       depth: data.depth ?? 3,
       strands: data.strands ?? ["structural", "tests", "provenance", "invariants"],
@@ -64,7 +64,7 @@ export async function loadConfig(root: string): Promise<DnaConfig> {
   }
 }
 
-export async function scanFiles(root: string, config: DnaConfig): Promise<string[]> {
+export async function scanFiles(root: string, config: GpsConfig): Promise<string[]> {
   const patterns: string[] = [];
   for (const lang of config.languages) {
     const g = GLOBS_BY_LANG[lang];

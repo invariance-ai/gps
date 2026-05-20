@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import fg from "fast-glob";
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import type { ImportBinding, ParsedFile } from "./parser.js";
 
 /**

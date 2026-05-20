@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { pathToFileURL, fileURLToPath } from "node:url";
-import type { DnaIndex } from "./index_store.js";
+import type { GpsIndex } from "./index_store.js";
 
 /**
  * Python sibling of verify_index.ts. Same precision/recall/coverage contract,
@@ -43,9 +43,9 @@ export interface PyVerifyReport {
     from_file: string;
     from_line: number;
     callee: string;
-    dna_resolved_to?: string;
+    gps_resolved_to?: string;
     pyright_resolved_to?: string;
-    issue: "wrong_target" | "pyright_says_no_target" | "dna_missed";
+    issue: "wrong_target" | "pyright_says_no_target" | "gps_missed";
   }>;
   /** Set when pyright wasn't available; sample_size will be 0. */
   skipped_reason?: string;
@@ -77,7 +77,7 @@ function mulberry32(seed: number): () => number {
 
 function resolveSeed(opt?: number): number | undefined {
   if (opt !== undefined && Number.isFinite(opt)) return Math.trunc(opt);
-  const env = process.env.DNA_VERIFY_SEED;
+  const env = process.env.GPS_VERIFY_SEED;
   if (env && env.trim() !== "") {
     const n = Number(env);
     if (Number.isFinite(n)) return Math.trunc(n);
@@ -115,7 +115,7 @@ function lastNameOf(qualified: string): string {
   return qualified.split(".").pop() ?? qualified;
 }
 
-function guessTargetFile(index: DnaIndex, edge: DnaIndex["edges"][number]): string {
+function guessTargetFile(index: GpsIndex, edge: GpsIndex["edges"][number]): string {
   if (edge.to_id) {
     const byId = index.symbols.find((s) => s.id === edge.to_id);
     if (byId) return byId.file;
@@ -124,7 +124,7 @@ function guessTargetFile(index: DnaIndex, edge: DnaIndex["edges"][number]): stri
   return target?.file ?? "?";
 }
 
-function coverageOf(index: DnaIndex): number {
+function coverageOf(index: GpsIndex): number {
   const pyEdges = index.edges.filter((e) => e.file?.endsWith(".py"));
   if (pyEdges.length === 0) return 1;
   const good = pyEdges.filter(
@@ -153,7 +153,7 @@ function normalizePyTarget(p: string): string {
  * Locate `pyright-langserver` on PATH. Returns the resolved binary path or
  * undefined. We use `command -v` / `where` rather than a hard-coded path so
  * pip user-installs (`~/Library/Python/3.12/bin`) work as long as that dir is
- * in PATH for the dna process.
+ * in PATH for the gps process.
  */
 export function findPyrightLangserver(override?: string): string | undefined {
   if (override) return override;
@@ -176,7 +176,7 @@ interface CallSite {
  * Find call sites in a Python source file by regex. Honest about the
  * trade-off: this is the same heuristic level as the v0.1 indexer parser, so
  * recall is "calls the parser would have found", not "every dynamic call".
- * For verify-index that's the right denominator — we're asking "does DNA's
+ * For verify-index that's the right denominator — we're asking "does GPS's
  * index match what a simple-but-correct static reader sees?".
  */
 function findPyCallSites(source: string): Array<{ line: number; col: number; callee: string }> {
@@ -221,7 +221,7 @@ function findPyCallSites(source: string): Array<{ line: number; col: number; cal
     while ((m = callRe.exec(stripped)) !== null) {
       const name = m[1]!;
       if (skip.has(name)) continue;
-      // Skip attribute calls (`obj.foo()`, `mod.Cls()`) — DNA's parser
+      // Skip attribute calls (`obj.foo()`, `mod.Cls()`) — GPS's parser
       // intentionally doesn't track them, so they don't belong in the recall
       // denominator. Mirrors the TS sibling's PropertyAccessExpression skip.
       if (m.index > 0 && stripped[m.index - 1] === ".") continue;
@@ -318,7 +318,7 @@ class PyrightClient {
       capabilities: {
         textDocument: { definition: { linkSupport: true } },
       },
-      workspaceFolders: [{ uri: rootUri, name: "dna-verify" }],
+      workspaceFolders: [{ uri: rootUri, name: "gps-verify" }],
       initializationOptions: {},
     });
     this.notify("initialized", {});
@@ -389,7 +389,7 @@ async function readSymbolNameAtDefinition(absFile: string, line: number): Promis
 }
 
 export async function verifyIndexPython(
-  index: DnaIndex,
+  index: GpsIndex,
   opts: PyVerifyOptions,
 ): Promise<PyVerifyReport> {
   const { root, sample = DEFAULT_SAMPLE } = opts;
@@ -445,7 +445,7 @@ export async function verifyIndexPython(
   await client.initialize(rootUri);
 
   try {
-    // ---- Precision: sample DNA's python edges, ask pyright who's actually called.
+    // ---- Precision: sample GPS's python edges, ask pyright who's actually called.
     const pyEdges = index.edges.filter((e) => e.file?.endsWith(".py"));
     const sampleEdges = pickRandom(pyEdges, sample, rand);
     const worst: PyVerifyReport["worst"] = [];
@@ -502,7 +502,7 @@ export async function verifyIndexPython(
           from_file: edge.file!,
           from_line: edge.line ?? 0,
           callee,
-          dna_resolved_to: `${guessTargetFile(index, edge)}:${callee}`,
+          gps_resolved_to: `${guessTargetFile(index, edge)}:${callee}`,
           issue: "pyright_says_no_target",
         });
         continue;
@@ -510,14 +510,14 @@ export async function verifyIndexPython(
       const def = defs[0]!;
       const defAbs = fileURLToPath(def.uri);
       const defName = (await readSymbolNameAtDefinition(defAbs, def.range.start.line)) ?? callee;
-      // Skip externals (stdlib, site-packages) — those aren't DNA's job.
+      // Skip externals (stdlib, site-packages) — those aren't GPS's job.
       if (defAbs.includes("/site-packages/") || defAbs.includes("/typeshed/") || !defAbs.startsWith(realpathSync(root))) {
         inconclusive++;
         continue;
       }
       const pyrightTarget = `${realRel(root, defAbs)}:${defName}`;
-      const dnaTarget = `${guessTargetFile(index, edge)}:${callee}`;
-      if (normalizePyTarget(pyrightTarget) === normalizePyTarget(dnaTarget)) {
+      const gpsTarget = `${guessTargetFile(index, edge)}:${callee}`;
+      if (normalizePyTarget(pyrightTarget) === normalizePyTarget(gpsTarget)) {
         confirmed++;
       } else {
         contradicted++;
@@ -525,7 +525,7 @@ export async function verifyIndexPython(
           from_file: edge.file!,
           from_line: edge.line ?? 0,
           callee,
-          dna_resolved_to: dnaTarget,
+          gps_resolved_to: gpsTarget,
           pyright_resolved_to: pyrightTarget,
           issue: "wrong_target",
         });
@@ -533,10 +533,10 @@ export async function verifyIndexPython(
     }
 
     // ---- Recall: enumerate static call sites across the project, sample,
-    //      see which DNA recorded. We don't ask pyright for every callsite —
+    //      see which GPS recorded. We don't ask pyright for every callsite —
     //      that would be O(callsites) LSP roundtrips which is unaffordable for
     //      django (~50k LOC). Instead we use the same parser-level callsite
-    //      finder DNA itself targets, then check pyright on the sample to
+    //      finder GPS itself targets, then check pyright on the sample to
     //      filter out unresolvables. This mirrors the TS recall denominator.
     interface RecallSite {
       file: string;
@@ -593,7 +593,7 @@ export async function verifyIndexPython(
           from_file: site.file,
           from_line: site.line,
           callee: site.callee,
-          issue: "dna_missed",
+          issue: "gps_missed",
         });
       }
     }

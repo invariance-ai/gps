@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { AliasBinding, FeaturesFile as FeaturesFileT } from "@invariance/dna-schemas";
+import type { AliasBinding, FeaturesFile as FeaturesFileT } from "@invariance/gps-schemas";
 import {
   loadFeatures,
   saveFeatures,
@@ -12,7 +12,7 @@ import {
  * Location-anchored context. An `area` is a directory; an alias is a
  * human-friendly name ("home") that resolves to a file + its directory + an
  * optional linked feature. The alias registry lives in the `aliases` map of
- * `.dna/features.yml`.
+ * `.gps/features.yml`.
  */
 
 /** Alias names are normalized the same way feature labels are (kebab-case). */
@@ -47,7 +47,7 @@ export interface UpsertAliasPatch {
   source?: "user" | "auto";
 }
 
-/** Create or merge an alias binding in `.dna/features.yml`. */
+/** Create or merge an alias binding in `.gps/features.yml`. */
 export async function upsertAlias(
   root: string,
   rawName: string,

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { TestRef } from "@invariance/dna-schemas";
-import type { DnaIndex } from "./index_store.js";
+import type { TestRef } from "@invariance/gps-schemas";
+import type { GpsIndex } from "./index_store.js";
 
 /**
  * Test discovery heuristics (v0.1):
@@ -11,7 +11,7 @@ import type { DnaIndex } from "./index_store.js";
  * Trade-off: false positives on common names (e.g. "init"). The CLI dedupes
  * and ranks co-located matches higher.
  */
-export function testFilesIn(index: DnaIndex): string[] {
+export function testFilesIn(index: GpsIndex): string[] {
   const set = new Set<string>();
   for (const file of index.files ?? []) {
     if (isTestFile(file)) set.add(file);
@@ -63,7 +63,7 @@ export async function testsForSymbol(
   symbol: string,
   symbolFile: string,
   root: string,
-  index: DnaIndex,
+  index: GpsIndex,
 ): Promise<TestRef[]> {
   const out: TestRef[] = [];
   const candidates = testFilesIn(index);

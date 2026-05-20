@@ -7,8 +7,8 @@ import {
   resolveActiveArea,
   upsertAlias,
   normalizeAlias,
-} from "@invariance/dna-core";
-import type { NoteSeverity } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import type { NoteSeverity } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface AddOpts extends RootOption {
@@ -94,7 +94,7 @@ export function registerDirective(program: Command): void {
     const area = await resolveActiveArea(root, opts.alias ?? opts.area);
     if (!area) {
       console.error(
-        kleur.red("could not resolve an area — pass --area or --alias, or run `dna feature use <label>`"),
+        kleur.red("could not resolve an area — pass --area or --alias, or run `gps feature use <label>`"),
       );
       process.exitCode = 1;
       return;

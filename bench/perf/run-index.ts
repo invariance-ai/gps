@@ -6,7 +6,7 @@ import {
   writeIndex,
   loadParseCache,
   saveParseCache,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { timeIt } from "./measure.js";
 
 export interface IndexResult {

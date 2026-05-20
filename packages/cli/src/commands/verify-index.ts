@@ -9,7 +9,7 @@ import {
   verifyIndexPython,
   type VerifyReport,
   type PyVerifyReport,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -30,7 +30,7 @@ const DEFAULTS: Thresholds = { precision: 0.95, recall: 0.9, coverage: 0.85 };
 
 async function loadThresholds(root: string): Promise<Thresholds> {
   try {
-    const raw = await readFile(path.join(root, ".dna/config.yml"), "utf8");
+    const raw = await readFile(path.join(root, ".gps/config.yml"), "utf8");
     const data = parseYaml(raw) ?? {};
     const t = data?.quality?.thresholds ?? {};
     return {
@@ -47,9 +47,9 @@ export function registerVerifyIndex(program: Command): void {
   addRootOption(
     program
       .command("verify-index")
-      .description("Score DNA's symbol graph against a type checker (precision/recall/coverage)")
+      .description("Score GPS's symbol graph against a type checker (precision/recall/coverage)")
       .option("--sample <n>", "Sampled edges & callsites (default 200)")
-      .option("--seed <n>", "Deterministic sampling seed (also honored via DNA_VERIFY_SEED)")
+      .option("--seed <n>", "Deterministic sampling seed (also honored via GPS_VERIFY_SEED)")
       .option("--lang <lang>", "Language: typescript | python | auto (default auto)")
       .option("--no-cache", "Don't write the cached report")
       .option("--json", "Emit JSON instead of text"),
@@ -91,7 +91,7 @@ export function registerVerifyIndex(program: Command): void {
           : await verifyIndex(index, { root, sample, seed });
 
       if (!opts.noCache) {
-        const cacheDir = path.join(root, ".dna/cache");
+        const cacheDir = path.join(root, ".gps/cache");
         await mkdir(cacheDir, { recursive: true });
         await writeFile(
           path.join(cacheDir, "verify-index.json"),
@@ -143,7 +143,7 @@ function renderReport(r: VerifyReport | PyVerifyReport, t: Thresholds): void {
     console.log("\n" + kleur.bold("worst offenders"));
     for (const w of r.worst) {
       console.log(`  ${kleur.dim(w.from_file + ":" + w.from_line)}  ${w.callee}  ${kleur.yellow(w.issue)}`);
-      if (w.dna_resolved_to) console.log(`    dna → ${kleur.dim(w.dna_resolved_to)}`);
+      if (w.gps_resolved_to) console.log(`    gps → ${kleur.dim(w.gps_resolved_to)}`);
       const tw = w as { ts_resolved_to?: string; pyright_resolved_to?: string };
       if (tw.ts_resolved_to) console.log(`    ts  → ${kleur.dim(tw.ts_resolved_to)}`);
       if (tw.pyright_resolved_to) console.log(`    py  → ${kleur.dim(tw.pyright_resolved_to)}`);

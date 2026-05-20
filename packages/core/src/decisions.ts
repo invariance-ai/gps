@@ -1,9 +1,9 @@
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { Decision, type Decision as DecisionT } from "@invariance/dna-schemas";
+import { Decision, type Decision as DecisionT } from "@invariance/gps-schemas";
 
-const DIR = ".dna/decisions";
+const DIR = ".gps/decisions";
 
 function fileFor(root: string, symbol: string): string {
   const safe = symbol.replace(/[/\\:]/g, "__").replace(/\./g, "_");

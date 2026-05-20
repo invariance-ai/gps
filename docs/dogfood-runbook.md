@@ -1,6 +1,6 @@
 # Dogfood runbook
 
-How to measure dna's effect on a real repo, end-to-end. Follow this if you want to contribute a new datapoint, or reproduce the 2026-05-12 invariance-platform run.
+How to measure gps's effect on a real repo, end-to-end. Follow this if you want to contribute a new datapoint, or reproduce the 2026-05-12 invariance-platform run.
 
 The first run lives at [`bench/dogfood/2026-05-12-invariance-platform.md`](../bench/dogfood/2026-05-12-invariance-platform.md). The shape of every subsequent run should match it so results stack cleanly.
 
@@ -43,21 +43,21 @@ Prompts must be answerable from the code alone (no external runtime context requ
 ```bash
 # 1. Two fresh clones of the target at the same SHA.
 git clone <target> baseline && (cd baseline && git checkout <SHA>)
-git clone <target> dna     && (cd dna     && git checkout <SHA>)
+git clone <target> gps     && (cd gps     && git checkout <SHA>)
 
-# 2. Install dna into the dna/ clone only.
-# Until @invariance/dna is on npm, use a local checkout's built CLI via --use-local
+# 2. Install gps into the gps/ clone only.
+# Until @invariance/gps is on npm, use a local checkout's built CLI via --use-local
 # (or omit the flag — install auto-detects workspace checkouts and switches to
 # local mode automatically). Once published, drop the prefix and use `npx -y`.
-cd dna
-DNA_BIN="node /abs/path/to/dna-repo/packages/cli/dist/index.js"
-$DNA_BIN init
-$DNA_BIN install claude --use-local
-$DNA_BIN index
+cd gps
+GPS_BIN="node /abs/path/to/gps-repo/packages/cli/dist/index.js"
+$GPS_BIN init
+$GPS_BIN install claude --use-local
+$GPS_BIN index
 
 # 3. Run each prompt against each clone with claude -p.
 for p in prompts/*.txt; do
-  for variant in baseline dna; do
+  for variant in baseline gps; do
     (cd $variant && claude -p "$(cat ../$p)" \
        --output-format json \
        --permission-mode bypassPermissions \
@@ -79,7 +79,7 @@ Tokens come from `usage.{input_tokens, cache_creation_input_tokens, cache_read_i
 Drop a markdown file in `bench/dogfood/YYYY-MM-DD-<repo-slug>.md` matching the shape of [`bench/dogfood/2026-05-12-invariance-platform.md`](../bench/dogfood/2026-05-12-invariance-platform.md):
 
 - Setup table (repo, SHA, size, index time, model, judge, prompts, variants).
-- Per-prompt results table (tokens baseline, tokens dna, Δ, %, judge baseline, judge dna, winner).
+- Per-prompt results table (tokens baseline, tokens gps, Δ, %, judge baseline, judge gps, winner).
 - Aggregates section (input total, output total, judge means by dimension, win/loss/tie counts).
 - Honest takeaway paragraph — what shape did this run reproduce, what changed.
 

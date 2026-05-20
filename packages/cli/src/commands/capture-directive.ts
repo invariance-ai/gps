@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { extractDirectives, recordDirective, resolveActiveArea } from "@invariance/dna-core";
+import { extractDirectives, recordDirective, resolveActiveArea } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -58,10 +58,10 @@ export function registerCaptureDirective(program: Command): void {
       if (opts.emit) {
         console.log(
           [
-            "<!-- dna:captured-directive -->",
-            `dna noticed ${directives.length} location-scoped instruction${directives.length === 1 ? "" : "s"} but couldn't resolve which area "here" means.`,
-            "Run `dna feature use <label>` or pass `dna directive add \"...\" --area <dir>` to record them.",
-            "<!-- /dna:captured-directive -->",
+            "<!-- gps:captured-directive -->",
+            `gps noticed ${directives.length} location-scoped instruction${directives.length === 1 ? "" : "s"} but couldn't resolve which area "here" means.`,
+            "Run `gps feature use <label>` or pass `gps directive add \"...\" --area <dir>` to record them.",
+            "<!-- /gps:captured-directive -->",
           ].join("\n"),
         );
       }
@@ -87,13 +87,13 @@ export function registerCaptureDirective(program: Command): void {
       return;
     }
     if (opts.emit && recorded.length > 0) {
-      const lines = ["<!-- dna:captured-directive -->"];
+      const lines = ["<!-- gps:captured-directive -->"];
       lines.push(
-        `dna captured ${recorded.length} directive${recorded.length === 1 ? "" : "s"} for area \`${area}\`:`,
+        `gps captured ${recorded.length} directive${recorded.length === 1 ? "" : "s"} for area \`${area}\`:`,
       );
       for (const r of recorded) lines.push(`- [${r.polarity}] ${r.text}`);
-      lines.push("These will resurface when you work in this directory. Run `dna directive list` to review.");
-      lines.push("<!-- /dna:captured-directive -->");
+      lines.push("These will resurface when you work in this directory. Run `gps directive list` to review.");
+      lines.push("<!-- /gps:captured-directive -->");
       console.log(lines.join("\n"));
     }
   });

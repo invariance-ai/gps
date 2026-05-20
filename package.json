@@ -1,14 +1,14 @@
 {
-  "name": "dna-workspace",
+  "name": "gps-workspace",
   "version": "0.0.0",
   "private": true,
   "description": "Codebase context for coding agents",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/invariance-ai/dna.git"
+    "url": "https://github.com/invariance-ai/gps.git"
   },
-  "homepage": "https://github.com/invariance-ai/dna",
+  "homepage": "https://github.com/invariance-ai/gps",
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",

@@ -1,0 +1,53 @@
+name: gps pulse
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# gps's own repo dogfoods pulse by building from source — the published
+# @invariance/gps package lags this branch. Other repos should use the
+# composite action at .github/actions/gps-pulse instead.
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Index + pulse
+        id: pulse
+        run: |
+          set +e
+          node packages/cli/dist/index.js index || true
+          node packages/cli/dist/index.js pulse --base "${{ github.event.pull_request.base.sha }}" --json > pulse.json
+          node packages/cli/dist/index.js pulse --base "${{ github.event.pull_request.base.sha }}" --github > pulse.md
+          BAND=$(node -e "console.log(require('./pulse.json').risk_band)")
+          SCORE=$(node -e "console.log(require('./pulse.json').risk_score)")
+          echo "band=$BAND" >> "$GITHUB_OUTPUT"
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
+
+      - name: Comment on PR
+        if: ${{ github.event.pull_request }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: gps-pulse
+          path: pulse.md
+
+      # Report-only on gps's own repo: the diff is large and untested-caller
+      # noise dominates. Other repos can flip fail-on-block in the composite action.
+      - name: Pulse summary
+        run: echo "gps pulse — risk_band=${{ steps.pulse.outputs.band }} score=${{ steps.pulse.outputs.score }}"

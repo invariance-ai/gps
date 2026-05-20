@@ -1,9 +1,9 @@
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { TodoItem, type TodoItem as TodoItemT } from "@invariance/dna-schemas";
+import { TodoItem, type TodoItem as TodoItemT } from "@invariance/gps-schemas";
 
-const REL = ".dna/todos.json";
+const REL = ".gps/todos.json";
 
 export function todosPath(root: string): string {
   return path.join(root, REL);

@@ -1,0 +1,11 @@
+{
+  "task_id": "005-invariant-respect",
+  "arm": "gps",
+  "attempt": 1,
+  "agent_label": "sonnet",
+  "passed": true,
+  "failed_checks": [],
+  "duration_sec": 22.87,
+  "output_chars": 276,
+  "timed_out": false
+}

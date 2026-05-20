@@ -1,6 +1,6 @@
 # repo-edit-bench
 
-Measures whether `dna` reduces bad agent edits in real repos.
+Measures whether `gps` reduces bad agent edits in real repos.
 
 ## Design
 
@@ -8,7 +8,7 @@ For each task in `tasks/`:
 
 1. Run a coding agent (Claude Code, Codex, Cursor agent) twice:
    - **baseline** — normal tools only (grep, read, edit)
-   - **dna** — same tools + `dna` MCP server (`get_context`, `impact_of`, `tests_for`, `invariants_for`)
+   - **gps** — same tools + `gps` MCP server (`get_context`, `impact_of`, `tests_for`, `invariants_for`)
 2. Score the resulting patch on:
    - task success (functional check)
    - tests passed after edit

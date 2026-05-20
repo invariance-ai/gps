@@ -1,0 +1,11 @@
+{
+  "task_id": "004-hidden-caller",
+  "arm": "gps",
+  "attempt": 0,
+  "agent_label": "sonnet",
+  "passed": true,
+  "failed_checks": [],
+  "duration_sec": 48.656,
+  "output_chars": 264,
+  "timed_out": false
+}

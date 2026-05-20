@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-// Cut a coordinated release of all dna packages.
+// Cut a coordinated release of all gps packages.
 //
 //   pnpm tsx scripts/release.ts <version>           # bump + commit + tag
 //   pnpm tsx scripts/release.ts <version> --publish # bump + build + publish + commit + tag

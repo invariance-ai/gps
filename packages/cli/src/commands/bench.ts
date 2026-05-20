@@ -2,11 +2,11 @@ import type { Command } from "commander";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
-import { loadTasks, runBench, parseMatrix, type BenchAgent } from "@invariance/dna-core";
+import { loadTasks, runBench, parseMatrix, type BenchAgent } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerBench(program: Command): void {
-  const bench = program.command("bench").description("Repo-edit-bench: A/B coding agents with and without DNA");
+  const bench = program.command("bench").description("Repo-edit-bench: A/B coding agents with and without GPS");
 
   addRootOption(
     bench
@@ -30,7 +30,7 @@ export function registerBench(program: Command): void {
   addRootOption(
     bench
       .command("run")
-      .description("Run bench: each task twice (baseline + dna) × n attempts × agent(s)")
+      .description("Run bench: each task twice (baseline + gps) × n attempts × agent(s)")
       .option("--tasks <path>", "Tasks directory (default bench/repo-edit-bench/tasks)")
       .option("--out <path>", "Output directory (default bench/results/<timestamp>)")
       .option("--agent <cmd>", "Single agent command (default: `claude -p`). Overrides --matrix.")
@@ -73,18 +73,18 @@ export function registerBench(program: Command): void {
       timeoutSec,
     });
     const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
-    console.log(`\naggregate: baseline ${pct(summary.baseline.pass_rate)}  •  dna ${pct(summary.dna.pass_rate)}  •  Δ ${pct(summary.dna.pass_rate - summary.baseline.pass_rate)}`);
+    console.log(`\naggregate: baseline ${pct(summary.baseline.pass_rate)}  •  gps ${pct(summary.gps.pass_rate)}  •  Δ ${pct(summary.gps.pass_rate - summary.baseline.pass_rate)}`);
     if (summary.agents.length > 1) {
       for (const a of summary.agents) {
         const b = summary.cells.find((c) => c.agent_label === a && c.arm === "baseline");
-        const d = summary.cells.find((c) => c.agent_label === a && c.arm === "dna");
+        const d = summary.cells.find((c) => c.agent_label === a && c.arm === "gps");
         if (b && d) {
-          console.log(`  ${kleur.cyan(a.padEnd(8))} baseline ${pct(b.pass_rate)}  dna ${pct(d.pass_rate)}  Δ ${pct(d.pass_rate - b.pass_rate)}`);
+          console.log(`  ${kleur.cyan(a.padEnd(8))} baseline ${pct(b.pass_rate)}  gps ${pct(d.pass_rate)}  Δ ${pct(d.pass_rate - b.pass_rate)}`);
         }
       }
     }
-    if (summary.baseline.timed_out > 0 || summary.dna.timed_out > 0) {
-      console.log(kleur.yellow(`timed out: baseline=${summary.baseline.timed_out} dna=${summary.dna.timed_out}`));
+    if (summary.baseline.timed_out > 0 || summary.gps.timed_out > 0) {
+      console.log(kleur.yellow(`timed out: baseline=${summary.baseline.timed_out} gps=${summary.gps.timed_out}`));
     }
     for (const w of summary.warnings) {
       console.log(kleur.yellow(`warning: ${w}`));
@@ -95,7 +95,7 @@ export function registerBench(program: Command): void {
   addRootOption(
     bench
       .command("report")
-      .description("Print the markdown report from a previous `dna bench run`")
+      .description("Print the markdown report from a previous `gps bench run`")
       .option("--run <path>", "Results directory (default: latest under bench/results/)"),
   ).action(async (opts: RootOption & { run?: string }) => {
     const root = resolveRoot(opts);

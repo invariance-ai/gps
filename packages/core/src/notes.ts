@@ -6,12 +6,12 @@ import {
   type NoteSeverity,
   type NoteSource,
   type Note as NoteT,
-} from "@invariance/dna-schemas";
+} from "@invariance/gps-schemas";
 
-const DIR = ".dna/notes";
-const FILE_DIR = ".dna/notes/file";
-const FEATURE_DIR = ".dna/notes/feature";
-const AREA_DIR = ".dna/notes/area";
+const DIR = ".gps/notes";
+const FILE_DIR = ".gps/notes/file";
+const FEATURE_DIR = ".gps/notes/feature";
+const AREA_DIR = ".gps/notes/area";
 
 function fileFor(root: string, symbol: string): string {
   // Symbols can contain `.` (Stripe.refunds.create) or `/` (path/to/sym).

@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-const REL = ".dna/pending-lessons.json";
+const REL = ".gps/pending-lessons.json";
 
 export const DEFAULT_CONFIDENCE_GATE = 0.75;
 export const DEFAULT_COUNT_GATE = 2;

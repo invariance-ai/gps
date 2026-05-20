@@ -9,12 +9,12 @@ import path from "node:path";
  * This is the privacy line: we never persist what an agent asked or what
  * we returned, only that symbol X was looked at N times.
  *
- * Feeds `dna suggest` — symbols with high query counts and no covering
+ * Feeds `gps suggest` — symbols with high query counts and no covering
  * invariant become an authoring queue.
  *
- * Storage: .dna/observations.json keyed by symbol name (qualified preferred).
+ * Storage: .gps/observations.json keyed by symbol name (qualified preferred).
  */
-const REL = ".dna/observations.json";
+const REL = ".gps/observations.json";
 
 export interface FailureEntry {
   at: string; // ISO timestamp
@@ -81,7 +81,7 @@ export async function recordObservation(
 }
 
 /**
- * Append a session event if `.dna/session/id` exists; no-op otherwise. We
+ * Append a session event if `.gps/session/id` exists; no-op otherwise. We
  * keep this here (and in features.ts) instead of cross-importing because both
  * modules need to write to the session log without depending on each other.
  */
@@ -91,12 +91,12 @@ async function appendSessionEvent(
 ): Promise<void> {
   let id: string;
   try {
-    id = (await readFile(path.join(root, ".dna/session/id"), "utf8")).trim();
+    id = (await readFile(path.join(root, ".gps/session/id"), "utf8")).trim();
   } catch {
     return;
   }
   if (!id) return;
-  const dir = path.join(root, ".dna/sessions");
+  const dir = path.join(root, ".gps/sessions");
   try {
     await mkdir(dir, { recursive: true });
     await appendFile(path.join(dir, `${id}.jsonl`), `${JSON.stringify(event)}\n`);
@@ -143,7 +143,7 @@ export async function recordFailure(
   store.symbols[target] = entry;
   await writeStore(root, store);
 
-  // Side-effect: drop a TODO into .dna/todos.json so future get_context surfaces
+  // Side-effect: drop a TODO into .gps/todos.json so future get_context surfaces
   // unfinished work. Never edits user source files.
   const { addTodo } = await import("./todos.js");
   const text = failure.message

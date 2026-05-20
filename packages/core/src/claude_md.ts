@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, writeFile, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
-import type { NoteSeverity } from "@invariance/dna-schemas";
+import type { NoteSeverity } from "@invariance/gps-schemas";
 
 /**
- * Manages a single fenced block inside CLAUDE.md (or AGENTS.md) where dna
+ * Manages a single fenced block inside CLAUDE.md (or AGENTS.md) where gps
  * persists *global* lessons — repo-wide rules learned by an agent that don't
  * belong to one symbol/file/feature.
  *
@@ -13,17 +13,17 @@ import type { NoteSeverity } from "@invariance/dna-schemas";
  *  - Writes are atomic (temp file + rename).
  *  - Lessons are id-keyed; upsert never duplicates.
  *  - A timestamped snapshot of the prior CLAUDE.md is kept under
- *    .dna/backups/ (last 5).
+ *    .gps/backups/ (last 5).
  *
- * Marker convention is distinct from the existing `dna:start`/`dna:end`
+ * Marker convention is distinct from the existing `gps:start`/`gps:end`
  * instruction block so install-time copy and learned lessons cannot collide.
  */
 
-export const LESSONS_OPEN = "<!-- dna:global-lessons -->";
-export const LESSONS_CLOSE = "<!-- /dna:global-lessons -->";
+export const LESSONS_OPEN = "<!-- gps:global-lessons -->";
+export const LESSONS_CLOSE = "<!-- /gps:global-lessons -->";
 
 const LESSONS_BLOCK_RE =
-  /<!-- dna:global-lessons -->([\s\S]*?)<!-- \/dna:global-lessons -->\n?/m;
+  /<!-- gps:global-lessons -->([\s\S]*?)<!-- \/gps:global-lessons -->\n?/m;
 
 export interface GlobalLesson {
   id: string;
@@ -37,7 +37,7 @@ export function claudeMdPath(root: string, filename = "CLAUDE.md"): string {
 }
 
 function backupsDir(root: string): string {
-  return path.join(root, ".dna/backups");
+  return path.join(root, ".gps/backups");
 }
 
 export function generateLessonId(): string {
@@ -67,7 +67,7 @@ function parseEntries(block: string): GlobalLesson[] {
 }
 
 function renderEntries(lessons: GlobalLesson[]): string {
-  const header = "## dna global lessons\n\n_Auto-managed by `dna lessons record`. Edit via the CLI; freeform notes above/below are preserved._\n\n";
+  const header = "## gps global lessons\n\n_Auto-managed by `gps lessons record`. Edit via the CLI; freeform notes above/below are preserved._\n\n";
   if (lessons.length === 0) return header.trim() + "\n";
   return (
     header +

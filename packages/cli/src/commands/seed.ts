@@ -3,8 +3,8 @@ import path from "node:path";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import kleur from "kleur";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { seed } from "@invariance/dna-core";
-import type { SeedProposal } from "@invariance/dna-schemas";
+import { seed } from "@invariance/gps-core";
+import type { SeedProposal } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface SeedOpts extends RootOption {
@@ -18,10 +18,10 @@ export function registerSeed(program: Command): void {
   addRootOption(
     program
       .command("seed")
-      .description("Bootstrap proposed notes/decisions from git log + gh PRs. Writes to .dna/proposals.yml unless --apply.")
+      .description("Bootstrap proposed notes/decisions from git log + gh PRs. Writes to .gps/proposals.yml unless --apply.")
       .option("--commits <n>", "Number of commits to scan", "200")
       .option("--prs <n>", "Number of merged PRs to scan", "50")
-      .option("--apply", "Append to .dna/notes and .dna/decisions instead of writing to proposals.yml", false)
+      .option("--apply", "Append to .gps/notes and .gps/decisions instead of writing to proposals.yml", false)
       .option("--json", "Emit JSON"),
   ).action(async (opts: SeedOpts) => {
     const root = resolveRoot(opts);
@@ -53,7 +53,7 @@ export function registerSeed(program: Command): void {
       const decCount = await appendProposals(root, result.proposals.filter((p) => p.kind === "decision"), "decisions");
       console.log(kleur.green(`\n✓ applied ${noteCount} note(s), ${decCount} decision(s)`));
     } else {
-      const out = path.join(root, ".dna", "proposals.yml");
+      const out = path.join(root, ".gps", "proposals.yml");
       await mkdir(path.dirname(out), { recursive: true });
       await writeFile(out, stringifyYaml(result));
       console.log(kleur.dim(`\nwrote ${path.relative(root, out)} — review, then re-run with --apply`));
@@ -67,7 +67,7 @@ async function appendProposals(
   kind: "notes" | "decisions",
 ): Promise<number> {
   if (proposals.length === 0) return 0;
-  const dir = path.join(root, ".dna", kind);
+  const dir = path.join(root, ".gps", kind);
   await mkdir(dir, { recursive: true });
   // Bucket everything under a single "_seed" target so seeding is reversible.
   const file = path.join(dir, "_seed.yml");

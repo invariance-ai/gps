@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import fg from "fast-glob";
-import type { SeedProposal, SeedResult } from "@invariance/dna-schemas";
+import type { SeedProposal, SeedResult } from "@invariance/gps-schemas";
 import { isGitRepo } from "./git.js";
 import { extractTodos } from "./notes.js";
 
@@ -16,7 +16,7 @@ export interface SeedOptions {
   scanFiles?: string[];
 }
 
-/** Tier definitions for `dna init --seed`. Exposed here so they can be
+/** Tier definitions for `gps init --seed`. Exposed here so they can be
  * unit-tested without depending on the CLI package. The CLI re-exports
  * these for its own use. */
 export type SeedTier = "safe" | "medium" | "aggressive";
@@ -35,7 +35,7 @@ export const SEED_TIER_DEFAULTS: Record<SeedTier, SeedTierConfig> = {
 
 /**
  * Mine git history (+ gh PRs when available) for proposed notes/decisions/invariants.
- * Pure read; emits proposals only — writing to .dna/ is up to the caller.
+ * Pure read; emits proposals only — writing to .gps/ is up to the caller.
  */
 export async function seed(root: string, opts: SeedOptions = {}): Promise<SeedResult> {
   const proposals: SeedProposal[] = [];
@@ -72,7 +72,7 @@ export async function seed(root: string, opts: SeedOptions = {}): Promise<SeedRe
       const matched = await fg(patterns, {
         cwd: root,
         absolute: false,
-        ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/.dna/**"],
+        ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/.gps/**"],
         followSymbolicLinks: false,
       });
       files = files.concat(matched);

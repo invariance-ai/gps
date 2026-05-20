@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Parser, Language, type Node } from "web-tree-sitter";
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import type { ImportBinding, ParsedFile, ParsedLanguage } from "./parser.js";
 
 /**
@@ -12,7 +12,7 @@ import type { ImportBinding, ParsedFile, ParsedLanguage } from "./parser.js";
  * packages/core/grammars/.
  *
  * Falls through to the regex parser in parser.ts for other languages and
- * when DNA_PARSER=regex is set.
+ * when GPS_PARSER=regex is set.
  */
 
 const SUPPORTED = new Set<ParsedLanguage>([
@@ -55,7 +55,7 @@ const parserPool = new Map<string, Parser>();
 // The parser is a pure function of (language, content). Hashing content and
 // memoizing the resulting SymbolRef[] (and the rest of ParsedFile minus the
 // tree, which we already delete()) lets repeat parses of identical files —
-// either within one process or across `dna index` runs — skip tree-sitter
+// either within one process or across `gps index` runs — skip tree-sitter
 // entirely. The tree itself is a native handle and isn't cached.
 
 interface CachedParse {
@@ -120,7 +120,7 @@ function lruSet(key: string, value: CachedParse): void {
 }
 
 function cacheFile(root: string): string {
-  return path.join(root, ".dna", "cache", "parse-cache.json");
+  return path.join(root, ".gps", "cache", "parse-cache.json");
 }
 
 /**
@@ -142,7 +142,7 @@ export async function loadParseCache(root: string): Promise<void> {
 }
 
 /**
- * Flush the persistent parse cache to disk under `root/.dna/cache/`.
+ * Flush the persistent parse cache to disk under `root/.gps/cache/`.
  * No-op if no writes happened since load.
  */
 export async function saveParseCache(root: string): Promise<void> {

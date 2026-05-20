@@ -32,7 +32,7 @@ export const CORPORA: Record<string, Corpus> = {
 };
 
 export function cacheDir(): string {
-  return path.join(os.homedir(), ".cache", "dna-bench", "corpora");
+  return path.join(os.homedir(), ".cache", "gps-bench", "corpora");
 }
 
 export async function ensureCorpus(c: Corpus): Promise<string> {

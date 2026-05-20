@@ -5,8 +5,8 @@ import type { Command } from "commander";
 import kleur from "kleur";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
-const SESSION_ID_REL = ".dna/session/id";
-const SESSIONS_DIR = ".dna/sessions";
+const SESSION_ID_REL = ".gps/session/id";
+const SESSIONS_DIR = ".gps/sessions";
 
 interface StartOpts extends RootOption {
   json?: boolean;

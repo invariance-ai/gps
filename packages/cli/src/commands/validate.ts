@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { readIndex, staleFiles } from "@invariance/dna-core";
+import { readIndex, staleFiles } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface ValidateOpts extends RootOption {
@@ -32,9 +32,9 @@ export function registerValidate(program: Command): void {
       if (opts.json) {
         console.log(JSON.stringify({ ok: false, reason: "no_index" }));
       } else if (!opts.quiet) {
-        console.error(kleur.yellow("no index found — run `dna index` first"));
+        console.error(kleur.yellow("no index found — run `gps index` first"));
       } else {
-        console.error("no index — run `dna index`");
+        console.error("no index — run `gps index`");
       }
       process.exit(2);
       return;
@@ -68,7 +68,7 @@ export function registerValidate(program: Command): void {
     if (total > opts.limit) {
       console.error(kleur.dim(`  … and ${total - opts.limit} more`));
     }
-    console.error(kleur.dim("run `dna index` to rebuild before attribution"));
+    console.error(kleur.dim("run `gps index` to rebuild before attribution"));
     process.exit(1);
   });
 }

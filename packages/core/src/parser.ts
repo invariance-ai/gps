@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 
 /**
  * v0.1 parser: regex-based extraction of declarations and call sites for
  * TypeScript/JavaScript and Python. tree-sitter (WASM) is planned for v0.2 —
- * shipped this way to keep `npm install -g @invariance/dna` zero-native-deps.
+ * shipped this way to keep `npm install -g @invariance/gps` zero-native-deps.
  *
  * Trade-off (honest): ~90% precision on typical code, lower on heavy macros,
  * decorators-as-factories, and dynamic dispatch. Good enough for v0.1 because
@@ -131,7 +131,7 @@ const KEYWORDS = new Set([
 ]);
 
 export async function parseFile(filePath: string): Promise<ParsedFile> {
-  if (process.env.DNA_PARSER !== "regex") {
+  if (process.env.GPS_PARSER !== "regex") {
     const ext = path.extname(filePath);
     if (ext === ".ts" || ext === ".tsx" || ext === ".js" || ext === ".jsx" ||
         ext === ".mjs" || ext === ".cjs" || ext === ".py") {
@@ -139,13 +139,13 @@ export async function parseFile(filePath: string): Promise<ParsedFile> {
         const { parseFileTS } = await import("./parser_ts.js");
         return await parseFileTS(filePath);
       } catch (err) {
-        if (process.env.DNA_PARSER === "tree-sitter") throw err;
+        if (process.env.GPS_PARSER === "tree-sitter") throw err;
         // best-effort fallback to regex; warn once per process, count the rest
         parserFallbackCount++;
         if (!warnedFallback) {
           warnedFallback = true;
           parserFallbackFirstError = (err as Error).message;
-          console.error(`dna: tree-sitter parser unavailable (${parserFallbackFirstError}); falling back to regex. Set DNA_PARSER=regex to silence.`);
+          console.error(`gps: tree-sitter parser unavailable (${parserFallbackFirstError}); falling back to regex. Set GPS_PARSER=regex to silence.`);
         }
       }
     }
@@ -164,10 +164,10 @@ let parserFallbackFirstError: string | null = null;
  */
 /**
  * Hydrate the persistent tree-sitter parse cache for `root`. Cheap when already
- * loaded. No-op if the regex fallback path is active (DNA_PARSER=regex).
+ * loaded. No-op if the regex fallback path is active (GPS_PARSER=regex).
  */
 export async function loadParseCache(root: string): Promise<void> {
-  if (process.env.DNA_PARSER === "regex") return;
+  if (process.env.GPS_PARSER === "regex") return;
   try {
     const m = await import("./parser_ts.js");
     await m.loadParseCache(root);
@@ -178,7 +178,7 @@ export async function loadParseCache(root: string): Promise<void> {
 
 /** Persist the tree-sitter parse cache for `root`. Non-fatal on failure. */
 export async function saveParseCache(root: string): Promise<void> {
-  if (process.env.DNA_PARSER === "regex") return;
+  if (process.env.GPS_PARSER === "regex") return;
   try {
     const m = await import("./parser_ts.js");
     await m.saveParseCache(root);
@@ -189,7 +189,7 @@ export async function saveParseCache(root: string): Promise<void> {
 
 export function reportParserFallbacks(): { count: number; firstError: string | null } {
   if (parserFallbackCount > 1) {
-    console.error(`dna: tree-sitter fell back to regex for ${parserFallbackCount} files this run.`);
+    console.error(`gps: tree-sitter fell back to regex for ${parserFallbackCount} files this run.`);
   }
   return { count: parserFallbackCount, firstError: parserFallbackFirstError };
 }

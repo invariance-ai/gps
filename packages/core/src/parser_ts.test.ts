@@ -13,7 +13,7 @@ import {
 describe("parser_ts content-hash cache", () => {
   let dir: string;
   beforeAll(async () => {
-    dir = await mkdtemp(path.join(os.tmpdir(), "dna-parser-cache-"));
+    dir = await mkdtemp(path.join(os.tmpdir(), "gps-parser-cache-"));
     await mkdir(dir, { recursive: true });
   });
   beforeEach(() => {
@@ -67,7 +67,7 @@ describe("parser_ts content-hash cache", () => {
   });
 
   it("persists across processes via load/save", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "dna-parser-persist-"));
+    const root = await mkdtemp(path.join(os.tmpdir(), "gps-parser-persist-"));
     try {
       const f = path.join(root, "x.ts");
       await writeFile(f, `export const k = 42;\n`);
@@ -79,7 +79,7 @@ describe("parser_ts content-hash cache", () => {
       await saveParseCache(root);
 
       const written = await readFile(
-        path.join(root, ".dna", "cache", "parse-cache.json"),
+        path.join(root, ".gps", "cache", "parse-cache.json"),
         "utf8",
       );
       expect(written.length).toBeGreaterThan(10);

@@ -1,6 +1,6 @@
 ---
 name: Dogfood result
-about: Report a measured dna run against a real repo
+about: Report a measured gps run against a real repo
 title: "dogfood: <repo-slug> @ <short-sha>"
 labels: ["dogfood-result"]
 ---
@@ -9,7 +9,7 @@ labels: ["dogfood-result"]
 
 - Repo: `owner/name`
 - SHA: `xxxxxxx`
-- Size: <files> source files, <symbols> symbols, <edges> edges (per `dna index`)
+- Size: <files> source files, <symbols> symbols, <edges> edges (per `gps index`)
 - Language(s): TS / Python / mixed
 - License: MIT / Apache / …
 
@@ -18,11 +18,11 @@ labels: ["dogfood-result"]
 - Model under test: Claude Opus 4.7 (1M ctx) via `claude -p --output-format json`
 - Judge model: Claude Sonnet 4.6, blinded A/B, swapped order
 - Prompts: <N> prompts (mix of where/how/tests/impact — see `docs/dogfood-runbook.md`)
-- Variants: baseline (vanilla clone) vs dna (`init` + `install claude` + `index`)
+- Variants: baseline (vanilla clone) vs gps (`init` + `install claude` + `index`)
 
 ## Headline numbers
 
-| | baseline | dna |
+| | baseline | gps |
 |---|---:|---:|
 | input tokens (total) | | |
 | output tokens (total) | | |
@@ -46,7 +46,7 @@ One paragraph. What did this run confirm or contradict from prior runs?
 ## Checklist
 
 - [ ] Both clones at the same SHA
-- [ ] dna installed only in the dna/ clone
+- [ ] gps installed only in the gps/ clone
 - [ ] Judge run from neutral cwd with no repo context
 - [ ] A/B order swapped between the two judge passes
 - [ ] No raw claude JSON committed (size + PII)

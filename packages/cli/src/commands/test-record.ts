@@ -5,7 +5,7 @@ import {
   parseFailedTests,
   readObservations,
   diffSymbols,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -30,7 +30,7 @@ export function registerTestRecord(program: Command): void {
   addRootOption(
     program
       .command("test-record")
-      .description("Record a test run tied to active symbols (surfaces in `dna prepare` later)")
+      .description("Record a test run tied to active symbols (surfaces in `gps prepare` later)")
       .requiredOption("--command <cmd>", "The test command that was run")
       .requiredOption("--exit <code>", "Exit code", (v) => parseInt(v, 10))
       .option("--symbol <name>", "Symbol to attribute (defaults to last-prepared)")

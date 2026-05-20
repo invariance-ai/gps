@@ -1,6 +1,6 @@
 # Design Alternatives Evaluation
 
-Evals on the *design* of `dna`, not the product thesis. The wedge (callable structural+invariant context for coding agents) is assumed correct. The question here: are the architectural picks in the current plan the right ones?
+Evals on the *design* of `gps`, not the product thesis. The wedge (callable structural+invariant context for coding agents) is assumed correct. The question here: are the architectural picks in the current plan the right ones?
 
 Scoring: 1 (worst) to 5 (best) on each criterion. Higher is better for the project.
 
@@ -37,9 +37,9 @@ Criteria key:
 | C: In-memory + JSON snapshot | 5 | 5 | 4 | 1 | 5 | Sub-ms queries, no DB dep; breaks past ~500k LOC, slow cold start |
 | D: DuckDB | 4 | 5 | 4 | 2 | 4 | Columnar OLAP, great for analytics on graph; graph traversal is awkward without recursive SQL |
 
-**Recommendation: switch default to B (SQLite) for v0, keep Kuzu as an opt-in for large monorepos.** The query patterns dna actually runs (callers, callees, tests-for-symbol, 1-3 hop impact) are not deep enough to need a real graph engine. SQLite means zero install friction, every CI has it, and the moat isn't in the DB choice anyway — it's in the strands and invariants. Kuzu adds a binary dependency that complicates the npm distribution story (axis 7).
+**Recommendation: switch default to B (SQLite) for v0, keep Kuzu as an opt-in for large monorepos.** The query patterns gps actually runs (callers, callees, tests-for-symbol, 1-3 hop impact) are not deep enough to need a real graph engine. SQLite means zero install friction, every CI has it, and the moat isn't in the DB choice anyway — it's in the strands and invariants. Kuzu adds a binary dependency that complicates the npm distribution story (axis 7).
 
-**Plan delta:** swap Kuzu → SQLite as default. Keep Kuzu behind `dna config storage=kuzu` for >500k LOC repos.
+**Plan delta:** swap Kuzu → SQLite as default. Keep Kuzu behind `gps config storage=kuzu` for >500k LOC repos.
 
 ---
 
@@ -81,7 +81,7 @@ Criteria key:
 | B: One mega-tool `ask(symbol, what)` | 5 | 4 | 3 | 2 | 5 | LLM picks intent in natural language; harder to evaluate; less precise |
 | C: Retrieval API + `prepare_edit` planner | 3 | 4 | 5 | 4 | 4 | Planner returns "here's everything you need before editing X"; matches the wedge exactly |
 
-**Recommendation: A + C combined. Keep narrow tools but add `prepare_edit(symbol)` as a meta-tool that internally calls all the others and returns a single bundle.** This matches the user-facing pitch ("before your agent edits, it asks dna…") more directly than 7 separate tools. Narrow tools stay for agents/devs who want finer control. B is wrong: a mega-tool with a free-form "what" parameter is harder to cache, harder to score in benchmarks, and gives no traction for telemetry on which intent is most common.
+**Recommendation: A + C combined. Keep narrow tools but add `prepare_edit(symbol)` as a meta-tool that internally calls all the others and returns a single bundle.** This matches the user-facing pitch ("before your agent edits, it asks gps…") more directly than 7 separate tools. Narrow tools stay for agents/devs who want finer control. B is wrong: a mega-tool with a free-form "what" parameter is harder to cache, harder to score in benchmarks, and gives no traction for telemetry on which intent is most common.
 
 **Plan delta:** medium — add `prepare_edit` as the headline MCP tool. Demote the 7 narrow tools to "advanced" in the README. Most agents will only ever call `prepare_edit`.
 
@@ -96,9 +96,9 @@ Criteria key:
 | C: Lazy per-symbol on first call | 3 | 2 | 4 | 4 | 5 | Zero upfront cost; first call slow; great for huge repos / cold demos |
 | D: Cloud-hosted continuously updated | 1 | 5 | 5 | 5 | 2 | Best UX once set up; auth, privacy, pricing all complicate v0 |
 
-**Recommendation: A as default with B added in v0, C as a fallback for stale indices, D deferred to paid tier.** Concretely: `dna init` installs a git post-commit hook (opt-in via prompt), the watcher stays for active dev, and any query against an unindexed symbol triggers a partial lazy index for that symbol's neighborhood. This gives the "it just works" feel without the cloud dependency. D is in the deferred-decisions section of the plan already; leave it there.
+**Recommendation: A as default with B added in v0, C as a fallback for stale indices, D deferred to paid tier.** Concretely: `gps init` installs a git post-commit hook (opt-in via prompt), the watcher stays for active dev, and any query against an unindexed symbol triggers a partial lazy index for that symbol's neighborhood. This gives the "it just works" feel without the cloud dependency. D is in the deferred-decisions section of the plan already; leave it there.
 
-**Plan delta:** small — add the git-hook installer to `dna init` and add the lazy fallback path in the query layer.
+**Plan delta:** small — add the git-hook installer to `gps init` and add the lazy fallback path in the query layer.
 
 ---
 
@@ -106,7 +106,7 @@ Criteria key:
 
 | Option | Cost | Lat | P/R | Def | Friction | Notes |
 |---|---|---|---|---|---|---|
-| A: npm `@invariance/dna` (current) | 5 | 4 | 4 | 2 | 3 | Easy for TS users; Python devs hate installing Node for a Python tool; native deps (tree-sitter, Kuzu) cause install pain |
+| A: npm `@invariance/gps` (current) | 5 | 4 | 4 | 2 | 3 | Easy for TS users; Python devs hate installing Node for a Python tool; native deps (tree-sitter, Kuzu) cause install pain |
 | B: Standalone binary (Go/Rust rewrite) | 1 | 5 | 4 | 3 | 5 | One curl-install; language-agnostic users; massive rewrite cost; loses MCP SDK ergonomics |
 | C: Multi-channel (npm + pipx + brew) | 3 | 4 | 4 | 3 | 5 | Meet users where they are; CI complexity; same TS core under each |
 | D: Hosted service + thin local proxy | 2 | 3 | 5 | 5 | 2 | Strong moat; but the OSS wedge dies if the daily-use path needs a login |
@@ -137,7 +137,7 @@ Ordered by leverage on the v0 success criteria (token efficiency, latency, adopt
 
 1. **Output format → hybrid (axis 3).** Highest leverage. Directly moves the token-efficiency benchmark. One-day change; touches MCP server + CLI pretty-printer only.
 2. **Storage → SQLite default, Kuzu opt-in (axis 2).** Removes a young native dependency from the install path; SQLite is already on every dev machine. Cuts install-failure tickets to near zero.
-3. **Distribution → multi-channel (axis 7).** Python-heavy repos are half the v0 target. Ship `pipx install dna` and `brew install dna` alongside npm. Same binary, three wrappers.
+3. **Distribution → multi-channel (axis 7).** Python-heavy repos are half the v0 target. Ship `pipx install gps` and `brew install gps` alongside npm. Same binary, three wrappers.
 4. **Add `prepare_edit` MCP tool (axis 5).** Matches the wedge language verbatim. Most agents will call only this; narrow tools become escape hatches.
 5. **Invariants: add `@invariant` code annotations alongside YAML (axis 4).** Survives refactors, lives in code review, lower friction than YAML for function-local rules.
 6. **Index trigger: git post-commit hook + lazy per-symbol fallback (axis 6).** Removes the "I forgot to re-index" failure mode that will dominate early bug reports.

@@ -1,7 +1,7 @@
 import { parse as parseYaml } from "yaml";
-import type { Invariant } from "@invariance/dna-schemas";
-import { Invariant as InvariantSchema } from "@invariance/dna-schemas";
-import { DnaLlm } from "./client.js";
+import type { Invariant } from "@invariance/gps-schemas";
+import { Invariant as InvariantSchema } from "@invariance/gps-schemas";
+import { GpsLlm } from "./client.js";
 
 /**
  * Given the artifacts of a regression (PR diff, test output, surrounding
@@ -9,7 +9,7 @@ import { DnaLlm } from "./client.js";
  * would have prevented the regression.
  *
  * The LLM returns a YAML block that must validate as Invariant. We parse and
- * zod-validate before returning — the caller writes to .dna/invariants.yml.
+ * zod-validate before returning — the caller writes to .gps/invariants.yml.
  */
 
 const SYSTEM = `You analyze code regressions and propose declarative invariants.
@@ -52,7 +52,7 @@ export interface PostmortemResult {
 }
 
 export async function proposeInvariant(
-  llm: DnaLlm,
+  llm: GpsLlm,
   input: PostmortemInput,
 ): Promise<PostmortemResult> {
   const user = renderUserPrompt(input);

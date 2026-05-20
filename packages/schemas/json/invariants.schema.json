@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/invariance-ai/dna/schemas/invariants.schema.json",
-  "title": "dna invariants",
-  "$ref": "#/definitions/dna invariants",
+  "$id": "https://github.com/invariance-ai/gps/schemas/invariants.schema.json",
+  "title": "gps invariants",
+  "$ref": "#/definitions/gps invariants",
   "definitions": {
-    "dna invariants": {
+    "gps invariants": {
       "type": "array",
       "items": {
         "type": "object",
@@ -45,7 +45,7 @@
         ],
         "additionalProperties": false
       },
-      "description": "Top-level array of invariants in .dna/invariants.yml."
+      "description": "Top-level array of invariants in .gps/invariants.yml."
     }
   }
 }

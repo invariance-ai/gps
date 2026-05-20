@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const REL = ".dna/runtime.json";
+const REL = ".gps/runtime.json";
 
 export interface RuntimeEvent {
   symbol: string;

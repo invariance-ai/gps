@@ -5,7 +5,7 @@
  * We drive it via `cmm cli <tool> <json>` which is a one-shot mode that
  * mirrors a single MCP tool call. First step is index_repository (cached
  * across runs by cmm's persistent KG); then we call trace_path per symbol —
- * that returns callers + callees + hop counts, the closest analog to DNA's
+ * that returns callers + callees + hop counts, the closest analog to GPS's
  * get_context structural payload.
  *
  * CMM_BIN env overrides the binary path. Falls back to common install

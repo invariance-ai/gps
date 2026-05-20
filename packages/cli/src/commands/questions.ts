@@ -6,8 +6,8 @@ import {
   loadQuestions,
   setStatus,
   topSymbols,
-} from "@invariance/dna-core";
-import type { Question, QuestionStatus } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import type { Question, QuestionStatus } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface ListOpts extends RootOption {

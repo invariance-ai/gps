@@ -13,7 +13,7 @@
  *
  * The default query tool tracked for the warm-p50 latency gate is
  * `get_context` (the per-tool harness in bench:perf doesn't have a literal
- * "dna-brief" entry — get_context is the closest analog and is what the
+ * "gps-brief" entry — get_context is the closest analog and is what the
  * brief response is built on).
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";

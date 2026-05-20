@@ -65,7 +65,7 @@ async function main(): Promise<void> {
     "",
     "# Command reference",
     "",
-    "`dna` exposes its full surface as a CLI. Every read command supports `--json` (stable contract) and `--markdown` (LLM-optimal); ANSI colors auto-strip when piped.",
+    "`gps` exposes its full surface as a CLI. Every read command supports `--json` (stable contract) and `--markdown` (LLM-optimal); ANSI colors auto-strip when piped.",
     "",
   ];
   // Group: print top-level subcommands alphabetically for stable diffs.

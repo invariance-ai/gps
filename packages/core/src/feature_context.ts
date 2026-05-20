@@ -4,7 +4,7 @@ import { loadAllNotes } from "./notes.js";
 import { loadAllDecisions } from "./decisions.js";
 import { loadAllQuestions, filterByStatus } from "./questions.js";
 import { readTestRuns } from "./test_runs.js";
-import type { Invariant, Note, Decision, Question } from "@invariance/dna-schemas";
+import type { Invariant, Note, Decision, Question } from "@invariance/gps-schemas";
 
 export interface FeatureContext {
   feature: string;

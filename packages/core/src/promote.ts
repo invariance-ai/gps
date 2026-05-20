@@ -1,4 +1,4 @@
-import type { Note } from "@invariance/dna-schemas";
+import type { Note } from "@invariance/gps-schemas";
 import { loadNotes } from "./notes.js";
 
 /**

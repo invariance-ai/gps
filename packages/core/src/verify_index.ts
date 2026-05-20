@@ -1,7 +1,7 @@
 import path from "node:path";
 import { realpathSync } from "node:fs";
 import ts from "typescript";
-import type { DnaIndex } from "./index_store.js";
+import type { GpsIndex } from "./index_store.js";
 import { wilson, type WilsonCI } from "./stats.js";
 
 export type { WilsonCI };
@@ -16,7 +16,7 @@ function realRel(root: string, abs: string): string {
 
 /**
  * tsserver resolves workspace package imports to the built dist/.d.ts file
- * (whatever `main`/`types` points at). DNA tracks source files. Normalize
+ * (whatever `main`/`types` points at). GPS tracks source files. Normalize
  * both ends so monorepos don't all look "wrong" when they're actually right.
  *
  * Strip every JS/TS extension we might encounter (incl. .d.ts, .mjs, .cjs,
@@ -30,17 +30,17 @@ function normalizeTarget(p: string): string {
 }
 
 /**
- * Verify DNA's symbol graph against TypeScript's own type checker.
+ * Verify GPS's symbol graph against TypeScript's own type checker.
  *
  * For each sampled call edge we recorded, ask `ts` what the call at
- * (file, line) actually resolves to. Compare DNA's `to` against the real
+ * (file, line) actually resolves to. Compare GPS's `to` against the real
  * symbol's declaration file + name. Also sample call sites that ts knows
- * about but DNA may have missed (recall).
+ * about but GPS may have missed (recall).
  *
  * Three numbers ship in the report:
  *   precision = confirmed / (confirmed + contradicted)   (inconclusive excluded)
- *   recall    = (ts edges DNA has) / (sampled ts edges)
- *   coverage  = (DNA edges with status ∈ {exact, typed}) / (total DNA edges)
+ *   recall    = (ts edges GPS has) / (sampled ts edges)
+ *   coverage  = (GPS edges with status ∈ {exact, typed}) / (total GPS edges)
  *
  * Python is intentionally out of scope here — pyright shell-out lives in
  * a separate verify_index_py module when we add it.
@@ -63,9 +63,9 @@ export interface VerifyReport {
     from_file: string;
     from_line: number;
     callee: string;
-    dna_resolved_to?: string;
+    gps_resolved_to?: string;
     ts_resolved_to?: string;
-    issue: "wrong_target" | "ts_says_no_target" | "dna_missed";
+    issue: "wrong_target" | "ts_says_no_target" | "gps_missed";
   }>;
 }
 
@@ -92,7 +92,7 @@ function mulberry32(seed: number): () => number {
 
 function resolveSeed(opt?: number): number | undefined {
   if (opt !== undefined && Number.isFinite(opt)) return Math.trunc(opt);
-  const env = process.env.DNA_VERIFY_SEED;
+  const env = process.env.GPS_VERIFY_SEED;
   if (env && env.trim() !== "") {
     const n = Number(env);
     if (Number.isFinite(n)) return Math.trunc(n);
@@ -101,14 +101,14 @@ function resolveSeed(opt?: number): number | undefined {
 }
 
 export async function verifyIndex(
-  index: DnaIndex,
+  index: GpsIndex,
   opts: VerifyOptions,
 ): Promise<VerifyReport> {
   const { root, sample = DEFAULT_SAMPLE } = opts;
   const seed = resolveSeed(opts.seed);
   const rand: () => number = seed !== undefined ? mulberry32(seed) : Math.random;
 
-  // Build a ts Program over the TS files DNA indexed.
+  // Build a ts Program over the TS files GPS indexed.
   const tsFiles = index.files
     .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx") || f.endsWith(".js") || f.endsWith(".jsx"))
     .map((f) => path.resolve(root, f));
@@ -158,7 +158,7 @@ export async function verifyIndex(
     if (sf) lineCache.set(f, sf);
   }
 
-  // --- Precision pass: sample edges from DNA, ask ts who's actually called.
+  // --- Precision pass: sample edges from GPS, ask ts who's actually called.
   const tsEdges = index.edges.filter(
     (e) => e.file && (e.file.endsWith(".ts") || e.file.endsWith(".tsx") || e.file.endsWith(".js") || e.file.endsWith(".jsx")),
   );
@@ -185,21 +185,21 @@ export async function verifyIndex(
     const declFile = sym?.declarations?.[0]?.getSourceFile().fileName;
     const declName = sym?.getName();
     const tsTarget = declFile && declName ? `${realRel(root, declFile)}:${declName}` : undefined;
-    const dnaTarget = `${guessTargetFile(index, edge)}:${callee}`;
+    const gpsTarget = `${guessTargetFile(index, edge)}:${callee}`;
     if (!tsTarget) {
-      // ts found the call but couldn't resolve a target — can't judge DNA.
+      // ts found the call but couldn't resolve a target — can't judge GPS.
       inconclusive++;
       worst.push({
         from_file: edge.file!,
         from_line: edge.line ?? 0,
         callee,
-        dna_resolved_to: dnaTarget,
+        gps_resolved_to: gpsTarget,
         issue: "ts_says_no_target",
       });
       continue;
     }
     // Match by file path + name (after dist/src normalization).
-    if (normalizeTarget(tsTarget) === normalizeTarget(dnaTarget)) {
+    if (normalizeTarget(tsTarget) === normalizeTarget(gpsTarget)) {
       confirmed++;
     } else {
       contradicted++;
@@ -207,7 +207,7 @@ export async function verifyIndex(
         from_file: edge.file!,
         from_line: edge.line ?? 0,
         callee,
-        dna_resolved_to: dnaTarget,
+        gps_resolved_to: gpsTarget,
         ts_resolved_to: tsTarget,
         issue: "wrong_target",
       });
@@ -215,7 +215,7 @@ export async function verifyIndex(
   }
 
   // --- Recall pass: enumerate ALL callsites ts can find across the project,
-  //     then sample from that flat list. Same shape as the DNA-edges side,
+  //     then sample from that flat list. Same shape as the GPS-edges side,
   //     which keeps per-file density bias out of the recall denominator.
   interface RecallSite {
     file: string;
@@ -228,7 +228,7 @@ export async function verifyIndex(
     if (!sf) continue;
     const relFile = path.relative(root, f);
     visitCalls(sf, (callExpr, line) => {
-      // Skip method calls — DNA's parser intentionally doesn't track them.
+      // Skip method calls — GPS's parser intentionally doesn't track them.
       if (ts.isPropertyAccessExpression(callExpr.expression)) return;
       const callee = nameOfCallExpression(callExpr);
       if (!callee) return;
@@ -253,7 +253,7 @@ export async function verifyIndex(
         from_file: site.file,
         from_line: site.line,
         callee: site.callee,
-        issue: "dna_missed",
+        issue: "gps_missed",
       });
     }
   }
@@ -280,7 +280,7 @@ export async function verifyIndex(
   };
 }
 
-function coverageOf(index: DnaIndex): number {
+function coverageOf(index: GpsIndex): number {
   if (index.edges.length === 0) return 1;
   const good = index.edges.filter(
     (e) => e.resolution_status === "exact" || e.resolution_status === "typed",
@@ -292,7 +292,7 @@ function lastNameOf(qualified: string): string {
   return qualified.split(".").pop() ?? qualified;
 }
 
-function guessTargetFile(index: DnaIndex, edge: DnaIndex["edges"][number]): string {
+function guessTargetFile(index: GpsIndex, edge: GpsIndex["edges"][number]): string {
   // Prefer the stable id — edges record `to_id` precisely so we can identify
   // the actual resolved target without falling back to name-only lookup, which
   // would pick an arbitrary same-name symbol when collisions exist.

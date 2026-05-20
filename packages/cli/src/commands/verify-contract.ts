@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { buildContract, saveContract, verifyContract } from "@invariance/dna-core";
+import { buildContract, saveContract, verifyContract } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface BuildOpts extends RootOption {
@@ -64,7 +64,7 @@ export function registerVerifyContract(program: Command): void {
     const root = resolveRoot(opts);
     const r = await verifyContract(root, opts.base);
     if (!r) {
-      console.error(kleur.red("no contract found — run `dna contract-build <symbol>` first"));
+      console.error(kleur.red("no contract found — run `gps contract-build <symbol>` first"));
       process.exitCode = 1;
       return;
     }

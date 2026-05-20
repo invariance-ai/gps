@@ -2,13 +2,13 @@ import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { SeedProposal as SeedProposalSchema, SeedResult as SeedResultSchema } from "@invariance/dna-schemas";
+import { SeedProposal as SeedProposalSchema, SeedResult as SeedResultSchema } from "@invariance/gps-schemas";
 import { seed, SEED_TIERS, SEED_TIER_DEFAULTS, type SeedTier } from "./seed.js";
 
 const roots: string[] = [];
 
 async function mkTmp(): Promise<string> {
-  const r = await mkdtemp(path.join(os.tmpdir(), "dna-seed-"));
+  const r = await mkdtemp(path.join(os.tmpdir(), "gps-seed-"));
   roots.push(r);
   return r;
 }

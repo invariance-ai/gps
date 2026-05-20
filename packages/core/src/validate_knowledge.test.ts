@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { stringify as stringifyYaml } from "yaml";
 import { writeIndex, clearIndexCache } from "./index_store.js";
-import type { DnaIndex } from "./index_store.js";
+import type { GpsIndex } from "./index_store.js";
 import { validateKnowledge } from "./validate_knowledge.js";
 
 async function setupRoot(): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "dna-vk-"));
+  const root = await mkdtemp(path.join(tmpdir(), "gps-vk-"));
   return root;
 }
 
@@ -16,7 +16,7 @@ async function writeFakeIndex(
   root: string,
   symbols: Array<{ id?: string; name: string; qualified_name?: string; file: string; line?: number; kind?: string }>,
 ): Promise<void> {
-  const idx: DnaIndex = {
+  const idx: GpsIndex = {
     version: 1,
     built_at: new Date().toISOString(),
     root,
@@ -37,13 +37,13 @@ async function writeFakeIndex(
 }
 
 async function writeNote(root: string, name: string, note: Record<string, unknown>): Promise<void> {
-  const dir = path.join(root, ".dna/notes");
+  const dir = path.join(root, ".gps/notes");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `${name}.yml`), stringifyYaml([note]));
 }
 
 async function writeDecision(root: string, name: string, decision: Record<string, unknown>): Promise<void> {
-  const dir = path.join(root, ".dna/decisions");
+  const dir = path.join(root, ".gps/decisions");
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, `${name}.yml`), stringifyYaml([decision]));
 }

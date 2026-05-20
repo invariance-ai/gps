@@ -1,7 +1,7 @@
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
-import type { ProvenanceEntry } from "@invariance/dna-schemas";
+import type { ProvenanceEntry } from "@invariance/gps-schemas";
 
 const execFile = promisify(_execFile);
 

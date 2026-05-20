@@ -1,4 +1,4 @@
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import { readIndex } from "./index_store.js";
 import { changedFiles } from "./git_diff.js";
 

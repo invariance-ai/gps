@@ -1,8 +1,8 @@
 import { parse as parseYaml } from "yaml";
 import { randomUUID } from "node:crypto";
-import type { Decision, Question } from "@invariance/dna-schemas";
-import { Decision as DecisionSchema, Question as QuestionSchema } from "@invariance/dna-schemas";
-import { DnaLlm } from "./client.js";
+import type { Decision, Question } from "@invariance/gps-schemas";
+import { Decision as DecisionSchema, Question as QuestionSchema } from "@invariance/gps-schemas";
+import { GpsLlm } from "./client.js";
 
 /**
  * Distill a conversation transcript or PR thread into structured Decision
@@ -60,7 +60,7 @@ export interface ExtractDecisionsResult {
 }
 
 export async function extractDecisions(
-  llm: DnaLlm,
+  llm: GpsLlm,
   input: ExtractDecisionsInput,
 ): Promise<ExtractDecisionsResult> {
   const user = renderUserPrompt(input);

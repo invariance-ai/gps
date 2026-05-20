@@ -6,7 +6,7 @@
     {
       "corpus": "self",
       "index": {
-        "root": "/private/tmp/dna-p5-ci-perf",
+        "root": "/private/tmp/gps-p5-ci-perf",
         "files": 162,
         "symbols": 940,
         "edges": 1372,

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { loadDecisions, loadAllDecisions, rankDecisions } from "@invariance/dna-core";
+import { loadDecisions, loadAllDecisions, rankDecisions } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerDecisions(program: Command): void {

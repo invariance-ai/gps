@@ -1,12 +1,12 @@
 /**
- * Starter invariant packs surfaced by `dna invariant init --stack <name>`.
+ * Starter invariant packs surfaced by `gps invariant init --stack <name>`.
  *
  * These are deliberately conservative: each rule is a constraint that a domain
  * expert on the relevant stack would recognise on sight, with an `evidence`
  * pointer the user is expected to swap for their own policy doc. Packs are
  * meant as scaffolding, not as a substitute for repo-specific authoring.
  */
-import type { Invariant } from "@invariance/dna-schemas";
+import type { Invariant } from "@invariance/gps-schemas";
 
 export type StackName = "stripe" | "auth" | "gdpr" | "multi-tenant" | "http-api";
 

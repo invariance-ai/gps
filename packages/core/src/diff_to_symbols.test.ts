@@ -3,12 +3,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, it, expect } from "vitest";
 import { parseUnifiedDiff, symbolsInHunks, type HunkRange } from "./diff_to_symbols.js";
-import { writeIndex, clearIndexCache, type DnaIndex } from "./index_store.js";
+import { writeIndex, clearIndexCache, type GpsIndex } from "./index_store.js";
 
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-d2s-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-d2s-"));
   roots.push(root);
   return root;
 }
@@ -99,11 +99,11 @@ describe("parseUnifiedDiff", () => {
 });
 
 describe("symbolsInHunks: end_line range overlap", () => {
-  async function seedIndex(root: string, index: DnaIndex): Promise<void> {
+  async function seedIndex(root: string, index: GpsIndex): Promise<void> {
     await writeIndex(root, index);
   }
 
-  function baseIndex(root: string, symbols: DnaIndex["symbols"]): DnaIndex {
+  function baseIndex(root: string, symbols: GpsIndex["symbols"]): GpsIndex {
     return {
       version: 1,
       built_at: new Date().toISOString(),

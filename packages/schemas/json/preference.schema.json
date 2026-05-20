@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/invariance-ai/dna/schemas/preference.schema.json",
-  "title": "dna preference",
-  "$ref": "#/definitions/dna preference",
+  "$id": "https://github.com/invariance-ai/gps/schemas/preference.schema.json",
+  "title": "gps preference",
+  "$ref": "#/definitions/gps preference",
   "definitions": {
-    "dna preference": {
+    "gps preference": {
       "type": "object",
       "properties": {
         "id": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
- * Generate JSON Schemas for `.dna/` files from the Zod definitions in
- * `@invariance/dna-schemas`. Run via `pnpm gen:schemas`. Editors and CI can
+ * Generate JSON Schemas for `.gps/` files from the Zod definitions in
+ * `@invariance/gps-schemas`. Run via `pnpm gen:schemas`. Editors and CI can
  * reference these via `$schema` to validate user-authored YAML/JSON.
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -19,7 +19,7 @@ import {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.resolve(HERE, "..", "packages", "schemas", "json");
-const REPO = "https://github.com/invariance-ai/dna";
+const REPO = "https://github.com/invariance-ai/gps";
 
 const Config = z
   .object({
@@ -30,20 +30,20 @@ const Config = z
       .array(z.enum(["structural", "tests", "provenance", "invariants"]))
       .default(["structural", "tests", "provenance", "invariants"]),
   })
-  .describe("dna repo configuration written to .dna/config.yml by `dna init`.");
+  .describe("gps repo configuration written to .gps/config.yml by `gps init`.");
 
 const InvariantsFile = z
   .array(Invariant)
-  .describe("Top-level array of invariants in .dna/invariants.yml.");
+  .describe("Top-level array of invariants in .gps/invariants.yml.");
 
 const targets: Array<{ name: string; schema: z.ZodTypeAny; title: string }> = [
-  { name: "config", schema: Config, title: "dna config" },
-  { name: "invariants", schema: InvariantsFile, title: "dna invariants" },
-  { name: "invariant", schema: Invariant, title: "dna invariant (single)" },
-  { name: "note", schema: Note, title: "dna note" },
-  { name: "decision", schema: Decision, title: "dna decision" },
-  { name: "preference", schema: Preference, title: "dna preference" },
-  { name: "prepare-edit-result", schema: PrepareEditResult, title: "dna prepare_edit result (versioned)" },
+  { name: "config", schema: Config, title: "gps config" },
+  { name: "invariants", schema: InvariantsFile, title: "gps invariants" },
+  { name: "invariant", schema: Invariant, title: "gps invariant (single)" },
+  { name: "note", schema: Note, title: "gps note" },
+  { name: "decision", schema: Decision, title: "gps decision" },
+  { name: "preference", schema: Preference, title: "gps preference" },
+  { name: "prepare-edit-result", schema: PrepareEditResult, title: "gps prepare_edit result (versioned)" },
 ];
 
 async function main(): Promise<void> {

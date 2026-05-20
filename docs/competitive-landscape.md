@@ -1,8 +1,8 @@
-# Competitive Landscape: `dna` vs. the "Repo Context for Agents" Market
+# Competitive Landscape: `gps` vs. the "Repo Context for Agents" Market
 
 **Scope.** Tools competing on the job: *give a coding agent better repo context before it edits code.* OSS and commercial, MCP-first and IDE-native.
 
-**Date.** May 2026. v0 alpha of `dna`.
+**Date.** May 2026. v0 alpha of `gps`.
 
 ## Snapshot
 
@@ -13,14 +13,14 @@ The category split into four camps in 2025-26:
 3. **Hosted SaaS code intelligence** (Sourcegraph/Cody, Greptile) — graph + search + review, sold per-seat.
 4. **Rule/invariant enforcement** (Semgrep, CodeQL) — pattern/dataflow rules, originally for security, now exposed to agents as skills/MCP.
 
-`dna` sits at the **intersection of camps 2 and 4**: it ships a structural graph *and* a declarative invariants layer with evidence pointers. That intersection is what to defend.
+`gps` sits at the **intersection of camps 2 and 4**: it ships a structural graph *and* a declarative invariants layer with evidence pointers. That intersection is what to defend.
 
 ## Per-Competitor Table
 
 | Tool | URL | One-liner | Delivery | Approach | Returns | License/Pricing | Traction |
 |---|---|---|---|---|---|---|---|
 | **Smart-Grep** | (no canonical repo; appears only as benchmark baseline cited by Sverklo) | Symbol-aware grep wrapper, F1 0.49 on Sverklo's 90-task bench | CLI | Regex + symbol heuristics | Lines + symbol names | OSS | Low; cited mostly as a baseline |
-| **Sverklo MCP** | sverklo.com | Local-first code intelligence MCP, the closest spiritual sibling to `dna` | MCP, CLI | Tree-sitter + BM25 + local ONNX embeddings + PageRank, fused via RRF | Ranked code chunks + symbol graph | MIT, free | Small but active; 43x fewer tokens than grep claim |
+| **Sverklo MCP** | sverklo.com | Local-first code intelligence MCP, the closest spiritual sibling to `gps` | MCP, CLI | Tree-sitter + BM25 + local ONNX embeddings + PageRank, fused via RRF | Ranked code chunks + symbol graph | MIT, free | Small but active; 43x fewer tokens than grep claim |
 | **Nia / Nozomio** | trynia.ai, github.com/nozomio-labs/nia | Indexed packages + repos as agent-callable context | Hosted MCP | Vector RAG over repos, docs, 3000+ pre-indexed packages | Code snippets + doc passages | Commercial; YC S25 | Active; +27% Cursor eval claim |
 | **Hyperspell** | hyperspell.com | Memory/context layer for AI agents (broader than code) | Hosted SDK | Pluggable connectors (Gmail/Slack/Notion + code) into a memory graph | Memory passages | Commercial; YC | Pivoting; not code-specific |
 | **Sourcegraph Cody** | sourcegraph.com | Enterprise code search + Cody agent, now MCP-aware | IDE plugin + MCP | LSIF/SCIP graph + remote search + MCP tool calls | Files, symbols, refs, definitions | Commercial; enterprise seats | Established; serving F500 |
@@ -47,28 +47,28 @@ The category split into four camps in 2025-26:
 
 ### What is commodity now
 
-- **Tree-sitter + PageRank-style repo map.** Aider productized it in 2023; in 2026 there are at minimum 8 MCP servers reimplementing the same idea (CodeGraph, CodeGraphContext, code-graph-mcp, Sverklo, Probe, jCodeMunch, CodeSight, codebase-memory-mcp). Stars range from 28 to 10.9k. **`dna`'s "structural" strand alone is undifferentiated.**
+- **Tree-sitter + PageRank-style repo map.** Aider productized it in 2023; in 2026 there are at minimum 8 MCP servers reimplementing the same idea (CodeGraph, CodeGraphContext, code-graph-mcp, Sverklo, Probe, jCodeMunch, CodeSight, codebase-memory-mcp). Stars range from 28 to 10.9k. **`gps`'s "structural" strand alone is undifferentiated.**
 - **Vector RAG over chunks.** Cursor, Windsurf, Continue, Claude Context, Nia, Tabby — every major IDE and several MCP servers ship this. Token-savings claims (40-95% less than grep) are uniform and no longer credible as a differentiator.
 - **Caller / callee / impact analysis.** CodeGraph and code-graph-mcp already expose `impact_of`-equivalent tools. This is table stakes for any AST-graph product.
-- **Tests-for-symbol.** Implicit in any call-graph product. Continue and Sourcegraph already do this; `dna`'s "tests" strand is a polish layer, not a moat.
+- **Tests-for-symbol.** Implicit in any call-graph product. Continue and Sourcegraph already do this; `gps`'s "tests" strand is a polish layer, not a moat.
 
 ### Closest competitor
 
-**Sverklo MCP.** It is the closest analog by architecture (local-first, tree-sitter + BM25 + ONNX + PageRank, MIT, MCP+CLI). The difference: Sverklo optimizes *retrieval quality* on a 90-task benchmark; `dna` optimizes *structured evidence shape* (4 named strands the agent can call individually). Sverklo wins on "find me code about X", `dna` wins on "what must I not break in X". They will collide.
+**Sverklo MCP.** It is the closest analog by architecture (local-first, tree-sitter + BM25 + ONNX + PageRank, MIT, MCP+CLI). The difference: Sverklo optimizes *retrieval quality* on a 90-task benchmark; `gps` optimizes *structured evidence shape* (4 named strands the agent can call individually). Sverklo wins on "find me code about X", `gps` wins on "what must I not break in X". They will collide.
 
 Honorable mentions: **code-graph-mcp** matches the impact/route/dead-code surface area, and **Greptile** matches the graph-index ambition at SaaS scale.
 
-### Where `dna` is actually defensible
+### Where `gps` is actually defensible
 
 Of the four strands, three (structural, tests, provenance) are commodity. The defensible wedge is narrower than the README suggests:
 
-1. **Invariants as a first-class, agent-callable strand with evidence pointers.** No competitor in this list exposes `invariants_for(symbol)` returning declarative rules linked back to docs. The closest things — Semgrep rules and CodeQL queries — are *security-first*, *code-as-pattern*, and not authored by product/engineering leads. A `.dna/invariants.yml` authored by a PM saying "refunds > $1000 require finance approval" with a link to the policy doc is a meaningfully different artifact, and it is the only piece of `dna`'s output that an LLM cannot reconstruct from a tree-sitter pass.
+1. **Invariants as a first-class, agent-callable strand with evidence pointers.** No competitor in this list exposes `invariants_for(symbol)` returning declarative rules linked back to docs. The closest things — Semgrep rules and CodeQL queries — are *security-first*, *code-as-pattern*, and not authored by product/engineering leads. A `.gps/invariants.yml` authored by a PM saying "refunds > $1000 require finance approval" with a link to the policy doc is a meaningfully different artifact, and it is the only piece of `gps`'s output that an LLM cannot reconstruct from a tree-sitter pass.
 
-2. **The "before they edit" contract / four-strand shape.** Not the strands themselves, but the *bundle* — `get_context` returning structure + tests + provenance + invariants in one shot — is a UX position no one else has explicitly staked. Sverklo et al. return ranked chunks; Greptile returns review comments; `dna` returns a decision-ready brief. Worth defending by making this output stable, citable, and diffable across runs.
+2. **The "before they edit" contract / four-strand shape.** Not the strands themselves, but the *bundle* — `get_context` returning structure + tests + provenance + invariants in one shot — is a UX position no one else has explicitly staked. Sverklo et al. return ranked chunks; Greptile returns review comments; `gps` returns a decision-ready brief. Worth defending by making this output stable, citable, and diffable across runs.
 
 ### Honest recommendation
 
-If `dna` shipped today as "yet another tree-sitter MCP with impact analysis", it would be the 9th such tool and would lose to Sverklo (retrieval quality), code-graph-mcp (feature breadth), and Greptile (distribution). The sharpest two differentiators to lean into:
+If `gps` shipped today as "yet another tree-sitter MCP with impact analysis", it would be the 9th such tool and would lose to Sverklo (retrieval quality), code-graph-mcp (feature breadth), and Greptile (distribution). The sharpest two differentiators to lean into:
 
 - **Invariants.** Build the authoring UX (YAML + AI-assisted drafting from PRs/docs), the evidence link format, and a small library of starter invariants for common stacks (Stripe, auth, GDPR, multi-tenant isolation). This is the one strand no competitor has.
 - **Runtime/data provenance (v1 roadmap).** OTel/Sentry/Datadog traces tying symbols to real production behavior, and data-layer touches (which tables/columns a symbol writes). No OSS competitor does this; it requires plumbing competitors won't build casually.

@@ -26,9 +26,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Build first: workspace packages (dna-llm, dna-cli, …) import sibling
+      # Build first: workspace packages (gps-llm, gps-cli, …) import sibling
       # packages by their published entrypoints, so the .d.ts files must exist
-      # before `tsc --noEmit` can resolve `@invariance/dna-schemas` etc.
+      # before `tsc --noEmit` can resolve `@invariance/gps-schemas` etc.
       - run: pnpm -r build
 
       - run: pnpm -r typecheck

@@ -26,16 +26,16 @@ importers:
 
   packages/cli:
     dependencies:
-      '@invariance/dna-core':
+      '@invariance/gps-core':
         specifier: workspace:*
         version: link:../core
-      '@invariance/dna-llm':
+      '@invariance/gps-llm':
         specifier: workspace:*
         version: link:../llm
-      '@invariance/dna-mcp':
+      '@invariance/gps-mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@invariance/dna-schemas':
+      '@invariance/gps-schemas':
         specifier: workspace:*
         version: link:../schemas
       commander:
@@ -50,7 +50,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@invariance/dna-schemas':
+      '@invariance/gps-schemas':
         specifier: workspace:*
         version: link:../schemas
       chokidar:
@@ -74,7 +74,7 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.88.0
         version: 0.88.0(zod@3.25.76)
-      '@invariance/dna-schemas':
+      '@invariance/gps-schemas':
         specifier: workspace:*
         version: link:../schemas
       yaml:
@@ -83,13 +83,13 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@invariance/dna-core':
+      '@invariance/gps-core':
         specifier: workspace:*
         version: link:../core
-      '@invariance/dna-llm':
+      '@invariance/gps-llm':
         specifier: workspace:*
         version: link:../llm
-      '@invariance/dna-schemas':
+      '@invariance/gps-schemas':
         specifier: workspace:*
         version: link:../schemas
       '@modelcontextprotocol/sdk':

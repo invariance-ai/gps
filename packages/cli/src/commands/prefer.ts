@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { addPreference } from "@invariance/dna-core";
-import type { PreferenceScope, PreferenceSource } from "@invariance/dna-schemas";
+import { addPreference } from "@invariance/gps-core";
+import type { PreferenceScope, PreferenceSource } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {

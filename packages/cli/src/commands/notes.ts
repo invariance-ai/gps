@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { loadNotes, loadAllNotes, rankNotes } from "@invariance/dna-core";
+import { loadNotes, loadAllNotes, rankNotes } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerNotes(program: Command): void {

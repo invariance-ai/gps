@@ -14,7 +14,7 @@ import {
   rankDecisions,
   rankNotes,
   resolveSymbol,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface WhyOpts extends RootOption {
@@ -30,7 +30,7 @@ export function registerWhy(program: Command): void {
   addRootOption(
     program
       .command("why <symbol>")
-      .description("Everything dna knows about a symbol, in one answer")
+      .description("Everything gps knows about a symbol, in one answer")
       .option("--json", "Emit JSON"),
   ).action(async (symbol: string, opts: WhyOpts) => {
     const root = resolveRoot(opts);

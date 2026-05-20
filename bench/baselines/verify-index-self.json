@@ -23,7 +23,7 @@
       "from_file": "packages/cli/src/commands/init.ts",
       "from_line": 127,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -31,7 +31,7 @@
       "from_file": "packages/cli/src/commands/assume.ts",
       "from_line": 85,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -39,7 +39,7 @@
       "from_file": "packages/cli/src/commands/postmortem.ts",
       "from_line": 65,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -47,7 +47,7 @@
       "from_file": "packages/cli/src/commands/trace.ts",
       "from_line": 19,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -55,21 +55,21 @@
       "from_file": "bench/perf/run-queries.ts",
       "from_line": 59,
       "callee": "clearIndexCache",
-      "dna_resolved_to": "packages/core/src/index_store.ts:clearIndexCache",
+      "gps_resolved_to": "packages/core/src/index_store.ts:clearIndexCache",
       "issue": "ts_says_no_target"
     },
     {
       "from_file": "bench/perf/accuracy.ts",
       "from_line": 215,
       "callee": "getContext",
-      "dna_resolved_to": "packages/core/src/query.ts:getContext",
+      "gps_resolved_to": "packages/core/src/query.ts:getContext",
       "issue": "ts_says_no_target"
     },
     {
       "from_file": "packages/cli/src/commands/context.ts",
       "from_line": 36,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -77,7 +77,7 @@
       "from_file": "packages/cli/src/commands/sync.ts",
       "from_line": 23,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -85,7 +85,7 @@
       "from_file": "packages/cli/src/commands/questions.ts",
       "from_line": 96,
       "callee": "resolveRoot",
-      "dna_resolved_to": "bench/perf/run.ts:resolveRoot",
+      "gps_resolved_to": "bench/perf/run.ts:resolveRoot",
       "ts_resolved_to": "packages/cli/src/root.ts:resolveRoot",
       "issue": "wrong_target"
     },
@@ -93,7 +93,7 @@
       "from_file": "bench/perf/accuracy.ts",
       "from_line": 49,
       "callee": "testsForSymbol",
-      "dna_resolved_to": "packages/core/src/tests.ts:testsForSymbol",
+      "gps_resolved_to": "packages/core/src/tests.ts:testsForSymbol",
       "issue": "ts_says_no_target"
     }
   ],

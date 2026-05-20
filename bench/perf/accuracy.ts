@@ -10,15 +10,15 @@
  *   Q2. "What functions does <symbol> call?"      — callees recall
  *   Q3. "Which tests cover <symbol>?"             — test linkage
  *
- * Ground truth comes from DNA's own structural index (treated as the oracle
+ * Ground truth comes from GPS's own structural index (treated as the oracle
  * for callers/callees because it parses the AST). For tests, ground truth is
- * the DNA testsForSymbol result. We then ask claude -p to extract the answer
+ * the GPS testsForSymbol result. We then ask claude -p to extract the answer
  * set from each tool's output and score recall against the oracle.
  *
- * This is intentionally asymmetric in DNA's favour for callers/callees (DNA
+ * This is intentionally asymmetric in GPS's favour for callers/callees (GPS
  * is the oracle), but the *interesting* number is whether rg and cmm can
  * also recover those answers — and at what token cost. The goal is to show
- * DNA delivers the same answer for far fewer tokens, not that DNA "knows"
+ * GPS delivers the same answer for far fewer tokens, not that GPS "knows"
  * more.
  */
 import { spawn } from "node:child_process";
@@ -29,7 +29,7 @@ import {
   callersOf,
   calleesOf,
   testsForSymbol,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 
 export interface OracleAnswer {
   symbol: string;

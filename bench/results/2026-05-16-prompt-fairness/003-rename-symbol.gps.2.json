@@ -1,0 +1,10 @@
+{
+  "task_id": "003-rename-symbol",
+  "arm": "gps",
+  "attempt": 2,
+  "passed": true,
+  "failed_checks": [],
+  "duration_sec": 44.861,
+  "output_chars": 403,
+  "timed_out": false
+}

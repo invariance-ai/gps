@@ -4,7 +4,7 @@ import type {
   PulseFinding,
   PulseResult,
   PulseSeverity,
-} from "@invariance/dna-schemas";
+} from "@invariance/gps-schemas";
 import { gate } from "./gate.js";
 import { loadNotes, rankNotes } from "./notes.js";
 import { loadDecisions } from "./decisions.js";
@@ -27,7 +27,7 @@ const SEV_WEIGHT: Record<PulseSeverity, number> = {
 };
 
 /**
- * Compose a diff-time risk report. Pure reads — no side effects on .dna/.
+ * Compose a diff-time risk report. Pure reads — no side effects on .gps/.
  * Weighting is intentionally simple so the score is explainable on a PR.
  */
 export async function pulse(root: string, opts: PulseOptions = {}): Promise<PulseResult> {
@@ -160,7 +160,7 @@ function renderMarkdown(
 ): string {
   const emoji = band === "block" ? "🛑" : band === "high" ? "⚠️" : band === "medium" ? "🟡" : "🟢";
   const lines: string[] = [];
-  lines.push(`# dna pulse ${emoji} risk=${round(score)} (${band})`);
+  lines.push(`# gps pulse ${emoji} risk=${round(score)} (${band})`);
   lines.push("");
   lines.push(`**Base:** \`${base}\``);
   lines.push(`**Changed files:** ${files.length} · **Changed symbols:** ${symbols.length}`);

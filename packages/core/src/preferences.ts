@@ -7,9 +7,9 @@ import {
   type Preference as PreferenceT,
   type PreferenceScope,
   type PreferenceSource,
-} from "@invariance/dna-schemas";
+} from "@invariance/gps-schemas";
 
-const REL = ".dna/preferences.yml";
+const REL = ".gps/preferences.yml";
 
 export function preferencesPath(root: string): string {
   return path.join(root, REL);
@@ -93,7 +93,7 @@ export async function removePreference(root: string, id: string): Promise<boolea
  *   "i prefer terse explanations"
  *   "don't add comments unless asked"
  *
- * Conservative on purpose: false negatives are fine (user can `dna prefer`
+ * Conservative on purpose: false negatives are fine (user can `gps prefer`
  * manually); false positives spam the preferences file. Requires both a
  * directive cue and a meaningful predicate (>= 3 content words).
  */

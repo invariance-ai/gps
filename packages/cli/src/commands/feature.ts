@@ -18,7 +18,7 @@ import {
   setActive,
   switchActive,
   topSymbols,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 const execFile = promisify(_execFile);
@@ -94,7 +94,7 @@ export function registerFeature(program: Command): void {
       return;
     }
     if (entries.length === 0) {
-      console.log(kleur.dim("no features yet — agents tag a session with `dna feature use <label>`"));
+      console.log(kleur.dim("no features yet — agents tag a session with `gps feature use <label>`"));
       return;
     }
     for (const f of entries) {

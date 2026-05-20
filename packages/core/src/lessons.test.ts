@@ -9,12 +9,12 @@ import {
   LESSONS_OPEN,
   LESSONS_CLOSE,
 } from "./claude_md.js";
-import { writeIndex, type DnaIndex } from "./index_store.js";
+import { writeIndex, type GpsIndex } from "./index_store.js";
 
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-lessons-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-lessons-"));
   roots.push(root);
   return root;
 }
@@ -34,7 +34,7 @@ describe("classifyHeuristic", () => {
   });
 
   it("labels a single symbol mention as symbol", () => {
-    const idx: DnaIndex = {
+    const idx: GpsIndex = {
       version: 1,
       built_at: "",
       root: "",
@@ -48,7 +48,7 @@ describe("classifyHeuristic", () => {
   });
 
   it("labels file-path mention with no symbols as file", () => {
-    const idx: DnaIndex = {
+    const idx: GpsIndex = {
       version: 1,
       built_at: "",
       root: "",
@@ -104,9 +104,9 @@ describe("CLAUDE.md global block", () => {
 });
 
 describe("persistLesson + listLessons + reclassifyLesson", () => {
-  it("symbol scope writes to .dna/notes and is listable", async () => {
+  it("symbol scope writes to .gps/notes and is listable", async () => {
     const root = await tempRepo();
-    const idx: DnaIndex = {
+    const idx: GpsIndex = {
       version: 1,
       built_at: "",
       root,
@@ -122,7 +122,7 @@ describe("persistLesson + listLessons + reclassifyLesson", () => {
       severity: "high",
     });
     expect(res.scope).toBe("symbol");
-    expect(res.path).toContain(".dna/notes/createRefund.yml");
+    expect(res.path).toContain(".gps/notes/createRefund.yml");
 
     const lessons = await listLessons(root);
     expect(lessons.find((l) => l.id === res.id)).toBeTruthy();

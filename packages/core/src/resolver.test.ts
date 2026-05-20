@@ -8,7 +8,7 @@ import { buildResolver } from "./resolver.js";
 describe("resolver (cross-file imports)", () => {
   let root: string;
   beforeAll(async () => {
-    root = await mkdtemp(path.join(os.tmpdir(), "dna-resolver-"));
+    root = await mkdtemp(path.join(os.tmpdir(), "gps-resolver-"));
     await mkdir(path.join(root, "src"), { recursive: true });
   });
   afterAll(async () => {

@@ -15,12 +15,12 @@ import { loadFeatures, setActive } from "./features.js";
 import { classifyHeuristic } from "./lessons.js";
 import { recordDirective } from "./lessons.js";
 import { loadAreaNotes } from "./notes.js";
-import type { AliasBinding, FeaturesFile } from "@invariance/dna-schemas";
+import type { AliasBinding, FeaturesFile } from "@invariance/gps-schemas";
 
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-areas-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-areas-"));
   roots.push(root);
   return root;
 }
@@ -167,9 +167,9 @@ describe("matchAliasesInPrompt", () => {
 describe("loadFeatures backward-compat", () => {
   it("parses a features.yml with no aliases key", async () => {
     const root = await tempRepo();
-    await mkdir(path.join(root, ".dna"), { recursive: true });
+    await mkdir(path.join(root, ".gps"), { recursive: true });
     await writeFile(
-      path.join(root, ".dna/features.yml"),
+      path.join(root, ".gps/features.yml"),
       stringifyYaml({ version: 1, features: {} }),
     );
     const features = await loadFeatures(root);

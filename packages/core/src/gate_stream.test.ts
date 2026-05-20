@@ -11,7 +11,7 @@ import {
 describe("gate_stream seq cursor", () => {
   let root: string;
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "dna-gate-stream-"));
+    root = await mkdtemp(path.join(tmpdir(), "gps-gate-stream-"));
   });
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });

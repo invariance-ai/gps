@@ -7,9 +7,9 @@
 | agent | arm | pass rate (95% CI) | mean duration (s) | mean output (chars) | timed out |
 |---|---|---|---|---|---|
 | sonnet | baseline | 77.8% [45, 94] | 46.6 | 451 | 0 |
-| sonnet | dna | 77.8% [45, 94] | 39.6 | 372 | 0 |
+| sonnet | gps | 77.8% [45, 94] | 39.6 | 372 | 0 |
 
-## Per agent × task (baseline → dna)
+## Per agent × task (baseline → gps)
 
 | agent | 004-hidden-caller | 005-invariant-respect | 006-cross-file-extract |
 |---|---|---|---|
@@ -17,7 +17,7 @@
 
 ## Per task (aggregate across agents)
 
-| task | baseline | dna | delta |
+| task | baseline | gps | delta |
 |---|---|---|---|
 | 004-hidden-caller | 100.0% | 100.0% | 0.0pp |
 | 005-invariant-respect | 33.3% | 33.3% | 0.0pp |
@@ -28,4 +28,4 @@
 | arm | pass rate (95% CI) | mean duration (s) | mean output (chars) | timed out |
 |---|---|---|---|---|
 | baseline | 77.8% [45, 94] | 46.6 | 451 | 0 |
-| dna      | 77.8% [45, 94] | 39.6 | 372 | 0 |
+| gps      | 77.8% [45, 94] | 39.6 | 372 | 0 |

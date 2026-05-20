@@ -6,8 +6,8 @@ import type {
   ClassifierMeta,
   LessonEntry,
   AliasBinding,
-} from "@invariance/dna-schemas";
-import { readIndex, type DnaIndex } from "./index_store.js";
+} from "@invariance/gps-schemas";
+import { readIndex, type GpsIndex } from "./index_store.js";
 import {
   loadFeatures,
   matchFeaturesInPrompt,
@@ -61,7 +61,7 @@ const POSITIONAL_RE =
   /\b(here|this file|this dir(?:ectory)?|this folder|this area|this page|this component|in here)\b/gi;
 
 export interface ClassifyContext {
-  index?: DnaIndex;
+  index?: GpsIndex;
   features?: Awaited<ReturnType<typeof loadFeatures>>;
   aliases?: Record<string, AliasBinding>;
   /** The directory "here"/"this" resolves to, supplied by the caller. */
@@ -86,7 +86,7 @@ function dedupe(arr: string[]): string[] {
   return Array.from(new Set(arr));
 }
 
-function extractSymbols(text: string, index?: DnaIndex): string[] {
+function extractSymbols(text: string, index?: GpsIndex): string[] {
   const out: string[] = [];
   for (const m of text.matchAll(SYMBOLLIKE_RE)) out.push(m[0]);
   for (const m of text.matchAll(QUALIFIED_NAME_RE)) out.push(m[0]);
@@ -108,7 +108,7 @@ function extractSymbols(text: string, index?: DnaIndex): string[] {
   return all.filter((c) => known.has(c) || known.has(c.split(".").pop() ?? ""));
 }
 
-function extractFiles(text: string, index?: DnaIndex): string[] {
+function extractFiles(text: string, index?: GpsIndex): string[] {
   const matches: string[] = [];
   for (const m of text.matchAll(FILEPATH_RE)) matches.push(m[0]);
   const all = dedupe(matches);
@@ -345,7 +345,7 @@ export async function persistLesson(
       return { id, scope: "global", path: p, promoted: true, pending_count: pending.count };
     }
     // Gate failed — stash as a file-scoped note attached to CLAUDE.md so it
-    // surfaces in dna get_context for the root config without writing to
+    // surfaces in gps get_context for the root config without writing to
     // the global block prematurely.
     const { file } = await appendFileNote(root, {
       id,
@@ -479,7 +479,7 @@ export async function listLessons(
         lesson: n.lesson,
         severity: n.severity,
         recorded_at: n.recorded_at,
-        path: `.dna/notes/${(n.applies_to ?? n.symbol).replace(/[/\\:]/g, "__").replace(/\./g, "_")}.yml`,
+        path: `.gps/notes/${(n.applies_to ?? n.symbol).replace(/[/\\:]/g, "__").replace(/\./g, "_")}.yml`,
       });
     }
   }
@@ -613,7 +613,7 @@ export async function recordDirective(
   const area = await resolveActiveArea(root, opts.area);
   if (!area) {
     throw new Error(
-      "could not resolve an area for this directive — pass `area` (a directory) or `alias`, or run `dna feature use <label>` first",
+      "could not resolve an area for this directive — pass `area` (a directory) or `alias`, or run `gps feature use <label>` first",
     );
   }
   const polarity = opts.polarity ?? detectPolarity(opts.directive);

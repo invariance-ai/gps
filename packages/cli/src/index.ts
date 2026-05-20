@@ -65,7 +65,7 @@ import { registerSync } from "./commands/sync.js";
 
 export function buildProgram(): Command {
   const program = new Command()
-    .name("dna")
+    .name("gps")
     .description("Codebase context for coding agents.")
     .version("0.1.0");
 
@@ -73,22 +73,22 @@ export function buildProgram(): Command {
     "beforeAll",
     [
       "Core 5 (the happy path):",
-      "  dna init                              write .dna/config.yml + invariants.yml",
-      "  dna install <claude|codex|cursor>     wire agent hooks + CLAUDE.md / AGENTS.md / .cursor/",
-      "  dna index                             build the symbol graph",
-      "  dna prepare <symbol> --intent <...>   decision-ready brief before edits",
-      "  dna learn <symbol> --lesson <...>     record what an edit taught you",
+      "  gps init                              write .gps/config.yml + invariants.yml",
+      "  gps install <claude|codex|cursor>     wire agent hooks + CLAUDE.md / AGENTS.md / .cursor/",
+      "  gps index                             build the symbol graph",
+      "  gps prepare <symbol> --intent <...>   decision-ready brief before edits",
+      "  gps learn <symbol> --lesson <...>     record what an edit taught you",
       "",
-      "Other essentials: dna doctor (health check), dna find, dna context, dna impact, dna tests.",
-      "Full surface (40+ commands) is available — see https://github.com/invariance-ai/dna#cli.",
+      "Other essentials: gps doctor (health check), gps find, gps context, gps impact, gps tests.",
+      "Full surface (40+ commands) is available — see https://github.com/invariance-ai/gps#cli.",
       "",
     ].join("\n"),
   );
 
   registerAll(program);
 
-  // Curate `dna --help`: only README-documented commands are visible by default.
-  // The full surface still runs and is reachable via `dna <name> --help`.
+  // Curate `gps --help`: only README-documented commands are visible by default.
+  // The full surface still runs and is reachable via `gps <name> --help`.
   const PRIMARY = new Set([
     "init",
     "install",
@@ -119,7 +119,7 @@ export function buildProgram(): Command {
       (cmd as unknown as { _hidden: boolean })._hidden = true;
     }
   }
-  program.showHelpAfterError("(use `dna --help` to see available commands)");
+  program.showHelpAfterError("(use `gps --help` to see available commands)");
 
   return program;
 }
@@ -207,15 +207,15 @@ if (isMain) {
       const msg = err.message ?? String(err);
       if (
         (err.code === "ENOENT" || /ENOENT/.test(msg)) &&
-        /\.dna\/(index\/symbols\.json|config\.yml)/.test(msg)
+        /\.gps\/(index\/symbols\.json|config\.yml)/.test(msg)
       ) {
         const isConfig = /config\.yml/.test(msg);
         console.error(
           isConfig
-            ? "dna is not initialized in this directory. Run `dna init` first."
-            : "No symbol index found. Run `dna index` first (or `dna init` if this is a new repo).",
+            ? "gps is not initialized in this directory. Run `gps init` first."
+            : "No symbol index found. Run `gps index` first (or `gps init` if this is a new repo).",
         );
-        console.error("Run `dna doctor` to see what else is missing.");
+        console.error("Run `gps doctor` to see what else is missing.");
         process.exit(1);
       }
       console.error(msg);

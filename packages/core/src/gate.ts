@@ -1,4 +1,4 @@
-import type { Invariant, SymbolRef } from "@invariance/dna-schemas";
+import type { Invariant, SymbolRef } from "@invariance/gps-schemas";
 import { loadInvariants, invariantsFor } from "./invariants.js";
 import { readIndex } from "./index_store.js";
 import { loadWaivers, isWaived, type Waiver } from "./waivers.js";

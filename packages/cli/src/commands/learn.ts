@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { appendNote } from "@invariance/dna-core";
-import type { NoteSeverity, NoteSource } from "@invariance/dna-schemas";
+import { appendNote } from "@invariance/gps-core";
+import type { NoteSeverity, NoteSource } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerLearn(program: Command): void {

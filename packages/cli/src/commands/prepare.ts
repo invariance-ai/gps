@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { prepareEdit, recordPrepared, inferSymbols, topSymbols } from "@invariance/dna-core";
+import { prepareEdit, recordPrepared, inferSymbols, topSymbols } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface PrepareOpts extends RootOption {
@@ -72,7 +72,7 @@ export function registerPrepare(program: Command): void {
       }
       if (!symbol && opts.feature) {
         const top = await topSymbols(root, opts.feature, 1);
-        if (top.length === 0) throw new Error(`feature "${opts.feature}" has no symbols (run \`dna feature attribute\` first)`);
+        if (top.length === 0) throw new Error(`feature "${opts.feature}" has no symbols (run \`gps feature attribute\` first)`);
         const id = top[0]!.id;
         const hash = id.indexOf("#");
         const tail = hash >= 0 ? id.slice(hash + 1) : id;
@@ -84,7 +84,7 @@ export function registerPrepare(program: Command): void {
         }
       }
       if (!symbol && intentText && intentMatchesAttempted && candidates.length === 0) {
-        throw new Error(`no symbol matches for intent; try \`dna plan "${intentText}"\``);
+        throw new Error(`no symbol matches for intent; try \`gps plan "${intentText}"\``);
       }
       if (!symbol) {
         throw new Error("symbol is required (or pass --intent <text> / --feature <label>)");
@@ -127,7 +127,7 @@ export function registerPrepare(program: Command): void {
           for (const c of candidates) console.log(`- ${c.symbol} (score=${c.score}, via=${c.via})`);
           console.log(kleur.dim("\nPass the symbol name directly to lock the choice."));
         }
-        console.log(kleur.dim("\n→ Run `dna brief` after editing to verify changed symbols, invariants, notes, and tests."));
+        console.log(kleur.dim("\n→ Run `gps brief` after editing to verify changed symbols, invariants, notes, and tests."));
       }
     } catch (e) {
       console.error(kleur.red(`error: ${(e as Error).message}`));

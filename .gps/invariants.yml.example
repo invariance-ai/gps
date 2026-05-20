@@ -1,0 +1,30 @@
+# .gps/invariants.yml — declarative constraints for symbols in your repo.
+# Agents calling `invariants_for(symbol)` will receive matching rules with evidence
+# *before* they edit, so they can avoid violating them.
+
+- name: High-value refunds require approval
+  applies_to:
+    - createRefund
+    - stripe.refunds.create
+  rule: Refunds over 1000 require finance_approval_id.
+  evidence:
+    - docs/refund-policy.md
+  severity: block
+
+- name: All DB writes go through transaction wrapper
+  applies_to:
+    - "db.write*"
+    - "db.update*"
+    - "db.delete*"
+  rule: Every write must be wrapped in withTransaction().
+  evidence:
+    - docs/db-conventions.md
+  severity: warn
+
+- name: No PII in logs
+  applies_to:
+    - "logger.*"
+  rule: Logger calls must not include email, ssn, or full name fields.
+  evidence:
+    - docs/privacy-policy.md
+  severity: block

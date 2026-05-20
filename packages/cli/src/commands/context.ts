@@ -5,7 +5,7 @@ import {
   formatContextPretty,
   formatContextMarkdown,
   featureContext,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface ContextOpts extends RootOption {
@@ -87,7 +87,7 @@ export function registerContext(program: Command): void {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(kleur.red(`error: ${msg}`));
       if (msg.includes("ENOENT") || msg.includes("symbols.json")) {
-        console.error(kleur.dim(`hint: run ${kleur.bold("dna init && dna index")} first.`));
+        console.error(kleur.dim(`hint: run ${kleur.bold("gps init && gps index")} first.`));
       }
       process.exitCode = 1;
     }

@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { addPreference, extractPreferences } from "@invariance/dna-core";
+import { addPreference, extractPreferences } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -68,11 +68,11 @@ export function registerCapturePreference(program: Command): void {
       return;
     }
     if (opts.emit && recorded.length > 0) {
-      const lines = ["<!-- dna:captured-prefs -->"];
-      lines.push(`dna captured ${recorded.length} preference${recorded.length === 1 ? "" : "s"} from this prompt:`);
+      const lines = ["<!-- gps:captured-prefs -->"];
+      lines.push(`gps captured ${recorded.length} preference${recorded.length === 1 ? "" : "s"} from this prompt:`);
       for (const p of recorded) lines.push(`- ${p.text}`);
-      lines.push("Run `dna preferences` to review or `dna prefer --remove <id>` to drop.");
-      lines.push("<!-- /dna:captured-prefs -->");
+      lines.push("Run `gps preferences` to review or `gps prefer --remove <id>` to drop.");
+      lines.push("<!-- /gps:captured-prefs -->");
       console.log(lines.join("\n"));
     }
   });

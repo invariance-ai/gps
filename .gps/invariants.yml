@@ -1,0 +1,12 @@
+# .gps/invariants.yml — declarative constraints for symbols in your repo.
+# Agents calling `invariants_for(symbol)` will receive matching rules with
+# evidence *before* they edit, so they can avoid violating them.
+
+- name: Example — high-value refunds require approval
+  applies_to:
+    - createRefund
+    - "stripe.refunds.create"
+  rule: Refunds over 1000 require finance_approval_id.
+  evidence:
+    - docs/refund-policy.md
+  severity: block

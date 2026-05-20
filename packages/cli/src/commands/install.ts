@@ -80,11 +80,11 @@ export function resolveCmd(opts: { useGlobal?: boolean; useLocal?: boolean }): C
     return { shell: `node ${JSON.stringify(bin)}`, command: "node", baseArgs: [bin], mode: "local" };
   }
   if (opts.useGlobal) {
-    return { shell: "dna", command: "dna", baseArgs: [], mode: "global" };
+    return { shell: "gps", command: "gps", baseArgs: [], mode: "global" };
   }
   // Auto-detect: when running from a workspace checkout (CLI not inside node_modules)
   // and the user didn't pin a mode, prefer local — hooks built for npx silently no-op
-  // until `@invariance/dna` is on npm. CI keeps the npx default for predictability.
+  // until `@invariance/gps` is on npm. CI keeps the npx default for predictability.
   const bin = localBinPath();
   if (bin && !process.env.CI && !bin.includes(`${path.sep}node_modules${path.sep}`)) {
     process.stderr.write(
@@ -95,23 +95,23 @@ export function resolveCmd(opts: { useGlobal?: boolean; useLocal?: boolean }): C
     return { shell: `node ${JSON.stringify(bin)}`, command: "node", baseArgs: [bin], mode: "local" };
   }
   return {
-    shell: "npx -y @invariance/dna",
+    shell: "npx -y @invariance/gps",
     command: "npx",
-    baseArgs: ["-y", "@invariance/dna"],
+    baseArgs: ["-y", "@invariance/gps"],
     mode: "npx",
   };
 }
 
 export function registerInstall(program: Command): void {
-  const install = program.command("install").description("Install dna agent integrations");
+  const install = program.command("install").description("Install gps agent integrations");
 
   addRootOption(
     install
       .command("claude")
       .description("Install Claude Code CLI-first instructions, skill, and hooks")
-      .option("--force", "Overwrite existing dna-managed Claude files")
-      .option("--skip-claude-md", "Do not append dna instructions to CLAUDE.md")
-      .option("--use-global", "Generate hooks that call `dna` directly (requires global install)")
+      .option("--force", "Overwrite existing gps-managed Claude files")
+      .option("--skip-claude-md", "Do not append gps instructions to CLAUDE.md")
+      .option("--use-global", "Generate hooks that call `gps` directly (requires global install)")
       .option("--use-local", "Generate hooks that call this CLI by absolute path (for dogfood/dev)")
       .option("--dry-run", "Show what would be written without touching disk"),
   ).action(async (opts: InstallOpts) => {
@@ -125,7 +125,7 @@ export function registerInstall(program: Command): void {
         spec,
       });
       console.log("");
-      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Claude Code CLI-first dna integration");
+      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Claude Code CLI-first gps integration");
       console.log(kleur.dim(`Hooks call: ${spec.shell}`));
       console.log(
         kleur.dim("Hooks fire on session start, prompts, edits, failures, brief on stop, and turn end."),
@@ -139,9 +139,9 @@ export function registerInstall(program: Command): void {
     install
       .command("codex")
       .description("Install Codex CLI integration: AGENTS.md, .codex/config.toml notify + MCP")
-      .option("--force", "Overwrite existing dna-managed Codex files")
-      .option("--skip-agents-md", "Do not append dna instructions to AGENTS.md")
-      .option("--use-global", "Configure Codex to call `dna` directly (requires global install)")
+      .option("--force", "Overwrite existing gps-managed Codex files")
+      .option("--skip-agents-md", "Do not append gps instructions to AGENTS.md")
+      .option("--use-global", "Configure Codex to call `gps` directly (requires global install)")
       .option("--use-local", "Configure Codex to call this CLI by absolute path (for dogfood/dev)")
       .option("--dry-run", "Show what would be written without touching disk"),
   ).action(async (opts: CodexInstallOpts) => {
@@ -155,9 +155,9 @@ export function registerInstall(program: Command): void {
         spec,
       });
       console.log("");
-      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Codex CLI dna integration");
+      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Codex CLI gps integration");
       console.log(kleur.dim(`Notify hook + MCP server use: ${spec.shell}`));
-      console.log(kleur.dim("Codex CLI has no PreToolUse hook; AGENTS.md teaches it to run `dna prepare` and `dna brief` like `rg`."));
+      console.log(kleur.dim("Codex CLI has no PreToolUse hook; AGENTS.md teaches it to run `gps prepare` and `gps brief` like `rg`."));
     } finally {
       DRY_RUN = false;
     }
@@ -166,10 +166,10 @@ export function registerInstall(program: Command): void {
   addRootOption(
     install
       .command("cursor")
-      .description("Install Cursor integration: .cursor/rules/dna.mdc + .cursor/mcp.json")
-      .option("--force", "Overwrite existing dna-managed Cursor files")
+      .description("Install Cursor integration: .cursor/rules/gps.mdc + .cursor/mcp.json")
+      .option("--force", "Overwrite existing gps-managed Cursor files")
       .option("--skip-mcp", "Do not write .cursor/mcp.json (rule file only)")
-      .option("--use-global", "Configure MCP to call `dna` directly (requires global install)")
+      .option("--use-global", "Configure MCP to call `gps` directly (requires global install)")
       .option("--use-local", "Configure MCP to call this CLI by absolute path (for dogfood/dev)")
       .option("--dry-run", "Show what would be written without touching disk"),
   ).action(async (opts: CursorInstallOpts) => {
@@ -183,9 +183,9 @@ export function registerInstall(program: Command): void {
         spec,
       });
       console.log("");
-      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Cursor dna integration");
+      console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Cursor gps integration");
       console.log(kleur.dim(`MCP server uses: ${spec.shell}`));
-      console.log(kleur.dim("Cursor has no shell hooks; .cursor/rules/dna.mdc teaches the agent to run `dna prepare` before edits and `dna brief` after."));
+      console.log(kleur.dim("Cursor has no shell hooks; .cursor/rules/gps.mdc teaches the agent to run `gps prepare` before edits and `gps brief` after."));
     } finally {
       DRY_RUN = false;
     }
@@ -200,7 +200,7 @@ export interface RunInstallClaudeOpts {
 
 export async function runInstallClaude(root: string, opts: RunInstallClaudeOpts): Promise<void> {
   const writes: Array<[string, string]> = [
-    [path.join(root, ".claude/skills/dna/SKILL.md"), CLAUDE_SKILL],
+    [path.join(root, ".claude/skills/gps/SKILL.md"), CLAUDE_SKILL],
     [
       path.join(root, ".claude/settings.json"),
       JSON.stringify(claudeSettings(opts.spec.shell), null, 2) + "\n",
@@ -233,7 +233,7 @@ export interface RunInstallCursorOpts {
 export async function runInstallCursor(root: string, opts: RunInstallCursorOpts): Promise<void> {
   await writeManagedFile(
     root,
-    path.join(root, ".cursor/rules/dna.mdc"),
+    path.join(root, ".cursor/rules/gps.mdc"),
     CURSOR_RULE,
     opts.force,
   );
@@ -275,11 +275,11 @@ async function upsertAgentMd(root: string, filename: string): Promise<void> {
   } catch {
     // create below
   }
-  const next = existing.includes("<!-- dna:start -->")
-    ? existing.replace(/<!-- dna:start -->[\s\S]*?<!-- dna:end -->\n?/m, AGENT_INSTRUCTIONS)
+  const next = existing.includes("<!-- gps:start -->")
+    ? existing.replace(/<!-- gps:start -->[\s\S]*?<!-- gps:end -->\n?/m, AGENT_INSTRUCTIONS)
     : `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${AGENT_INSTRUCTIONS}`;
   if (DRY_RUN) {
-    const verb = existing.includes("<!-- dna:start -->") ? "would refresh dna block in" : existing ? "would append dna block to" : "would create";
+    const verb = existing.includes("<!-- gps:start -->") ? "would refresh gps block in" : existing ? "would append gps block to" : "would create";
     console.log(kleur.yellow(`${verb}  `) + path.relative(root, file));
     return;
   }
@@ -391,8 +391,8 @@ function claudeSettings(cmd: string): unknown {
 }
 
 /**
- * Merge dna entries into .codex/config.toml without parsing TOML. We append a
- * managed block delimited by `# dna:start` / `# dna:end` and rewrite that span
+ * Merge gps entries into .codex/config.toml without parsing TOML. We append a
+ * managed block delimited by `# gps:start` / `# gps:end` and rewrite that span
  * on subsequent installs. Anything outside the markers is preserved verbatim.
  */
 async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
@@ -407,22 +407,22 @@ async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
 
   const tomlArr = (xs: string[]): string => "[" + xs.map((x) => JSON.stringify(x)).join(", ") + "]";
   const mcpEntry =
-    `[mcp_servers.dna]\n` +
+    `[mcp_servers.gps]\n` +
     `command = ${JSON.stringify(spec.command)}\n` +
     `args = ${tomlArr([...spec.baseArgs, "serve"])}\n`;
   const notifyArgs = tomlArr([spec.command, ...spec.baseArgs, "attach", "--transcript", "-"]);
 
   const block =
-    `# dna:start — managed by \`dna install codex\`. Edit outside markers freely.\n` +
+    `# gps:start — managed by \`gps install codex\`. Edit outside markers freely.\n` +
     `notify = ${notifyArgs}\n\n` +
     `${mcpEntry}` +
-    `# dna:end\n`;
+    `# gps:end\n`;
 
-  const next = existing.includes("# dna:start")
-    ? existing.replace(/# dna:start[\s\S]*?# dna:end\n?/m, block)
+  const next = existing.includes("# gps:start")
+    ? existing.replace(/# gps:start[\s\S]*?# gps:end\n?/m, block)
     : `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${block}`;
   if (DRY_RUN) {
-    const verb = existing.includes("# dna:start") ? "would refresh dna block in" : existing ? "would append dna block to" : "would create";
+    const verb = existing.includes("# gps:start") ? "would refresh gps block in" : existing ? "would append gps block to" : "would create";
     console.log(kleur.yellow(`${verb}  `) + path.relative(root, file));
     return;
   }
@@ -431,8 +431,8 @@ async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
 }
 
 /**
- * Merge a `dna` entry into `.mcp.json` at the repo root. Claude Code reads
- * this file at session start; we own only the `mcpServers.dna` key and leave
+ * Merge a `gps` entry into `.mcp.json` at the repo root. Claude Code reads
+ * this file at session start; we own only the `mcpServers.gps` key and leave
  * the rest of the JSON intact so users can mix in other MCP servers.
  *
  * This is what makes the SKILL.md `prepare_edit` advice actually callable —
@@ -449,10 +449,10 @@ async function upsertClaudeMcp(root: string, spec: CmdSpec): Promise<void> {
   }
   const servers =
     (existing.mcpServers as Record<string, unknown> | undefined) ?? {};
-  servers.dna = { command: spec.command, args: [...spec.baseArgs, "serve"] };
+  servers.gps = { command: spec.command, args: [...spec.baseArgs, "serve"] };
   const next = { ...existing, mcpServers: servers };
   if (DRY_RUN) {
-    console.log(kleur.yellow(`would upsert mcpServers.dna in  `) + path.relative(root, file));
+    console.log(kleur.yellow(`would upsert mcpServers.gps in  `) + path.relative(root, file));
     return;
   }
   await writeFile(file, JSON.stringify(next, null, 2) + "\n");
@@ -460,8 +460,8 @@ async function upsertClaudeMcp(root: string, spec: CmdSpec): Promise<void> {
 }
 
 /**
- * Merge a `dna` entry into `.cursor/mcp.json`. Cursor reads this file at
- * session start; we own only the `mcpServers.dna` key and leave the rest
+ * Merge a `gps` entry into `.cursor/mcp.json`. Cursor reads this file at
+ * session start; we own only the `mcpServers.gps` key and leave the rest
  * of the JSON intact so users can mix in other MCP servers.
  */
 async function upsertCursorMcp(root: string, spec: CmdSpec): Promise<void> {
@@ -476,10 +476,10 @@ async function upsertCursorMcp(root: string, spec: CmdSpec): Promise<void> {
   }
   const servers =
     (existing.mcpServers as Record<string, unknown> | undefined) ?? {};
-  servers.dna = { command: spec.command, args: [...spec.baseArgs, "serve"] };
+  servers.gps = { command: spec.command, args: [...spec.baseArgs, "serve"] };
   const next = { ...existing, mcpServers: servers };
   if (DRY_RUN) {
-    console.log(kleur.yellow(`would upsert mcpServers.dna in  `) + path.relative(root, file));
+    console.log(kleur.yellow(`would upsert mcpServers.gps in  `) + path.relative(root, file));
     return;
   }
   await writeFile(file, JSON.stringify(next, null, 2) + "\n");

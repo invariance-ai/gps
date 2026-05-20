@@ -9,13 +9,13 @@ import {
   reportParserFallbacks,
   loadParseCache,
   saveParseCache,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerIndex(program: Command): void {
   addRootOption(program
     .command("index")
-    .description("Scan repo, build symbol graph, write .dna/index/symbols.json")
+    .description("Scan repo, build symbol graph, write .gps/index/symbols.json")
     .option("--quiet", "Suppress stdout (for hook usage)"))
     .action(async (opts: RootOption & { quiet?: boolean }) => {
       const root = resolveRoot(opts);

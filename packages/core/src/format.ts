@@ -4,12 +4,12 @@ import type {
   Invariant,
   TestRef,
   ProvenanceEntry,
-} from "@invariance/dna-schemas";
+} from "@invariance/gps-schemas";
 
 // Auto-strip ANSI when piped (agents shelling out via Bash) or NO_COLOR is set.
-// Set DNA_FORCE_COLOR=1 to override.
+// Set GPS_FORCE_COLOR=1 to override.
 const useColor =
-  process.env.DNA_FORCE_COLOR === "1" ||
+  process.env.GPS_FORCE_COLOR === "1" ||
   (!process.env.NO_COLOR && !!process.stdout.isTTY);
 const w = (code: string) => (s: string) =>
   useColor ? `\x1b[${code}m${s}\x1b[0m` : s;

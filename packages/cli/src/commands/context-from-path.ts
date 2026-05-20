@@ -6,7 +6,7 @@ import {
   loadAreaNotes,
   loadFeatureNotes,
   loadAliases,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -14,7 +14,7 @@ interface Opts extends RootOption {
   json?: boolean;
 }
 
-const SURFACED_REL = ".dna/session/area-surfaced";
+const SURFACED_REL = ".gps/session/area-surfaced";
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return "";
@@ -115,8 +115,8 @@ export function registerContextFromPath(program: Command): void {
     }
 
     const lines: string[] = [];
-    lines.push("<!-- dna:auto-context -->");
-    lines.push(`## dna auto-loaded context — area \`${area}\``);
+    lines.push("<!-- gps:auto-context -->");
+    lines.push(`## gps auto-loaded context — area \`${area}\``);
     lines.push("");
     lines.push("You're working in an area with prior directives. Respect them.");
     lines.push("");
@@ -131,7 +131,7 @@ export function registerContextFromPath(program: Command): void {
         lines.push(`- [${n.severity ?? "info"}] ${n.lesson}`);
       }
     }
-    lines.push("<!-- /dna:auto-context -->");
+    lines.push("<!-- /gps:auto-context -->");
     console.log(lines.join("\n"));
   });
 }

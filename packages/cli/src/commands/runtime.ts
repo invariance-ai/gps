@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { importRuntimeJSON, loadRuntime, runtimeForSymbol } from "@invariance/dna-core";
+import { importRuntimeJSON, loadRuntime, runtimeForSymbol } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerRuntime(program: Command): void {
@@ -14,7 +14,7 @@ export function registerRuntime(program: Command): void {
     const root = resolveRoot(opts);
     try {
       const store = await importRuntimeJSON(root, file);
-      console.log(kleur.green(`✓ imported ${store.events.length} event(s) → .dna/runtime.json`));
+      console.log(kleur.green(`✓ imported ${store.events.length} event(s) → .gps/runtime.json`));
     } catch (e) {
       console.error(kleur.red(`error: ${(e as Error).message}`));
       process.exitCode = 1;

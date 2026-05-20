@@ -3,16 +3,16 @@ import { readFile, appendFile, access } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import { stringify as stringifyYaml } from "yaml";
-import { fetchPr, ghAvailable } from "@invariance/dna-core";
-import { DnaLlm, proposeInvariant } from "@invariance/dna-llm";
+import { fetchPr, ghAvailable } from "@invariance/gps-core";
+import { GpsLlm, proposeInvariant } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 /**
- * `dna postmortem --pr <n>` — given a PR (or a local diff file + symbols),
+ * `gps postmortem --pr <n>` — given a PR (or a local diff file + symbols),
  * propose an invariant that would have caught the regression.
  *
  * Default is interactive: print the proposed YAML and ask for confirmation
- * before appending to .dna/invariants.yml. --append-without-confirm for CI;
+ * before appending to .gps/invariants.yml. --append-without-confirm for CI;
  * --dry-run to see the prompt without burning API tokens.
  */
 
@@ -103,7 +103,7 @@ export function registerPostmortem(program: Command): void {
       if (opts.testOutput) failing = await readFile(opts.testOutput, "utf8");
 
       // 2. Run LLM
-      const llm = new DnaLlm({
+      const llm = new GpsLlm({
         apiKey: opts.apiKey,
         model: opts.model,
         dryRun: !opts.callApi || !!opts.dryRun,
@@ -125,7 +125,7 @@ export function registerPostmortem(program: Command): void {
         console.log(kleur.dim("--- user ---"));
         console.log(result.dry_run_prompt!.user);
         console.log("");
-        console.log(kleur.dim("Have the native agent return YAML, then paste it into .dna/invariants.yml or record it with dna invariants tooling."));
+        console.log(kleur.dim("Have the native agent return YAML, then paste it into .gps/invariants.yml or record it with gps invariants tooling."));
         return;
       }
 
@@ -143,7 +143,7 @@ export function registerPostmortem(program: Command): void {
       console.log("");
 
       // 4. Append or prompt
-      const invPath = path.join(root, ".dna", "invariants.yml");
+      const invPath = path.join(root, ".gps", "invariants.yml");
       if (opts.appendWithoutConfirm) {
         await appendInvariant(invPath, result.invariant);
         console.log(kleur.green(`appended → ${path.relative(root, invPath)}`));
@@ -151,7 +151,7 @@ export function registerPostmortem(program: Command): void {
       }
       console.log(
         kleur.dim(
-          `To append: rerun with --append-without-confirm, or paste the YAML into .dna/invariants.yml manually.`,
+          `To append: rerun with --append-without-confirm, or paste the YAML into .gps/invariants.yml manually.`,
         ),
       );
     } catch (e) {

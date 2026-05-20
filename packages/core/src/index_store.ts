@@ -1,20 +1,20 @@
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import path from "node:path";
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import type { ParsedFile } from "./parser.js";
 import { buildResolver, type Resolver } from "./resolver.js";
 import { stableSymbolId } from "./symbol_id.js";
 
 /**
- * v0.1 storage: a single JSON file at .dna/index/symbols.json.
+ * v0.1 storage: a single JSON file at .gps/index/symbols.json.
  *
  * Why not SQLite/Kuzu yet: design-eval recommended SQLite, but for v0.1 the
  * dataset fits in memory comfortably (< 1MB per 100k LOC after compaction),
- * and JSON keeps `npm install -g @invariance/dna` zero-native-deps. SQLite
+ * and JSON keeps `npm install -g @invariance/gps` zero-native-deps. SQLite
  * lands when repos in the wild push us past ~500k LOC or we need incremental
  * persistence between watch ticks.
  */
-export interface DnaIndex {
+export interface GpsIndex {
   version: 1;
   built_at: string;
   root: string;
@@ -32,36 +32,36 @@ export interface DnaIndex {
   }>;
 }
 
-const REL = ".dna/index/symbols.json";
+const REL = ".gps/index/symbols.json";
 
 export function indexPath(root: string): string {
   return path.join(root, REL);
 }
 
-export async function writeIndex(root: string, index: DnaIndex): Promise<void> {
+export async function writeIndex(root: string, index: GpsIndex): Promise<void> {
   const p = indexPath(root);
   await mkdir(path.dirname(p), { recursive: true });
   await writeFile(p, JSON.stringify(index, null, 2));
   indexCache.delete(p);
 }
 
-const indexCache = new Map<string, { mtimeMs: number; size: number; index: DnaIndex }>();
+const indexCache = new Map<string, { mtimeMs: number; size: number; index: GpsIndex }>();
 
 export function clearIndexCache(): void {
   indexCache.clear();
 }
 
 export class IndexNotBuiltError extends Error {
-  readonly code = "DNA_INDEX_NOT_BUILT";
+  readonly code = "GPS_INDEX_NOT_BUILT";
   constructor(public readonly path: string) {
     super(
-      `dna index not found at ${path}. Run \`dna index\` to build it (or \`dna init\` if this repo isn't set up yet).`,
+      `gps index not found at ${path}. Run \`gps index\` to build it (or \`gps init\` if this repo isn't set up yet).`,
     );
     this.name = "IndexNotBuiltError";
   }
 }
 
-export async function readIndex(root: string): Promise<DnaIndex> {
+export async function readIndex(root: string): Promise<GpsIndex> {
   const p = indexPath(root);
   let st;
   try {
@@ -77,7 +77,7 @@ export async function readIndex(root: string): Promise<DnaIndex> {
     return cached.index;
   }
   const raw = await readFile(p, "utf8");
-  const index = JSON.parse(raw) as DnaIndex;
+  const index = JSON.parse(raw) as GpsIndex;
   indexCache.set(p, { mtimeMs: st.mtimeMs, size: st.size, index });
   return index;
 }
@@ -93,10 +93,10 @@ export interface StaleReport {
 
 /**
  * Compare each indexed file's mtime against the index's built_at. Used by
- * `dna validate` and the Stop hook to gate attribution: a stale index will
+ * `gps validate` and the Stop hook to gate attribution: a stale index will
  * map a touched file to the wrong symbol set and silently pollute weights.
  */
-export async function staleFiles(root: string, index: DnaIndex): Promise<StaleReport> {
+export async function staleFiles(root: string, index: GpsIndex): Promise<StaleReport> {
   const builtAt = new Date(index.built_at).getTime();
   const stale_files: string[] = [];
   const missing_files: string[] = [];
@@ -120,7 +120,7 @@ export async function staleFiles(root: string, index: DnaIndex): Promise<StaleRe
   };
 }
 
-export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<DnaIndex> {
+export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<GpsIndex> {
   const symbols: SymbolRef[] = [];
   const byName = new Map<string, SymbolRef[]>();
   const byQualifiedName = new Map<string, SymbolRef>();
@@ -154,7 +154,7 @@ export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<Dn
 
   const resolver: Resolver = await buildResolver(parsed, { root });
 
-  const edges: DnaIndex["edges"] = [];
+  const edges: GpsIndex["edges"] = [];
   for (const file of parsed) {
     const absFile = file.path;
     const relFile = path.relative(root, absFile);
@@ -166,7 +166,7 @@ export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<Dn
       // Try the resolver first (import-graph aware) for "exact".
       const resolved = resolver.resolveCall(absFile, cs.callee_name);
       let to: SymbolRef | undefined;
-      let status: NonNullable<DnaIndex["edges"][number]["resolution_status"]> = "unresolved";
+      let status: NonNullable<GpsIndex["edges"][number]["resolution_status"]> = "unresolved";
       if (resolved.status === "exact" && resolved.target) {
         const targetAbs = resolved.target.file;
         const targetMap = relByAbs.get(targetAbs);

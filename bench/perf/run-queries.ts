@@ -5,7 +5,7 @@ import {
   getContext,
   impactOf,
   resolveSymbol,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { approxTokens, stats, timeIt, type LatencyStats } from "./measure.js";
 
 export interface QueryStats {

@@ -9,14 +9,14 @@ import { loadConfig, scanFiles } from "./scan.js";
 
 /**
  * Live gate stream: watches the working tree and appends gate findings to
- * .dna/cache/gate-stream.jsonl whenever a touched symbol violates an
+ * .gps/cache/gate-stream.jsonl whenever a touched symbol violates an
  * invariant. The watch is debounced (default 500ms) so a burst of edits
  * collapses to one evaluation.
  *
  * Consumed by:
- *   - `dna gate --watch` (prints findings as they arrive)
+ *   - `gps gate --watch` (prints findings as they arrive)
  *   - the `gate_stream` MCP tool (tail since seq or timestamp)
- *   - agent hooks (PostToolUse → `dna gate --changed --json`)
+ *   - agent hooks (PostToolUse → `gps gate --changed --json`)
  *
  * Concurrency note: hooks (one-shot writers) and a long-running `--watch`
  * loop may write to the same JSONL concurrently. We rely on the POSIX
@@ -26,7 +26,7 @@ import { loadConfig, scanFiles } from "./scan.js";
  * under that bound; large hit lists could exceed it. If we ever produce
  * larger entries, switch to an exclusive lockfile or chunked appends.
  */
-const REL = ".dna/cache/gate-stream.jsonl";
+const REL = ".gps/cache/gate-stream.jsonl";
 
 export function gateStreamPath(root: string): string {
   return path.join(root, REL);
@@ -89,7 +89,7 @@ async function readMaxSeq(root: string): Promise<number> {
 
 /**
  * Append a single entry using a short-lived O_APPEND fd. Used by one-shot
- * callers (hooks, `dna gate --changed`) where the cost of opening a fd is
+ * callers (hooks, `gps gate --changed`) where the cost of opening a fd is
  * dwarfed by the gate evaluation itself. See concurrency note above.
  */
 export async function appendGateStreamEntry(
@@ -210,7 +210,7 @@ export async function watchGateStream(
     ignored: [
       /(^|[\\/])node_modules[\\/]/,
       /(^|[\\/])\.git[\\/]/,
-      /(^|[\\/])\.dna[\\/]/,
+      /(^|[\\/])\.gps[\\/]/,
       /(^|[\\/])dist[\\/]/,
       ...(opts.ignored ?? []),
     ],
@@ -255,7 +255,7 @@ export async function watchGateStream(
 
 /**
  * Snapshot the gate against current dirty diff (no watch loop). Used by
- * `dna gate --changed` and the review-diff tool.
+ * `gps gate --changed` and the review-diff tool.
  */
 export async function gateChanged(
   root: string,

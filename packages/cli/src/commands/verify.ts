@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import { execFile as _execFile } from "node:child_process";
 import { promisify } from "node:util";
 import kleur from "kleur";
-import { loadAllNotes, updateNoteById } from "@invariance/dna-core";
+import { loadAllNotes, updateNoteById } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 const execFile = promisify(_execFile);
@@ -53,7 +53,7 @@ export function registerVerify(program: Command): void {
       }
     }
     console.log("");
-    console.log(kleur.dim(`verify with: dna verify <id> [--by <email>]`));
+    console.log(kleur.dim(`verify with: gps verify <id> [--by <email>]`));
   });
 
   addRootOption(

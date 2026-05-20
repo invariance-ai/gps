@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import kleur from "kleur";
-import { appendQuestion } from "@invariance/dna-core";
+import { appendQuestion } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface AskOpts extends RootOption {
@@ -44,7 +44,7 @@ export function registerAsk(program: Command): void {
 
 async function readSessionId(root: string): Promise<string | undefined> {
   try {
-    const id = (await readFile(path.join(root, ".dna/session/id"), "utf8")).trim();
+    const id = (await readFile(path.join(root, ".gps/session/id"), "utf8")).trim();
     return id || undefined;
   } catch {
     return undefined;

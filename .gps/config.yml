@@ -1,0 +1,23 @@
+languages: [typescript, python]
+exclude:
+  - node_modules
+  - dist
+  - build
+  - .next
+  - vendor
+  - __pycache__
+  - .venv
+depth: 3
+strands:
+  - structural
+  - tests
+  - provenance
+  - invariants
+quality:
+  thresholds:
+    # Floors enforced by `gps verify-index` in CI. Set just below current
+    # measured numbers so the gate blocks regressions but doesn't fail today.
+    # Ratchet upward as resolver/parser accuracy improves.
+    precision: 0.85
+    recall: 0.70
+    coverage: 0.40

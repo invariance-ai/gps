@@ -4,12 +4,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { gate } from "./gate.js";
 import { appendWaiver } from "./waivers.js";
-import { writeIndex, type DnaIndex } from "./index_store.js";
+import { writeIndex, type GpsIndex } from "./index_store.js";
 
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-gate-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-gate-"));
   roots.push(root);
   return root;
 }
@@ -22,12 +22,12 @@ afterEach(async () => {
 });
 
 async function seedInvariants(root: string, body: string): Promise<void> {
-  await mkdir(path.join(root, ".dna"), { recursive: true });
-  await writeFile(path.join(root, ".dna/invariants.yml"), body);
+  await mkdir(path.join(root, ".gps"), { recursive: true });
+  await writeFile(path.join(root, ".gps/invariants.yml"), body);
 }
 
 async function seedIndex(root: string): Promise<void> {
-  const idx: DnaIndex = {
+  const idx: GpsIndex = {
     version: 1,
     built_at: new Date().toISOString(),
     root,

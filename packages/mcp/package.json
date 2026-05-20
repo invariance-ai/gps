@@ -1,15 +1,15 @@
 {
-  "name": "@invariance/dna-mcp",
+  "name": "@invariance/gps-mcp",
   "version": "0.1.0",
-  "description": "MCP server for dna — exposes get_context/impact_of/tests_for/invariants_for/prepare_edit to coding agents.",
+  "description": "MCP server for gps — exposes get_context/impact_of/tests_for/invariants_for/prepare_edit to coding agents.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/invariance-ai/dna.git",
+    "url": "https://github.com/invariance-ai/gps.git",
     "directory": "packages/mcp"
   },
-  "homepage": "https://github.com/invariance-ai/dna#readme",
+  "homepage": "https://github.com/invariance-ai/gps#readme",
   "engines": {
     "node": ">=20"
   },
@@ -27,9 +27,9 @@
     "prepublishOnly": "tsc"
   },
   "dependencies": {
-    "@invariance/dna-core": "workspace:*",
-    "@invariance/dna-llm": "workspace:*",
-    "@invariance/dna-schemas": "workspace:*",
+    "@invariance/gps-core": "workspace:*",
+    "@invariance/gps-llm": "workspace:*",
+    "@invariance/gps-schemas": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.23.0"
   }

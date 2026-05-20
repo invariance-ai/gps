@@ -6,7 +6,7 @@ import {
   formatImpactMarkdown,
   diffSymbols,
   open as openQuery,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface ImpactOpts extends RootOption {

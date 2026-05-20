@@ -8,8 +8,8 @@ import type {
   ImpactInput,
   PrepareEditInput,
   PrepareEditResult,
-} from "@invariance/dna-schemas";
-import { readIndex, type DnaIndex } from "./index_store.js";
+} from "@invariance/gps-schemas";
+import { readIndex, type GpsIndex } from "./index_store.js";
 import { loadInvariants, invariantsFor } from "./invariants.js";
 import { testsForSymbol, testFilesIn, frameworkFor } from "./tests.js";
 import { readFile } from "node:fs/promises";
@@ -26,8 +26,8 @@ import { loadAssumptions } from "./assumptions.js";
 import { gapsForSymbol, type TestGap } from "./testgaps.js";
 import { loadPreferences, rankPreferences } from "./preferences.js";
 import { listTodos } from "./todos.js";
-import type { Assumption, Question, Decision, Note, TodoItem } from "@invariance/dna-schemas";
-import { PREPARE_EDIT_SCHEMA_VERSION } from "@invariance/dna-schemas";
+import type { Assumption, Question, Decision, Note, TodoItem } from "@invariance/gps-schemas";
+import { PREPARE_EDIT_SCHEMA_VERSION } from "@invariance/gps-schemas";
 
 interface ContextCaps {
   callers: number;
@@ -105,7 +105,7 @@ interface IndexLookups {
 
 export interface QueryContext {
   root: string;
-  index: DnaIndex;
+  index: GpsIndex;
   invariants: Invariant[];
   _lookups?: IndexLookups;
 }
@@ -114,7 +114,7 @@ function symKey(s: SymbolRef): string {
   return s.id ?? s.qualified_name ?? s.name;
 }
 
-function buildLookups(index: DnaIndex): IndexLookups {
+function buildLookups(index: GpsIndex): IndexLookups {
   const byId = new Map<string, SymbolRef>();
   const byQualified = new Map<string, SymbolRef>();
   const byName = new Map<string, SymbolRef[]>();

@@ -1,5 +1,5 @@
 import { loadDecisions, loadAllDecisions } from "./decisions.js";
-import type { Decision } from "@invariance/dna-schemas";
+import type { Decision } from "@invariance/gps-schemas";
 
 const STOP = new Set([
   "the","a","an","and","or","but","of","to","in","on","for","with","is","are","was","were",

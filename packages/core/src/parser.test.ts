@@ -7,7 +7,7 @@ import { parseFile } from "./parser.js";
 describe("parser (tree-sitter)", () => {
   let dir: string;
   beforeAll(async () => {
-    dir = await mkdtemp(path.join(os.tmpdir(), "dna-parser-"));
+    dir = await mkdtemp(path.join(os.tmpdir(), "gps-parser-"));
     await mkdir(dir, { recursive: true });
   });
   afterAll(async () => {

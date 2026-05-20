@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/invariance-ai/dna/schemas/decision.schema.json",
-  "title": "dna decision",
-  "$ref": "#/definitions/dna decision",
+  "$id": "https://github.com/invariance-ai/gps/schemas/decision.schema.json",
+  "title": "gps decision",
+  "$ref": "#/definitions/gps decision",
   "definitions": {
-    "dna decision": {
+    "gps decision": {
       "type": "object",
       "properties": {
         "symbol": {

@@ -6,7 +6,7 @@ import {
   watchGateStream,
   type GateHit,
   type GateResult,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface GateOpts extends RootOption {
@@ -84,7 +84,7 @@ export function registerGate(program: Command): void {
     for (const h of result.hits) printHit(h);
     if (result.blocking.length > 0) {
       console.log(
-        kleur.red(`\n✗ ${result.blocking.length} blocking invariant(s); waive with: dna waive <name> --reason <...>`),
+        kleur.red(`\n✗ ${result.blocking.length} blocking invariant(s); waive with: gps waive <name> --reason <...>`),
       );
       process.exitCode = 1;
     } else {

@@ -6,12 +6,12 @@ import {
   type Feature,
   type FeatureSymbol,
   type FeaturesFile as FeaturesFileT,
-} from "@invariance/dna-schemas";
-import { readIndex, type DnaIndex } from "./index_store.js";
+} from "@invariance/gps-schemas";
+import { readIndex, type GpsIndex } from "./index_store.js";
 import { bindAliasLocation } from "./areas.js";
 
-const FEATURES_REL = ".dna/features.yml";
-const ACTIVE_REL = ".dna/session/active-feature";
+const FEATURES_REL = ".gps/features.yml";
+const ACTIVE_REL = ".gps/session/active-feature";
 
 export function featuresPath(root: string): string {
   return path.join(root, FEATURES_REL);
@@ -184,8 +184,8 @@ export interface AttributeResult {
   recorded_at: string;
 }
 
-const LAST_ATTRIBUTION_REL = ".dna/session/last-attribution.json";
-const FEATURES_HISTORY_REL = ".dna/features-history.jsonl";
+const LAST_ATTRIBUTION_REL = ".gps/session/last-attribution.json";
+const FEATURES_HISTORY_REL = ".gps/features-history.jsonl";
 const HISTORY_TOP_N = 20;
 
 export function lastAttributionPath(root: string): string {
@@ -223,7 +223,7 @@ export async function attributeFiles(
   }
   const feature = features.features[normalized];
 
-  let index: DnaIndex;
+  let index: GpsIndex;
   try {
     index = await readIndex(root);
   } catch {
@@ -388,7 +388,7 @@ export interface FeatureDiffResult {
 }
 
 /**
- * Reads .dna/features-history.jsonl, finds the first snapshot of `label` at-or-after
+ * Reads .gps/features-history.jsonl, finds the first snapshot of `label` at-or-after
  * `sinceISO`, and diffs its top-N against the current top-N. If no snapshot is
  * found, the baseline is empty and every current symbol counts as "entered".
  */
@@ -451,7 +451,7 @@ export async function featureDiff(
 }
 
 /**
- * Append a session event if a `.dna/session/id` file exists. No-op otherwise.
+ * Append a session event if a `.gps/session/id` file exists. No-op otherwise.
  * Kept here to colocate with attributeFiles; observer.ts has its own variant.
  */
 export async function appendSessionEventIfActive(
@@ -460,12 +460,12 @@ export async function appendSessionEventIfActive(
 ): Promise<void> {
   let id: string | undefined;
   try {
-    id = (await readFile(path.join(root, ".dna/session/id"), "utf8")).trim();
+    id = (await readFile(path.join(root, ".gps/session/id"), "utf8")).trim();
   } catch {
     return;
   }
   if (!id) return;
-  const dir = path.join(root, ".dna/sessions");
+  const dir = path.join(root, ".gps/sessions");
   try {
     await mkdir(dir, { recursive: true });
     await appendFile(path.join(dir, `${id}.jsonl`), `${JSON.stringify(event)}\n`);

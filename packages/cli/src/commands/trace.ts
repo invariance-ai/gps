@@ -6,7 +6,7 @@ import {
   logForFile,
   isGitRepo,
   formatTracePretty,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerTrace(program: Command): void {

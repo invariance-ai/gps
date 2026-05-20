@@ -7,8 +7,8 @@ import {
   topSymbols,
   diffSymbols,
   type TopSymbol,
-} from "@invariance/dna-core";
-import type { Invariant } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import type { Invariant } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface InvOpts extends RootOption {
@@ -91,7 +91,7 @@ export function registerInvariants(program: Command): void {
     }
     if (!symbol) {
       if (all.length === 0) {
-        console.log(kleur.dim("No invariants declared. Add some to .dna/invariants.yml."));
+        console.log(kleur.dim("No invariants declared. Add some to .gps/invariants.yml."));
         return;
       }
       console.log(kleur.bold(`${all.length} invariant(s) declared:`));

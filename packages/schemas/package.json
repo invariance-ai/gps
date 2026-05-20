@@ -1,15 +1,15 @@
 {
-  "name": "@invariance/dna-schemas",
+  "name": "@invariance/gps-schemas",
   "version": "0.1.0",
-  "description": "Shared types and schemas for dna. Source of truth for CLI, MCP, and HTTP surfaces.",
+  "description": "Shared types and schemas for gps. Source of truth for CLI, MCP, and HTTP surfaces.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/invariance-ai/dna.git",
+    "url": "https://github.com/invariance-ai/gps.git",
     "directory": "packages/schemas"
   },
-  "homepage": "https://github.com/invariance-ai/dna#readme",
+  "homepage": "https://github.com/invariance-ai/gps#readme",
   "engines": {
     "node": ">=20"
   },

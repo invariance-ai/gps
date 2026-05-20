@@ -13,7 +13,7 @@ async function git(cwd: string, args: string[]): Promise<void> {
 }
 
 async function setupRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), "dna-pulse-"));
+  const root = await mkdtemp(path.join(tmpdir(), "gps-pulse-"));
   await git(root, ["init", "-q"]);
   await git(root, ["config", "user.email", "t@t"]);
   await git(root, ["config", "user.name", "t"]);
@@ -34,9 +34,9 @@ describe("pulse", () => {
 
   it("flags invariant hit when a touched file matches an invariant", async () => {
     const root = await setupRepo();
-    await mkdir(path.join(root, ".dna"), { recursive: true });
+    await mkdir(path.join(root, ".gps"), { recursive: true });
     await writeFile(
-      path.join(root, ".dna/invariants.yml"),
+      path.join(root, ".gps/invariants.yml"),
       `- name: no-changes-to-a\n  applies_to: ["a.ts"]\n  rule: do not touch a.ts\n  severity: block\n`,
     );
     await writeFile(path.join(root, "a.ts"), `export function foo() { return 2; }\n`);

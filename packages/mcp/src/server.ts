@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { TOOLS, type ToolName } from "@invariance/dna-schemas";
+import { TOOLS, type ToolName } from "@invariance/gps-schemas";
 import {
   open as openQuery,
   getContext,
@@ -60,10 +60,10 @@ import {
   ALL_SOURCE_GLOBS,
   validateKnowledge,
   brief,
-} from "@invariance/dna-core";
-import { llmClassify } from "@invariance/dna-llm";
+} from "@invariance/gps-core";
+import { llmClassify } from "@invariance/gps-llm";
 
-const OBSERVE = process.env.DNA_OBSERVE === "1";
+const OBSERVE = process.env.GPS_OBSERVE === "1";
 
 function symbolFor(args: unknown): string | undefined {
   if (typeof args === "object" && args && "symbol" in args) {
@@ -74,12 +74,12 @@ function symbolFor(args: unknown): string | undefined {
 }
 
 /**
- * Tool metadata flows from @invariance/dna-schemas so CLI flags, MCP tool I/O,
- * and HTTP OpenAPI stay in sync. Indexes are read from the cwd's .dna/ on each
+ * Tool metadata flows from @invariance/gps-schemas so CLI flags, MCP tool I/O,
+ * and HTTP OpenAPI stay in sync. Indexes are read from the cwd's .gps/ on each
  * call — cheap because the index is a single JSON file.
  */
 const server = new Server(
-  { name: "dna", version: "0.0.1" },
+  { name: "gps", version: "0.0.1" },
   { capabilities: { tools: {} } },
 );
 

@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/invariance-ai/dna/schemas/note.schema.json",
-  "title": "dna note",
-  "$ref": "#/definitions/dna note",
+  "$id": "https://github.com/invariance-ai/gps/schemas/note.schema.json",
+  "title": "gps note",
+  "$ref": "#/definitions/gps note",
   "definitions": {
-    "dna note": {
+    "gps note": {
       "type": "object",
       "properties": {
         "symbol": {

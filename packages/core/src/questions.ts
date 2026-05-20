@@ -2,9 +2,9 @@ import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { Question, type Question as QuestionT, type QuestionStatus } from "@invariance/dna-schemas";
+import { Question, type Question as QuestionT, type QuestionStatus } from "@invariance/gps-schemas";
 
-const DIR = ".dna/questions";
+const DIR = ".gps/questions";
 
 function fileFor(root: string, symbol: string): string {
   const safe = symbol.replace(/[/\\:]/g, "__").replace(/\./g, "_");

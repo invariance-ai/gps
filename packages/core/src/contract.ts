@@ -4,9 +4,9 @@ import { getContext, impactOf, open as openQuery } from "./query.js";
 import { invariantsFor, loadInvariants } from "./invariants.js";
 import { changedFiles } from "./git_diff.js";
 import { readIndex } from "./index_store.js";
-import type { Invariant, SymbolRef } from "@invariance/dna-schemas";
+import type { Invariant, SymbolRef } from "@invariance/gps-schemas";
 
-const REL = ".dna/contract.json";
+const REL = ".gps/contract.json";
 
 export interface EditContract {
   symbol: string;

@@ -10,14 +10,14 @@ const execFile = promisify(_execFile);
 
 /**
  * Repo-edit-bench harness. Runs one or more coding agents (default: a
- * single `claude -p`) across two arms (without DNA, with DNA) for N
+ * single `claude -p`) across two arms (without GPS, with GPS) for N
  * attempts per (agent, task, arm), runs the task's checks, and scores
  * each. Matrix mode (multiple agents) is how we surface lift on weaker
  * models when opus baseline already solves every toy task.
  *
  * Critical invariant: every attempt runs in a clean working tree. We reset
  * (or copy to a fresh tmpdir) before each attempt so arm-1's edits and
- * any `.dna/` artifacts cannot leak into arm-2.
+ * any `.gps/` artifacts cannot leak into arm-2.
  */
 export interface BenchTask {
   id: string;
@@ -36,7 +36,7 @@ export interface BenchAgent {
 
 export interface RunResult {
   task_id: string;
-  arm: "baseline" | "dna";
+  arm: "baseline" | "gps";
   attempt: number;
   /** Which agent ran this attempt. Defaults to "default" when not in matrix mode. */
   agent_label: string;
@@ -53,7 +53,7 @@ export interface RunResult {
 
 export interface CellSummary {
   agent_label: string;
-  arm: "baseline" | "dna";
+  arm: "baseline" | "gps";
   attempts: number;
   passes: number;
   pass_rate: number;
@@ -67,7 +67,7 @@ export interface PerTaskAgentRow {
   agent_label: string;
   task_id: string;
   baseline_pass: number;
-  dna_pass: number;
+  gps_pass: number;
   delta: number;
 }
 
@@ -77,10 +77,10 @@ export interface BenchSummary {
   agents: string[];
   /** Aggregate (all agents) — kept for backwards compatibility. */
   baseline: CellSummary;
-  dna: CellSummary;
+  gps: CellSummary;
   /** Per-(agent, arm) rollup. */
   cells: CellSummary[];
-  /** Per-(agent, task) baseline/dna delta. */
+  /** Per-(agent, task) baseline/gps delta. */
   per_task: PerTaskAgentRow[];
   warnings: string[];
 }
@@ -193,7 +193,7 @@ export function parseShellArgs(input: string): string[] {
 
 /**
  * Hard reset the working tree to HEAD: discard tracked-file edits, remove
- * untracked files & dirs (including `.dna/`), then also nuke `.dna/` for
+ * untracked files & dirs (including `.gps/`), then also nuke `.gps/` for
  * good measure (it's gitignored in some setups).
  *
  * Throws if repoPath isn't a git repo or git returns non-zero — the bench
@@ -210,33 +210,33 @@ export async function resetWorkingTree(repoPath: string): Promise<void> {
   }
   await execFile("git", ["-C", repoPath, "checkout", "--", "."]);
   await execFile("git", ["-C", repoPath, "clean", "-fd"]);
-  await rm(path.join(repoPath, ".dna"), { recursive: true, force: true });
-  // Also scrub .mcp.json so the dna arm's MCP config cannot leak into the
+  await rm(path.join(repoPath, ".gps"), { recursive: true, force: true });
+  // Also scrub .mcp.json so the gps arm's MCP config cannot leak into the
   // baseline arm's next attempt (the only between-arm difference must be
-  // the MCP-discovery file, written fresh each dna-arm attempt below).
+  // the MCP-discovery file, written fresh each gps-arm attempt below).
   await rm(path.join(repoPath, ".mcp.json"), { recursive: true, force: true });
 }
 
 /**
  * Canonical `.mcp.json` for Claude Code (and any other MCP-discovery agent)
- * to load DNA's MCP server. We use the globally-installed `dna` binary in
+ * to load GPS's MCP server. We use the globally-installed `gps` binary in
  * the bench because the harness already requires `claude -p` on PATH; if
- * `dna` isn't on PATH the agent simply gets no MCP tools and the dna arm
+ * `gps` isn't on PATH the agent simply gets no MCP tools and the gps arm
  * degenerates to baseline (which is the honest fallback, not silent help).
  *
- * Matches the shape written by `dna install claude --use-global` in
+ * Matches the shape written by `gps install claude --use-global` in
  * packages/cli/src/commands/install.ts (`upsertClaudeMcp`).
  */
-export const DNA_MCP_CONFIG = {
+export const GPS_MCP_CONFIG = {
   mcpServers: {
-    dna: { command: "dna", args: ["serve"] },
+    gps: { command: "gps", args: ["serve"] },
   },
 } as const;
 
-async function writeDnaMcpConfig(repoPath: string): Promise<void> {
+async function writeGpsMcpConfig(repoPath: string): Promise<void> {
   await writeFile(
     path.join(repoPath, ".mcp.json"),
-    JSON.stringify(DNA_MCP_CONFIG, null, 2) + "\n",
+    JSON.stringify(GPS_MCP_CONFIG, null, 2) + "\n",
   );
 }
 
@@ -245,7 +245,7 @@ async function prepareRepoForAttempt(repoPath: string): Promise<{ workPath: stri
     throw new Error(`bench: task.repo path does not exist: ${repoPath}`);
   }
   // Treat the path as its own repo only when it's the toplevel of a git repo.
-  // Otherwise (e.g. `examples/multi-symbol` inside the DNA monorepo) the
+  // Otherwise (e.g. `examples/multi-symbol` inside the GPS monorepo) the
   // headless agent's cwd would be a subdir of a much larger working tree —
   // and `--permission-mode bypassPermissions` would happily let it rename
   // symbols across the parent repo. Always copy to a fresh tmpdir in that
@@ -259,7 +259,7 @@ async function prepareRepoForAttempt(repoPath: string): Promise<{ workPath: stri
     await resetWorkingTree(repoPath);
     return { workPath: repoPath, dispose: async () => { /* in-place; reset on next attempt */ } };
   }
-  const tmp = await mkdtemp(path.join(os.tmpdir(), "dna-bench-"));
+  const tmp = await mkdtemp(path.join(os.tmpdir(), "gps-bench-"));
   await cp(repoPath, tmp, { recursive: true });
   // Init a git repo in the copy so resetWorkingTree-style cleanup works for
   // subsequent attempts and so the agent sees a real repo (matters for some
@@ -267,7 +267,7 @@ async function prepareRepoForAttempt(repoPath: string): Promise<{ workPath: stri
   try {
     await execFile("git", ["-C", tmp, "init", "-q"]);
     await execFile("git", ["-C", tmp, "add", "."]);
-    await execFile("git", ["-C", tmp, "-c", "user.email=bench@dna.local", "-c", "user.name=bench", "commit", "-qm", "bench fixture"]);
+    await execFile("git", ["-C", tmp, "-c", "user.email=bench@gps.local", "-c", "user.name=bench", "commit", "-qm", "bench fixture"]);
   } catch { /* best effort */ }
   return { workPath: tmp, dispose: async () => { await rm(tmp, { recursive: true, force: true }); } };
 }
@@ -275,7 +275,7 @@ async function prepareRepoForAttempt(repoPath: string): Promise<{ workPath: stri
 export async function runTask(
   repoRoot: string,
   task: BenchTask,
-  arm: "baseline" | "dna",
+  arm: "baseline" | "gps",
   attempt: number,
   opts: RunOptions = {},
   agent: BenchAgent = { label: "default", command: opts.agentCommand ?? "claude -p --permission-mode bypassPermissions" },
@@ -288,13 +288,13 @@ export async function runTask(
   // PROMPT FAIRNESS (closes hole flagged in bench/dogfood/2026-05-16-v02-validation.md):
   // both arms get the IDENTICAL prompt. The only difference between arms is
   // whether `.mcp.json` is present in workPath — that is what an agent like
-  // `claude -p` reads at session start to discover DNA's MCP tools (same
-  // mechanism `dna install claude` wires up for real users). Telling the
-  // baseline a tool exists via prompt-text was conflating "DNA's tools
+  // `claude -p` reads at session start to discover GPS's MCP tools (same
+  // mechanism `gps install claude` wires up for real users). Telling the
+  // baseline a tool exists via prompt-text was conflating "GPS's tools
   // helped" with "prompting the agent that tools exist helped".
   const prompt = task.prompt;
-  if (arm === "dna") {
-    await writeDnaMcpConfig(workPath);
+  if (arm === "gps") {
+    await writeGpsMcpConfig(workPath);
   }
 
   const t0 = Date.now();
@@ -365,7 +365,7 @@ export async function runBench(
   for (const agent of agents) {
     for (const task of tasks) {
       for (let attempt = 0; attempt < n; attempt++) {
-        for (const arm of ["baseline", "dna"] as const) {
+        for (const arm of ["baseline", "gps"] as const) {
           const r = await runTask(repoRoot, task, arm, attempt, opts, agent);
           results.push(r);
           // Tag per-attempt JSON by agent so matrix runs don't clobber.
@@ -389,7 +389,7 @@ function meanOf(arr: number[]): number {
   return arr.length === 0 ? 0 : arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function cell(results: RunResult[], agent_label: string, arm: "baseline" | "dna"): CellSummary {
+function cell(results: RunResult[], agent_label: string, arm: "baseline" | "gps"): CellSummary {
   const passes = results.filter((r) => r.passed).length;
   return {
     agent_label,
@@ -412,7 +412,7 @@ export function summarize(results: RunResult[], n: number, agentLabels?: string[
 
   const cells: CellSummary[] = [];
   for (const a of agents) {
-    for (const arm of ["baseline", "dna"] as const) {
+    for (const arm of ["baseline", "gps"] as const) {
       cells.push(cell(results.filter((r) => r.agent_label === a && r.arm === arm), a, arm));
     }
   }
@@ -421,15 +421,15 @@ export function summarize(results: RunResult[], n: number, agentLabels?: string[
   for (const a of agents) {
     for (const tid of tasks) {
       const b = results.filter((r) => r.agent_label === a && r.arm === "baseline" && r.task_id === tid);
-      const d = results.filter((r) => r.agent_label === a && r.arm === "dna" && r.task_id === tid);
+      const d = results.filter((r) => r.agent_label === a && r.arm === "gps" && r.task_id === tid);
       const bp = b.length === 0 ? 0 : b.filter((r) => r.passed).length / b.length;
       const dp = d.length === 0 ? 0 : d.filter((r) => r.passed).length / d.length;
-      per_task.push({ agent_label: a, task_id: tid, baseline_pass: bp, dna_pass: dp, delta: dp - bp });
+      per_task.push({ agent_label: a, task_id: tid, baseline_pass: bp, gps_pass: dp, delta: dp - bp });
     }
   }
 
   const baseline = cell(results.filter((r) => r.arm === "baseline"), "all", "baseline");
-  const dna = cell(results.filter((r) => r.arm === "dna"), "all", "dna");
+  const gps = cell(results.filter((r) => r.arm === "gps"), "all", "gps");
 
   const warnings: string[] = [];
   if (n < 3) {
@@ -441,7 +441,7 @@ export function summarize(results: RunResult[], n: number, agentLabels?: string[
     attempts_per_arm: n,
     agents,
     baseline,
-    dna,
+    gps,
     cells,
     per_task,
     warnings,
@@ -471,7 +471,7 @@ function renderMarkdown(s: BenchSummary): string {
 
   // Agent × task matrix only when matrix mode is in play.
   if (s.agents.length > 1 || (s.agents.length === 1 && s.agents[0] !== "default")) {
-    lines.push(`## Per agent × task (baseline → dna)`);
+    lines.push(`## Per agent × task (baseline → gps)`);
     lines.push("");
     const tasks = [...new Set(s.per_task.map((r) => r.task_id))];
     lines.push(`| agent | ${tasks.join(" | ")} |`);
@@ -482,7 +482,7 @@ function renderMarkdown(s: BenchSummary): string {
         if (!row) return "—";
         const delta = (row.delta * 100).toFixed(0);
         const sign = row.delta > 0 ? "+" : "";
-        return `${pct(row.baseline_pass)}→${pct(row.dna_pass)} (${sign}${delta}pp)`;
+        return `${pct(row.baseline_pass)}→${pct(row.gps_pass)} (${sign}${delta}pp)`;
       });
       lines.push(`| ${a} | ${cells.join(" | ")} |`);
     }
@@ -491,13 +491,13 @@ function renderMarkdown(s: BenchSummary): string {
 
   lines.push(`## Per task (aggregate across agents)`);
   lines.push("");
-  lines.push(`| task | baseline | dna | delta |`);
+  lines.push(`| task | baseline | gps | delta |`);
   lines.push(`|---|---|---|---|`);
   const tasks = [...new Set(s.per_task.map((r) => r.task_id))];
   for (const tid of tasks) {
     const rows = s.per_task.filter((r) => r.task_id === tid);
     const bp = meanOf(rows.map((r) => r.baseline_pass));
-    const dp = meanOf(rows.map((r) => r.dna_pass));
+    const dp = meanOf(rows.map((r) => r.gps_pass));
     lines.push(`| ${tid} | ${pct(bp)} | ${pct(dp)} | ${((dp - bp) * 100).toFixed(1)}pp |`);
   }
   lines.push("");
@@ -507,7 +507,7 @@ function renderMarkdown(s: BenchSummary): string {
   lines.push(`| arm | pass rate (95% CI) | mean duration (s) | mean output (chars) | timed out |`);
   lines.push(`|---|---|---|---|---|`);
   lines.push(`| baseline | ${pct(s.baseline.pass_rate)} ${formatWilsonPct(s.baseline.pass_rate_ci)} | ${s.baseline.mean_duration_sec.toFixed(1)} | ${s.baseline.mean_output_chars.toFixed(0)} | ${s.baseline.timed_out} |`);
-  lines.push(`| dna      | ${pct(s.dna.pass_rate)} ${formatWilsonPct(s.dna.pass_rate_ci)} | ${s.dna.mean_duration_sec.toFixed(1)} | ${s.dna.mean_output_chars.toFixed(0)} | ${s.dna.timed_out} |`);
+  lines.push(`| gps      | ${pct(s.gps.pass_rate)} ${formatWilsonPct(s.gps.pass_rate_ci)} | ${s.gps.mean_duration_sec.toFixed(1)} | ${s.gps.mean_output_chars.toFixed(0)} | ${s.gps.timed_out} |`);
 
   return lines.join("\n") + "\n";
 }

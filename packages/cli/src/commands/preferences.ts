@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { loadPreferences } from "@invariance/dna-core";
+import { loadPreferences } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -18,7 +18,7 @@ export function registerPreferences(program: Command): void {
       .option("--topic <t>", "Filter by topic")
       .option("--limit <n>", "Max to show", (v) => parseInt(v, 10), 50)
       .option("--json", "Emit JSON")
-      .option("--markdown", "Emit dna-auto-prefs markdown block (for hooks)"),
+      .option("--markdown", "Emit gps-auto-prefs markdown block (for hooks)"),
   ).action(async (opts: Opts) => {
     const root = resolveRoot(opts);
     let prefs = await loadPreferences(root);
@@ -31,16 +31,16 @@ export function registerPreferences(program: Command): void {
     }
     if (prefs.length === 0) {
       if (opts.markdown) return;
-      console.log(kleur.dim("no preferences yet — agents auto-capture them, or run `dna prefer \"...\"`"));
+      console.log(kleur.dim("no preferences yet — agents auto-capture them, or run `gps prefer \"...\"`"));
       return;
     }
     if (opts.markdown) {
-      const lines = ["<!-- dna:auto-prefs -->", "## dna preferences", ""];
+      const lines = ["<!-- gps:auto-prefs -->", "## gps preferences", ""];
       for (const p of prefs) {
         const tag = p.topic ? ` [${p.topic}]` : "";
         lines.push(`- ${p.text}${tag}`);
       }
-      lines.push("<!-- /dna:auto-prefs -->");
+      lines.push("<!-- /gps:auto-prefs -->");
       console.log(lines.join("\n"));
       return;
     }

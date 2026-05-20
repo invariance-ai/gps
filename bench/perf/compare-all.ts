@@ -1,5 +1,5 @@
 /**
- * Side-by-side bench: DNA vs ripgrep vs codebase-memory-mcp.
+ * Side-by-side bench: GPS vs ripgrep vs codebase-memory-mcp.
  *
  * Measures three axes per tool on the same sample of symbols:
  *   - tokens (mean, p95) — char/4 approximation
@@ -20,7 +20,7 @@ import {
   clearIndexCache,
   open,
   getContext,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { approxTokens, stats, timeIt, type LatencyStats } from "./measure.js";
 import { CORPORA, ensureCorpus } from "./corpora.js";
 import { indexCorpus } from "./run-index.js";
@@ -97,14 +97,14 @@ function pickSamples(symbols: { name: string; file: string }[], n: number): stri
   return out;
 }
 
-interface DnaRunResult {
+interface GpsRunResult {
   latency: LatencyStats;
   tokens_mean: number;
   tokens_p95: number;
   outputs: ToolOutput[];
 }
 
-async function runDna(root: string, symbols: string[], mode: "brief" | "full"): Promise<DnaRunResult> {
+async function runGps(root: string, symbols: string[], mode: "brief" | "full"): Promise<GpsRunResult> {
   clearIndexCache();
   const ctx = await open(root);
   const lats: number[] = [];
@@ -126,7 +126,7 @@ async function runDna(root: string, symbols: string[], mode: "brief" | "full"): 
     lats.push(ms);
     const text = result ? JSON.stringify(result, null, 2) : "";
     toks.push(approxTokens(text));
-    outputs.push({ symbol: sym, tool: `dna-${mode}`, text });
+    outputs.push({ symbol: sym, tool: `gps-${mode}`, text });
   }
   return {
     latency: stats(lats),
@@ -209,7 +209,7 @@ async function main(): Promise<void> {
   const root = await resolveCorpusRoot(opts.corpus);
   console.log(`  corpus root: ${root}`);
 
-  // Ensure DNA index exists (re-index if --corpus self or fresh corpus).
+  // Ensure GPS index exists (re-index if --corpus self or fresh corpus).
   console.log("  indexing…");
   const idx = await indexCorpus(root);
   console.log(`    ${idx.files} files, ${idx.symbols} symbols in ${idx.total_ms.toFixed(0)}ms`);
@@ -218,14 +218,14 @@ async function main(): Promise<void> {
   const symbols = pickSamples(index.symbols, opts.sampleSize);
   console.log(`  sampled ${symbols.length} symbols`);
 
-  // DNA brief + full
-  console.log("  running dna (brief)…");
-  const dnaBrief = await runDna(root, symbols, "brief");
-  console.log(`    tokens≈${Math.round(dnaBrief.tokens_mean)}  ms p50=${dnaBrief.latency.p50.toFixed(2)}`);
+  // GPS brief + full
+  console.log("  running gps (brief)…");
+  const gpsBrief = await runGps(root, symbols, "brief");
+  console.log(`    tokens≈${Math.round(gpsBrief.tokens_mean)}  ms p50=${gpsBrief.latency.p50.toFixed(2)}`);
 
-  console.log("  running dna (full)…");
-  const dnaFull = await runDna(root, symbols, "full");
-  console.log(`    tokens≈${Math.round(dnaFull.tokens_mean)}  ms p50=${dnaFull.latency.p50.toFixed(2)}`);
+  console.log("  running gps (full)…");
+  const gpsFull = await runGps(root, symbols, "full");
+  console.log(`    tokens≈${Math.round(gpsFull.tokens_mean)}  ms p50=${gpsFull.latency.p50.toFixed(2)}`);
 
   // rg
   console.log("  running rg…");
@@ -263,20 +263,20 @@ async function main(): Promise<void> {
       accuracyReason = "`claude` CLI not on PATH — skipped accuracy scoring";
       console.log(`  accuracy: ${accuracyReason}`);
     } else {
-      console.log("  building oracle from DNA index…");
+      console.log("  building oracle from GPS index…");
       const oracle = await buildOracle(root, symbols);
       const oracleSymbols = oracle.map((o) => o.symbol);
       // Limit accuracy scoring to first 5 symbols to keep claude -p cost bounded.
       const accSyms = oracleSymbols.slice(0, Math.min(5, oracleSymbols.length));
-      const accDnaBrief: ToolOutput[] = [];
+      const accGpsBrief: ToolOutput[] = [];
       for (const s of accSyms) {
-        accDnaBrief.push({ symbol: s, tool: "dna-brief", text: await getContextOutput(root, s) });
+        accGpsBrief.push({ symbol: s, tool: "gps-brief", text: await getContextOutput(root, s) });
       }
       const accRg = rgOutputs.filter((o) => accSyms.includes(o.symbol));
       const accCmm = cmmOutputs.filter((o) => accSyms.includes(o.symbol));
       const accOracle = oracle.filter((o) => accSyms.includes(o.symbol));
       console.log(`  scoring ${accSyms.length} symbols × 3 questions × ${1 + (accRg.length > 0 ? 1 : 0) + (accCmm.length > 0 ? 1 : 0)} tools via claude -p…`);
-      const scores = await scoreTool(accOracle, [...accDnaBrief, ...accRg, ...accCmm]);
+      const scores = await scoreTool(accOracle, [...accGpsBrief, ...accRg, ...accCmm]);
       accuracy = summarize(scores);
     }
   }
@@ -284,24 +284,24 @@ async function main(): Promise<void> {
   const accByTool = new Map(accuracy.map((a) => [a.tool, a]));
   const rows: Row[] = [
     {
-      tool: "dna-brief",
-      tokens_mean: dnaBrief.tokens_mean,
-      tokens_p95: dnaBrief.tokens_p95,
-      latency_p50: dnaBrief.latency.p50,
-      latency_p95: dnaBrief.latency.p95,
-      latency_mean: dnaBrief.latency.mean,
-      recall_overall: accByTool.get("dna-brief")?.overall_recall,
-      recall_callers: accByTool.get("dna-brief")?.callers_recall,
-      recall_callees: accByTool.get("dna-brief")?.callees_recall,
-      recall_tests: accByTool.get("dna-brief")?.tests_recall,
+      tool: "gps-brief",
+      tokens_mean: gpsBrief.tokens_mean,
+      tokens_p95: gpsBrief.tokens_p95,
+      latency_p50: gpsBrief.latency.p50,
+      latency_p95: gpsBrief.latency.p95,
+      latency_mean: gpsBrief.latency.mean,
+      recall_overall: accByTool.get("gps-brief")?.overall_recall,
+      recall_callers: accByTool.get("gps-brief")?.callers_recall,
+      recall_callees: accByTool.get("gps-brief")?.callees_recall,
+      recall_tests: accByTool.get("gps-brief")?.tests_recall,
     },
     {
-      tool: "dna-full",
-      tokens_mean: dnaFull.tokens_mean,
-      tokens_p95: dnaFull.tokens_p95,
-      latency_p50: dnaFull.latency.p50,
-      latency_p95: dnaFull.latency.p95,
-      latency_mean: dnaFull.latency.mean,
+      tool: "gps-full",
+      tokens_mean: gpsFull.tokens_mean,
+      tokens_p95: gpsFull.tokens_p95,
+      latency_p50: gpsFull.latency.p50,
+      latency_p95: gpsFull.latency.p95,
+      latency_mean: gpsFull.latency.mean,
     },
     {
       tool: "rg",
@@ -350,9 +350,9 @@ async function main(): Promise<void> {
   md.push("");
   md.push("## Notes");
   md.push("");
-  md.push("- `dna-brief` is the default mode (budget=1500); `dna-full` matches pre-PR behavior.");
+  md.push("- `gps-brief` is the default mode (budget=1500); `gps-full` matches pre-PR behavior.");
   md.push("- `rg` bundle = `rg --json <symbol>` + `rg -A 5 -B 2 <symbol> | head -50` (what a no-tool agent would actually run).");
-  md.push("- Recall is judged by `claude -p` extracting answers from each tool's output, scored against DNA's structural oracle (callers/callees) and DNA's testsForSymbol (tests). DNA's recall ceiling is therefore 1.0 by construction — the interesting numbers are whether rg/cmm can also recover those answers, and at what token cost.");
+  md.push("- Recall is judged by `claude -p` extracting answers from each tool's output, scored against GPS's structural oracle (callers/callees) and GPS's testsForSymbol (tests). GPS's recall ceiling is therefore 1.0 by construction — the interesting numbers are whether rg/cmm can also recover those answers, and at what token cost.");
 
   await mkdir(path.dirname(opts.out), { recursive: true });
   await writeFile(opts.out, md.join("\n") + "\n");

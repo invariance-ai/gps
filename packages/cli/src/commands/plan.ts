@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { inferSymbols } from "@invariance/dna-core";
+import { inferSymbols } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface PlanOpts extends RootOption {
@@ -29,7 +29,7 @@ export function registerPlan(program: Command): void {
       return;
     }
     if (matches.length === 0) {
-      console.log(kleur.dim("no symbol matches; try `dna index` first or be more specific"));
+      console.log(kleur.dim("no symbol matches; try `gps index` first or be more specific"));
       return;
     }
     console.log(kleur.bold(`top ${matches.length} symbol(s) for prompt:`));
@@ -43,7 +43,7 @@ export function registerPlan(program: Command): void {
     const top = matches[0]!;
     console.log(
       kleur.dim(
-        `\nnext: dna prepare ${top.symbol.qualified_name ?? top.symbol.name} --intent "<what you plan to change>"`,
+        `\nnext: gps prepare ${top.symbol.qualified_name ?? top.symbol.name} --intent "<what you plan to change>"`,
       ),
     );
   });

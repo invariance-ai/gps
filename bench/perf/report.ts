@@ -11,7 +11,7 @@ export interface CorpusReport {
 
 export function renderMarkdown(reports: CorpusReport[]): string {
   const L: string[] = [];
-  L.push("# DNA perf bench");
+  L.push("# GPS perf bench");
   L.push("");
   L.push(`Generated: ${new Date().toISOString()}`);
   L.push("");

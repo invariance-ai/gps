@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Note, Question, SymbolRef, TestRef, Invariant } from "@invariance/dna-schemas";
+import type { Note, Question, SymbolRef, TestRef, Invariant } from "@invariance/gps-schemas";
 import { diffSymbols } from "./diff_symbols.js";
 import { gateChanged } from "./gate_stream.js";
 import { open as openQuery } from "./query.js";
@@ -96,7 +96,7 @@ export async function brief(root: string, input: BriefInput = {}): Promise<Brief
   }
 
   // Per-symbol tests + questions. testsForSymbol checks co-located and
-  // name-containing test files — the same heuristic as `dna tests`.
+  // name-containing test files — the same heuristic as `gps tests`.
   const per_symbol: BriefSymbolEntry[] = [];
   const untested_symbols: string[] = [];
   let ctx: Awaited<ReturnType<typeof openQuery>> | null = null;

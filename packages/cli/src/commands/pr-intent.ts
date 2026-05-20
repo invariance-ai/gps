@@ -2,8 +2,8 @@ import type { Command } from "commander";
 import kleur from "kleur";
 import path from "node:path";
 import { stringify as stringifyYaml } from "yaml";
-import { appendDecision, fetchPrThread, flattenPrThread, ghAvailable } from "@invariance/dna-core";
-import { DnaLlm, extractDecisions } from "@invariance/dna-llm";
+import { appendDecision, fetchPrThread, flattenPrThread, ghAvailable } from "@invariance/gps-core";
+import { GpsLlm, extractDecisions } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -28,7 +28,7 @@ export function registerPrIntent(program: Command): void {
       .option("--call-api", "Call the bundled Anthropic client instead of printing a prompt")
       .option(
         "--save-without-confirm",
-        "Write extracted decisions to .dna/decisions/ without interactive prompt",
+        "Write extracted decisions to .gps/decisions/ without interactive prompt",
       )
       .option("--api-key <key>", "Anthropic API key (default: ANTHROPIC_API_KEY env)")
       .option("--model <id>", "Anthropic model ID (default: claude-opus-4-7)")
@@ -47,7 +47,7 @@ export function registerPrIntent(program: Command): void {
         .map((f) => path.basename(f).replace(/\.(ts|tsx|js|jsx|py)$/, ""))
         .filter((s) => s.length > 0);
 
-      const llm = new DnaLlm({
+      const llm = new GpsLlm({
         apiKey: opts.apiKey,
         model: opts.model,
         dryRun: !opts.callApi || !!opts.dryRun,
@@ -66,7 +66,7 @@ export function registerPrIntent(program: Command): void {
         console.log(kleur.dim("--- user ---"));
         console.log(result.dry_run_prompt!.user);
         console.log("");
-        console.log(kleur.dim("Have the native agent return YAML, then persist decisions with `dna decide`."));
+        console.log(kleur.dim("Have the native agent return YAML, then persist decisions with `gps decide`."));
         return;
       }
 
@@ -94,12 +94,12 @@ export function registerPrIntent(program: Command): void {
           await appendDecision(root, d);
         }
         console.log(
-          kleur.green(`wrote ${result.decisions.length} decision(s) to .dna/decisions/`),
+          kleur.green(`wrote ${result.decisions.length} decision(s) to .gps/decisions/`),
         );
       } else {
         console.log(
           kleur.dim(
-            "Run again with --save-without-confirm to persist to .dna/decisions/, or copy YAML manually.",
+            "Run again with --save-without-confirm to persist to .gps/decisions/, or copy YAML manually.",
           ),
         );
       }

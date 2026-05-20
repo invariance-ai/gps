@@ -4,7 +4,7 @@ import { mkdtemp, rm, writeFile, mkdir, readFile, stat } from "node:fs/promises"
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { DNA_MCP_CONFIG, parseShellArgs, resetWorkingTree, runTask, parseMatrix, loadTasks, summarize, AGENT_PRESETS, type BenchTask, type RunResult } from "./bench.js";
+import { GPS_MCP_CONFIG, parseShellArgs, resetWorkingTree, runTask, parseMatrix, loadTasks, summarize, AGENT_PRESETS, type BenchTask, type RunResult } from "./bench.js";
 
 const execFile = promisify(_execFile);
 const roots: string[] = [];
@@ -56,8 +56,8 @@ describe("parseShellArgs", () => {
 });
 
 describe("resetWorkingTree", () => {
-  it("discards edits, removes untracked files, and nukes .dna/", { timeout: 30_000 }, async () => {
-    const repo = await tempDir("dna-bench-reset-");
+  it("discards edits, removes untracked files, and nukes .gps/", { timeout: 30_000 }, async () => {
+    const repo = await tempDir("gps-bench-reset-");
     await gitInit(repo);
     await writeFile(path.join(repo, "tracked.txt"), "original\n");
     await execFile("git", ["-C", repo, "add", "."]);
@@ -66,8 +66,8 @@ describe("resetWorkingTree", () => {
     // dirty everything
     await writeFile(path.join(repo, "tracked.txt"), "MUTATED\n");
     await writeFile(path.join(repo, "untracked.txt"), "leak\n");
-    await mkdir(path.join(repo, ".dna"), { recursive: true });
-    await writeFile(path.join(repo, ".dna/index.json"), "{}\n");
+    await mkdir(path.join(repo, ".gps"), { recursive: true });
+    await writeFile(path.join(repo, ".gps/index.json"), "{}\n");
     await mkdir(path.join(repo, "newdir"), { recursive: true });
     await writeFile(path.join(repo, "newdir/x"), "x\n");
 
@@ -75,25 +75,25 @@ describe("resetWorkingTree", () => {
 
     expect((await readFile(path.join(repo, "tracked.txt"), "utf8"))).toBe("original\n");
     await expect(stat(path.join(repo, "untracked.txt"))).rejects.toThrow();
-    await expect(stat(path.join(repo, ".dna"))).rejects.toThrow();
+    await expect(stat(path.join(repo, ".gps"))).rejects.toThrow();
     await expect(stat(path.join(repo, "newdir"))).rejects.toThrow();
   });
 
   it("throws loudly when path is not a git repo", { timeout: 15_000 }, async () => {
-    const notRepo = await tempDir("dna-bench-notrepo-");
+    const notRepo = await tempDir("gps-bench-notrepo-");
     await expect(resetWorkingTree(notRepo)).rejects.toThrow(/not a git repo/);
   });
 
-  it("also scrubs .mcp.json so dna-arm config does not leak to baseline arm",
+  it("also scrubs .mcp.json so gps-arm config does not leak to baseline arm",
     { timeout: 30_000 }, async () => {
-    const repo = await tempDir("dna-bench-mcp-leak-");
+    const repo = await tempDir("gps-bench-mcp-leak-");
     await gitInit(repo);
     await writeFile(path.join(repo, "tracked.txt"), "ok\n");
     await execFile("git", ["-C", repo, "add", "."]);
     await execFile("git", ["-C", repo, "commit", "-q", "-m", "init"]);
 
-    // simulate the dna arm having written .mcp.json
-    await writeFile(path.join(repo, ".mcp.json"), JSON.stringify(DNA_MCP_CONFIG));
+    // simulate the gps arm having written .mcp.json
+    await writeFile(path.join(repo, ".mcp.json"), JSON.stringify(GPS_MCP_CONFIG));
 
     await resetWorkingTree(repo);
 
@@ -106,7 +106,7 @@ describe("prompt fairness (runTask)", () => {
   // we use a fake agentCommand that echoes its argv into a file in cwd. The
   // test reads the recorded prompts back and asserts byte-equality.
   async function setupRecordingRepo(): Promise<{ repo: string; task: BenchTask }> {
-    const repo = await tempDir("dna-bench-fair-");
+    const repo = await tempDir("gps-bench-fair-");
     await gitInit(repo);
     await writeFile(path.join(repo, "README.md"), "fixture\n");
     await execFile("git", ["-C", repo, "add", "."]);
@@ -115,7 +115,7 @@ describe("prompt fairness (runTask)", () => {
     const task: BenchTask = {
       id: "fair-test",
       repo: ".",
-      // Multiline + special chars so any extra suffix on the dna arm would be
+      // Multiline + special chars so any extra suffix on the gps arm would be
       // immediately visible as a diff between recorded files.
       prompt: "Edit src/foo.ts and add a comment.\n\nKeep it concise.",
       checks: ["true"],
@@ -128,7 +128,7 @@ describe("prompt fairness (runTask)", () => {
     // Write records OUTSIDE repo so the next attempt's resetWorkingTree
     // (which scrubs untracked files) cannot delete them. JSON-encode the
     // path to safely embed it inside the inline node -e source.
-    const outDir = await tempDir("dna-bench-fair-out-");
+    const outDir = await tempDir("gps-bench-fair-out-");
     // Use single-quoted wrapper for the node -e script so the inner double-
     // quoted path literal isn't terminated by parseShellArgs.
     const recorder = (tag: string): string => {
@@ -137,22 +137,22 @@ describe("prompt fairness (runTask)", () => {
     };
 
     const baseRes = await runTask(repo, task, "baseline", 0, { agentCommand: recorder("baseline"), timeoutSec: 30 });
-    const dnaRes  = await runTask(repo, task, "dna",      0, { agentCommand: recorder("dna"),      timeoutSec: 30 });
+    const gpsRes  = await runTask(repo, task, "gps",      0, { agentCommand: recorder("gps"),      timeoutSec: 30 });
     expect(baseRes.timed_out).toBe(false);
-    expect(dnaRes.timed_out).toBe(false);
+    expect(gpsRes.timed_out).toBe(false);
 
     const basePrompt = await readFile(path.join(outDir, "agent-baseline.txt"), "utf8");
-    const dnaPrompt  = await readFile(path.join(outDir, "agent-dna.txt"), "utf8");
-    expect(basePrompt).toBe(dnaPrompt);
+    const gpsPrompt  = await readFile(path.join(outDir, "agent-gps.txt"), "utf8");
+    expect(basePrompt).toBe(gpsPrompt);
     expect(basePrompt).toBe(task.prompt);
     // and specifically NOT the old appended suffix
-    expect(dnaPrompt).not.toMatch(/MCP server/i);
+    expect(gpsPrompt).not.toMatch(/MCP server/i);
   });
 
-  it("dna arm writes .mcp.json into the workdir; baseline arm does not",
+  it("gps arm writes .mcp.json into the workdir; baseline arm does not",
     { timeout: 30_000 }, async () => {
     const { repo, task } = await setupRecordingRepo();
-    const outDir = await tempDir("dna-bench-mcp-out-");
+    const outDir = await tempDir("gps-bench-mcp-out-");
     // Snapshot the .mcp.json that exists in cwd at agent invocation time,
     // OUTSIDE the repo so the next attempt's reset cannot wipe the snapshot.
     const snap = (tag: string): string => {
@@ -160,17 +160,17 @@ describe("prompt fairness (runTask)", () => {
       return `node -e 'try{require("fs").copyFileSync(".mcp.json", "${target}")}catch(e){}'`;
     };
 
-    await runTask(repo, task, "dna", 0, { agentCommand: snap("dna"), timeoutSec: 30 });
-    // baseline must NOT see a leftover .mcp.json from the prior dna attempt
+    await runTask(repo, task, "gps", 0, { agentCommand: snap("gps"), timeoutSec: 30 });
+    // baseline must NOT see a leftover .mcp.json from the prior gps attempt
     await runTask(repo, task, "baseline", 0, { agentCommand: snap("baseline"), timeoutSec: 30 });
 
-    const dnaSnap = await stat(path.join(outDir, "snap-dna.json")).then(() => true).catch(() => false);
+    const gpsSnap = await stat(path.join(outDir, "snap-gps.json")).then(() => true).catch(() => false);
     const baseSnap = await stat(path.join(outDir, "snap-baseline.json")).then(() => true).catch(() => false);
-    expect(dnaSnap).toBe(true);
+    expect(gpsSnap).toBe(true);
     expect(baseSnap).toBe(false);
 
-    const parsed = JSON.parse(await readFile(path.join(outDir, "snap-dna.json"), "utf8"));
-    expect(parsed).toEqual(DNA_MCP_CONFIG);
+    const parsed = JSON.parse(await readFile(path.join(outDir, "snap-gps.json"), "utf8"));
+    expect(parsed).toEqual(GPS_MCP_CONFIG);
   });
 });
 
@@ -194,7 +194,7 @@ describe("parseMatrix", () => {
 
 describe("loadTasks", () => {
   it("loads a minimal task yaml", async () => {
-    const dir = await tempDir("dna-bench-tasks-");
+    const dir = await tempDir("gps-bench-tasks-");
     await writeFile(
       path.join(dir, "demo.yml"),
       "repo: examples/x\nprompt: do thing\nchecks:\n  - 'true'\n",
@@ -204,7 +204,7 @@ describe("loadTasks", () => {
     expect(tasks[0]).toMatchObject({ id: "demo", repo: "examples/x", prompt: "do thing" });
   });
   it("silently drops the deprecated invariants_expected key", async () => {
-    const dir = await tempDir("dna-bench-tasks-");
+    const dir = await tempDir("gps-bench-tasks-");
     await writeFile(
       path.join(dir, "legacy.yml"),
       "repo: examples/x\nprompt: do\nchecks: ['true']\ninvariants_expected:\n  - foo\n",
@@ -214,7 +214,7 @@ describe("loadTasks", () => {
     expect((tasks[0] as unknown as { invariants_expected?: unknown }).invariants_expected).toBeUndefined();
   });
   it("rejects malformed yamls", async () => {
-    const dir = await tempDir("dna-bench-tasks-");
+    const dir = await tempDir("gps-bench-tasks-");
     await writeFile(path.join(dir, "bad.yml"), "prompt: only\n");
     await expect(loadTasks(dir)).rejects.toThrow(/malformed task/);
   });
@@ -235,7 +235,7 @@ describe("loadTasks", () => {
 });
 
 describe("summarize with Wilson CI and matrix", () => {
-  function mkResult(agent_label: string, task_id: string, arm: "baseline" | "dna", passed: boolean): RunResult {
+  function mkResult(agent_label: string, task_id: string, arm: "baseline" | "gps", passed: boolean): RunResult {
     return {
       task_id, arm, attempt: 0, agent_label, passed,
       failed_checks: [], duration_sec: 1, output_chars: 100, timed_out: false,
@@ -244,17 +244,17 @@ describe("summarize with Wilson CI and matrix", () => {
   it("computes per-agent cells and a Wilson CI on each", () => {
     const results: RunResult[] = [
       mkResult("opus", "t1", "baseline", true),
-      mkResult("opus", "t1", "dna", true),
+      mkResult("opus", "t1", "gps", true),
       mkResult("haiku", "t1", "baseline", false),
-      mkResult("haiku", "t1", "dna", true),
+      mkResult("haiku", "t1", "gps", true),
     ];
     const s = summarize(results, 1, ["opus", "haiku"]);
     expect(s.agents).toEqual(["opus", "haiku"]);
     expect(s.cells).toHaveLength(4);
-    const haikuDna = s.cells.find((c) => c.agent_label === "haiku" && c.arm === "dna");
-    expect(haikuDna?.pass_rate).toBe(1);
-    expect(haikuDna?.pass_rate_ci.low).toBeGreaterThan(0);
-    expect(haikuDna?.pass_rate_ci.high).toBe(1);
+    const haikuGps = s.cells.find((c) => c.agent_label === "haiku" && c.arm === "gps");
+    expect(haikuGps?.pass_rate).toBe(1);
+    expect(haikuGps?.pass_rate_ci.low).toBeGreaterThan(0);
+    expect(haikuGps?.pass_rate_ci.high).toBe(1);
     const haikuBase = s.cells.find((c) => c.agent_label === "haiku" && c.arm === "baseline");
     expect(haikuBase?.pass_rate).toBe(0);
     const perTaskHaiku = s.per_task.find((r) => r.agent_label === "haiku");

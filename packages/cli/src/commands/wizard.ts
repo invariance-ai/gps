@@ -15,7 +15,7 @@ import {
   appendNote,
   loadNotes,
   suggest,
-} from "@invariance/dna-core";
+} from "@invariance/gps-core";
 import { readFile } from "node:fs/promises";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 import { runInitCore } from "./init.js";
@@ -85,14 +85,14 @@ export function registerWizard(program: Command): void {
 
     try {
       console.log("");
-      console.log(kleur.bold("dna wizard") + kleur.dim(" — set up codebase context for coding agents"));
+      console.log(kleur.bold("gps wizard") + kleur.dim(" — set up codebase context for coding agents"));
       console.log(kleur.dim(`root: ${root}`));
 
       const claudeDetected = await isDir(path.join(root, ".claude"));
       const codexDetected = (await isDir(path.join(root, ".codex"))) || (await exists(path.join(root, "AGENTS.md")));
 
       // 1. init
-      header("1. initialize .dna/");
+      header("1. initialize .gps/");
       const initResult = await runInitCore(root, { force: false });
       for (const w of initResult.writes) step(w.action, w.relPath);
 
@@ -201,15 +201,15 @@ export function registerWizard(program: Command): void {
         console.log("");
       }
       console.log("Next:");
-      console.log(`  ${kleur.cyan("dna prefer \"<rule>\"")}        record a personal preference manually`);
-      console.log(`  ${kleur.cyan("dna preferences")}             list captured preferences`);
-      console.log(`  ${kleur.cyan("dna suggest")}                 see authoring queue (high-traffic symbols)`);
-      console.log(`  ${kleur.cyan("dna prepare <symbol>")}        decision-ready brief before editing`);
+      console.log(`  ${kleur.cyan("gps prefer \"<rule>\"")}        record a personal preference manually`);
+      console.log(`  ${kleur.cyan("gps preferences")}             list captured preferences`);
+      console.log(`  ${kleur.cyan("gps suggest")}                 see authoring queue (high-traffic symbols)`);
+      console.log(`  ${kleur.cyan("gps prepare <symbol>")}        decision-ready brief before editing`);
       console.log("");
       if (wantClaude || wantCodex) {
         console.log(
           kleur.dim(
-            "Agents will now auto-fire dna on session start, before edits, after edits, and on failures.",
+            "Agents will now auto-fire gps on session start, before edits, after edits, and on failures.",
           ),
         );
       }

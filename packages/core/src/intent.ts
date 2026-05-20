@@ -1,6 +1,6 @@
 /**
  * Lightweight intent classifier for the free-form `--intent` string passed to
- * `dna prepare`. Drives which sections are excluded so the LLM gets a brief
+ * `gps prepare`. Drives which sections are excluded so the LLM gets a brief
  * shaped for the task. Keyword-based — no model dependency.
  */
 

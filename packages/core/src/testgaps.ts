@@ -1,4 +1,4 @@
-import type { SymbolRef } from "@invariance/dna-schemas";
+import type { SymbolRef } from "@invariance/gps-schemas";
 import type { QueryContext } from "./query.js";
 import { calleesOf } from "./query.js";
 import { testsForSymbol } from "./tests.js";

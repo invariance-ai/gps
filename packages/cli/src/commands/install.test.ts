@@ -11,8 +11,8 @@ describe("resolveCmd", () => {
   it("returns the global shape under --use-global", () => {
     const spec = resolveCmd({ useGlobal: true });
     expect(spec.mode).toBe("global");
-    expect(spec.shell).toBe("dna");
-    expect(spec.command).toBe("dna");
+    expect(spec.shell).toBe("gps");
+    expect(spec.command).toBe("gps");
     expect(spec.baseArgs).toEqual([]);
   });
 
@@ -30,8 +30,8 @@ describe("resolveCmd", () => {
       const spec = resolveCmd({});
       expect(spec.mode).toBe("npx");
       expect(spec.command).toBe("npx");
-      expect(spec.baseArgs).toEqual(["-y", "@invariance/dna"]);
-      expect(spec.shell).toBe("npx -y @invariance/dna");
+      expect(spec.baseArgs).toEqual(["-y", "@invariance/gps"]);
+      expect(spec.shell).toBe("npx -y @invariance/gps");
     } finally {
       if (prev === undefined) delete process.env.CI;
       else process.env.CI = prev;

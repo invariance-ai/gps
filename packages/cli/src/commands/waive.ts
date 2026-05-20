@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { appendWaiver, loadInvariants } from "@invariance/dna-core";
+import { appendWaiver, loadInvariants } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface WaiveOpts extends RootOption {

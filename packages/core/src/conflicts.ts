@@ -1,7 +1,7 @@
 import { loadDecisions } from "./decisions.js";
 import { loadNotes } from "./notes.js";
 import { loadInvariants, invariantsFor } from "./invariants.js";
-import type { Decision, Invariant, Note } from "@invariance/dna-schemas";
+import type { Decision, Invariant, Note } from "@invariance/gps-schemas";
 
 export type ConflictKind = "contradicts" | "supersedes" | "stale";
 

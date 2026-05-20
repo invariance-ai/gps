@@ -8,7 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
  *   - dry-run mode (no API call; returns the prompt for inspection)
  */
 
-export interface DnaLlmOptions {
+export interface GpsLlmOptions {
   apiKey?: string;
   model?: string;
   /** Return the rendered prompt without making an API call. */
@@ -24,12 +24,12 @@ export interface CompletionResult {
 
 const DEFAULT_MODEL = "claude-opus-4-7";
 
-export class DnaLlm {
+export class GpsLlm {
   private readonly client: Anthropic | null;
   private readonly model: string;
   private readonly dryRun: boolean;
 
-  constructor(opts: DnaLlmOptions = {}) {
+  constructor(opts: GpsLlmOptions = {}) {
     this.dryRun = opts.dryRun === true;
     this.model = opts.model ?? DEFAULT_MODEL;
     if (this.dryRun) {

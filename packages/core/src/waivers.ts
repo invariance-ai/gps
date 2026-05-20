@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
-const REL = ".dna/waivers.yml";
+const REL = ".gps/waivers.yml";
 
 export interface Waiver {
   invariant: string;

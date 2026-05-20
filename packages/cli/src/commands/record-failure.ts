@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { recordFailure } from "@invariance/dna-core";
+import { recordFailure } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -23,7 +23,7 @@ export function registerRecordFailure(program: Command): void {
   addRootOption(
     program
       .command("record-failure")
-      .description("Record a tool/test failure against a symbol (fed into `dna suggest`)")
+      .description("Record a tool/test failure against a symbol (fed into `gps suggest`)")
       .option("--symbol <name>", "Symbol to attribute (defaults to last-prepared)")
       .option("--kind <kind>", "test|typecheck|lint|bash|other", "other")
       .option("--message <m>", "Short failure message (or pipe via stdin)")

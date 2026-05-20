@@ -25,7 +25,7 @@ interface SessionEvent {
 
 async function readActiveSessionId(root: string): Promise<string | undefined> {
   try {
-    const id = (await readFile(path.join(root, ".dna/session/id"), "utf8")).trim();
+    const id = (await readFile(path.join(root, ".gps/session/id"), "utf8")).trim();
     return id || undefined;
   } catch {
     return undefined;
@@ -34,7 +34,7 @@ async function readActiveSessionId(root: string): Promise<string | undefined> {
 
 async function readSessionEvents(root: string, id: string): Promise<SessionEvent[]> {
   try {
-    const raw = await readFile(path.join(root, ".dna/sessions", `${id}.jsonl`), "utf8");
+    const raw = await readFile(path.join(root, ".gps/sessions", `${id}.jsonl`), "utf8");
     const out: SessionEvent[] = [];
     for (const line of raw.split("\n")) {
       if (!line.trim()) continue;
@@ -95,7 +95,7 @@ export async function auditSession(root: string): Promise<AuditReport> {
     detail:
       runsInSession.length > 0
         ? `${runsInSession.length} test run(s) recorded (${runsInSession.filter((r) => r.exit === 0).length} pass / ${runsInSession.filter((r) => r.exit !== 0).length} fail)`
-        : "no tests recorded — run `dna test-record` after your test command",
+        : "no tests recorded — run `gps test-record` after your test command",
   });
 
   // Check 3: no unwaived blocking invariants

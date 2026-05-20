@@ -7,9 +7,9 @@ import {
   type Assumption as AssumptionT,
   type AssumptionConfidence,
   type AssumptionSource,
-} from "@invariance/dna-schemas";
+} from "@invariance/gps-schemas";
 
-const DIR = ".dna/assumptions";
+const DIR = ".gps/assumptions";
 
 function fileFor(root: string, symbol: string): string {
   const safe = symbol.replace(/[/\\:]/g, "__").replace(/\./g, "_");

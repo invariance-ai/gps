@@ -1,20 +1,20 @@
 {
-  "name": "@invariance/dna",
+  "name": "@invariance/gps",
   "version": "0.1.0",
-  "description": "dna CLI — codebase context for coding agents.",
+  "description": "gps CLI — codebase context for coding agents.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/invariance-ai/dna.git",
+    "url": "https://github.com/invariance-ai/gps.git",
     "directory": "packages/cli"
   },
-  "homepage": "https://github.com/invariance-ai/dna#readme",
+  "homepage": "https://github.com/invariance-ai/gps#readme",
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "dna": "./dist/index.js"
+    "gps": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "scripts": {
@@ -32,10 +32,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@invariance/dna-core": "workspace:*",
-    "@invariance/dna-llm": "workspace:*",
-    "@invariance/dna-mcp": "workspace:*",
-    "@invariance/dna-schemas": "workspace:*",
+    "@invariance/gps-core": "workspace:*",
+    "@invariance/gps-llm": "workspace:*",
+    "@invariance/gps-mcp": "workspace:*",
+    "@invariance/gps-schemas": "workspace:*",
     "yaml": "^2.5.0",
     "commander": "^12.1.0",
     "kleur": "^4.1.5"

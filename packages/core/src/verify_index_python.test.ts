@@ -15,7 +15,7 @@ describe("verifyIndexPython", () => {
     // If pyright IS available locally, this test still passes because we
     // construct an index with no .py files (so we hit the empty-file early
     // return) — that's a distinct skip path but exercises the same shape.
-    const root = await mkdtemp(path.join(os.tmpdir(), "dna-pyverify-empty-"));
+    const root = await mkdtemp(path.join(os.tmpdir(), "gps-pyverify-empty-"));
     try {
       const index = await buildIndex(root, []);
       const report = await verifyIndexPython(index, {
@@ -41,7 +41,7 @@ describe("verifyIndexPython", () => {
   it.skipIf(!PYRIGHT)(
     "reports precision/recall against pyright on a tiny python project",
     async () => {
-      const root = await mkdtemp(path.join(os.tmpdir(), "dna-pyverify-real-"));
+      const root = await mkdtemp(path.join(os.tmpdir(), "gps-pyverify-real-"));
       try {
         await mkdir(path.join(root, "pkg"), { recursive: true });
         await writeFile(

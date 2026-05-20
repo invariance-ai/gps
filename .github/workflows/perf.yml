@@ -49,7 +49,7 @@ jobs:
           set +e
           # verify-index requires an indexed root (bench:perf already built it).
           # Exits non-zero when precision/recall/coverage fall below the thresholds
-          # in .dna/config.yml; absolute-threshold enforcement runs here, while
+          # in .gps/config.yml; absolute-threshold enforcement runs here, while
           # baseline-regression enforcement runs in the next compare-verify step.
           node packages/cli/dist/index.js verify-index --sample 200 --seed 42 --json --no-cache \
             > bench/perf/results/verify-current.json
@@ -79,8 +79,8 @@ jobs:
       - name: Assemble PR comment
         run: |
           {
-            echo "<!-- dna-perf-gates -->"
-            echo "# DNA perf gates"
+            echo "<!-- gps-perf-gates -->"
+            echo "# GPS perf gates"
             echo ""
             cat bench/perf/results/perf-report.md
             echo ""
@@ -105,7 +105,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          marker="<!-- dna-perf-gates -->"
+          marker="<!-- gps-perf-gates -->"
           body=$(cat bench/perf/results/pr-comment.md)
           # Find an existing comment with our marker and edit it; else create.
           existing=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \

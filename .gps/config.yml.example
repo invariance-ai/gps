@@ -1,0 +1,16 @@
+# .gps/config.yml — copy to .gps/config.yml after `gps init`
+languages: [typescript, python]
+exclude:
+  - node_modules
+  - dist
+  - build
+  - .next
+  - vendor
+  - __pycache__
+  - .venv
+depth: 3
+strands:
+  - structural
+  - tests
+  - provenance
+  - invariants

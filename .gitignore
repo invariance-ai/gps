@@ -5,9 +5,9 @@ build/
 .DS_Store
 .env
 .env.local
-.dna/index/
-.dna/cache/
-.dna/observations.json
+.gps/index/
+.gps/cache/
+.gps/observations.json
 coverage/
 *.log
 .turbo/

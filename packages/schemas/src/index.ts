@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Single source of truth for dna's data shapes.
+ * Single source of truth for gps's data shapes.
  * CLI args, MCP tool I/O, and HTTP OpenAPI all derive from these.
  */
 
@@ -117,9 +117,9 @@ export type NoteSource = z.infer<typeof NoteSource>;
 
 /**
  * Where a lesson lives. `symbol` is the legacy default and remains the storage
- * for `.dna/notes/{symbol}.yml`. `file`, `feature`, and `area` write to
+ * for `.gps/notes/{symbol}.yml`. `file`, `feature`, and `area` write to
  * dedicated subdirectories. `area` is keyed by a directory path — a location.
- * `global` lives in the CLAUDE.md `dna:global-lessons` block.
+ * `global` lives in the CLAUDE.md `gps:global-lessons` block.
  */
 export const NoteScope = z.enum(["symbol", "file", "feature", "area", "global"]);
 export type NoteScope = z.infer<typeof NoteScope>;
@@ -165,7 +165,7 @@ export const Note = z.object({
 export type Note = z.infer<typeof Note>;
 
 /**
- * Schema-only in v0.2. CLI lands in v0.4 (`dna attach --session`). Defined
+ * Schema-only in v0.2. CLI lands in v0.4 (`gps attach --session`). Defined
  * now so data collected via future channels does not need migration.
  */
 export const DecisionSource = z.enum([
@@ -287,7 +287,7 @@ export type Feature = z.infer<typeof Feature>;
 /**
  * An alias is a human-friendly name ("home") that resolves to a location:
  * a file, the directory it lives in, and optionally a linked feature label.
- * Stored in the `aliases` map of `.dna/features.yml`. `source: user` bindings
+ * Stored in the `aliases` map of `.gps/features.yml`. `source: user` bindings
  * are pinned and never overwritten by auto-learning.
  */
 export const AliasBinding = z.object({
@@ -570,7 +570,7 @@ export type FindReusableResult = z.infer<typeof FindReusableResult>;
  */
 export const PrepareEditInput = z.object({
   symbol: z.string().optional().describe(
-    "Symbol to prepare. Optional if `intent` is provided — DNA will infer the top-matching symbol from the intent text.",
+    "Symbol to prepare. Optional if `intent` is provided — GPS will infer the top-matching symbol from the intent text.",
   ),
   intent: z.string().describe("What the agent plans to change, in one sentence."),
   budget: z.number().int().positive().optional().describe(
@@ -868,7 +868,7 @@ export type PreferencesListResult = z.infer<typeof PreferencesListResult>;
 export const BuildContractInput = z.object({
   symbol: z.string(),
   intent: z.string().optional(),
-  save: z.boolean().default(true).describe("Persist to .dna/contract.json for later verify_contract."),
+  save: z.boolean().default(true).describe("Persist to .gps/contract.json for later verify_contract."),
 });
 export type BuildContractInput = z.infer<typeof BuildContractInput>;
 export const EditContractOut = z.object({
@@ -1042,9 +1042,9 @@ export const VerifyIndexWorst = z.object({
   from_file: z.string(),
   from_line: z.number().int().nonnegative(),
   callee: z.string(),
-  dna_resolved_to: z.string().optional(),
+  gps_resolved_to: z.string().optional(),
   ts_resolved_to: z.string().optional(),
-  issue: z.enum(["wrong_target", "ts_says_no_target", "dna_missed"]),
+  issue: z.enum(["wrong_target", "ts_says_no_target", "gps_missed"]),
 });
 
 export const VerifyIndexResult = z.object({
@@ -1131,7 +1131,7 @@ export const TOOLS = {
   },
   invariants_for: {
     description:
-      "Asserted invariants that apply to a symbol. Call before editing — invariants with severity=block must be respected. Authored by the team in .dna/invariants.yml.",
+      "Asserted invariants that apply to a symbol. Call before editing — invariants with severity=block must be respected. Authored by the team in .gps/invariants.yml.",
     input: InvariantsForInput,
     output: InvariantsForResult,
   },
@@ -1173,13 +1173,13 @@ export const TOOLS = {
   },
   record_lesson: {
     description:
-      "Persist a lesson and let dna classify its scope (symbol|file|feature|global). Repo-wide lessons go to the CLAUDE.md managed block (always loaded); scoped lessons go to .dna/notes/* (pulled on-demand). Pass hint_scope/hint_target to bias the classifier, or force_scope to skip it. Use this in preference to record_learning when the lesson may not belong to a single symbol.",
+      "Persist a lesson and let gps classify its scope (symbol|file|feature|global). Repo-wide lessons go to the CLAUDE.md managed block (always loaded); scoped lessons go to .gps/notes/* (pulled on-demand). Pass hint_scope/hint_target to bias the classifier, or force_scope to skip it. Use this in preference to record_learning when the lesson may not belong to a single symbol.",
     input: RecordLessonInput,
     output: RecordLessonResult,
   },
   lessons_list: {
     description:
-      "List recorded lessons across scopes (global, file, feature, symbol). Filter by scope or target. Use when you want to audit what dna knows about a topic before adding more.",
+      "List recorded lessons across scopes (global, file, feature, symbol). Filter by scope or target. Use when you want to audit what gps knows about a topic before adding more.",
     input: LessonsListInput,
     output: LessonsListResult,
   },
@@ -1191,13 +1191,13 @@ export const TOOLS = {
   },
   record_directive: {
     description:
-      "Call this when the user gives a location-scoped instruction during a task — e.g. \"don't do X here\", \"always Y in this folder\", \"in the home page, avoid Z\". dna resolves \"here\"/\"this\" to the active area (a directory) and persists the directive as an area-scoped note, so future edits anywhere in that directory inherit it. Pass `area` or `alias` to target a specific location; otherwise the active area is used. Use this in preference to record_lesson when the instruction is about a place rather than a symbol.",
+      "Call this when the user gives a location-scoped instruction during a task — e.g. \"don't do X here\", \"always Y in this folder\", \"in the home page, avoid Z\". gps resolves \"here\"/\"this\" to the active area (a directory) and persists the directive as an area-scoped note, so future edits anywhere in that directory inherit it. Pass `area` or `alias` to target a specific location; otherwise the active area is used. Use this in preference to record_lesson when the instruction is about a place rather than a symbol.",
     input: RecordDirectiveInput,
     output: RecordDirectiveResult,
   },
   list_todos: {
     description:
-      "List TODOs DNA has captured for a file or symbol. Surfaces unfinished work (failed tests, captured notes) without editing source files.",
+      "List TODOs GPS has captured for a file or symbol. Surfaces unfinished work (failed tests, captured notes) without editing source files.",
     input: z.object({
       file: z.string().optional(),
       symbol: z.string().optional(),
@@ -1206,7 +1206,7 @@ export const TOOLS = {
     output: z.object({ todos: z.array(TodoItem) }),
   },
   resolve_todo: {
-    description: "Mark a DNA-tracked TODO as resolved by id.",
+    description: "Mark a GPS-tracked TODO as resolved by id.",
     input: z.object({ id: z.string() }),
     output: z.object({ resolved: z.boolean() }),
   },
@@ -1314,13 +1314,13 @@ export const TOOLS = {
   },
   verify_index: {
     description:
-      "Score DNA's symbol graph against TypeScript's type checker. Returns precision (DNA edges ts confirms), recall (ts edges DNA found), coverage (% of edges with exact|typed status), and a list of worst-offending callsites. Use this to prove DNA's affected-symbols claims are trustworthy on a given repo, or to find graph-quality regressions after a parser change.",
+      "Score GPS's symbol graph against TypeScript's type checker. Returns precision (GPS edges ts confirms), recall (ts edges GPS found), coverage (% of edges with exact|typed status), and a list of worst-offending callsites. Use this to prove GPS's affected-symbols claims are trustworthy on a given repo, or to find graph-quality regressions after a parser change.",
     input: VerifyIndexInput,
     output: VerifyIndexResult,
   },
   gate_stream: {
     description:
-      "Tail the live gate stream — invariant violations detected while files were being edited (via `dna gate --watch` or a PostToolUse hook). Use between tool calls to catch a violation you just introduced. Preferred cursor: `since_seq` (monotonic counter from the last entry you saw; returns entries with seq > since_seq). `since` (ISO timestamp) is accepted for backwards compatibility and ignored when `since_seq` is supplied. Use `limit` to cap the last N.",
+      "Tail the live gate stream — invariant violations detected while files were being edited (via `gps gate --watch` or a PostToolUse hook). Use between tool calls to catch a violation you just introduced. Preferred cursor: `since_seq` (monotonic counter from the last entry you saw; returns entries with seq > since_seq). `since` (ISO timestamp) is accepted for backwards compatibility and ignored when `since_seq` is supplied. Use `limit` to cap the last N.",
     input: GateStreamInput,
     output: GateStreamResult,
   },
@@ -1332,7 +1332,7 @@ export const TOOLS = {
   },
   seed_propose: {
     description:
-      "Mine repo history (TODOs, commits, PRs) for candidate notes and invariants. Tiered by confidence: safe (TODOs/FIXMEs only), medium (+ recent commits/PRs), aggressive (+ blame, weaker signals). Returns proposals — does not auto-write. Pair with `dna init --seed <tier>` for the CLI flow that drops candidates into .dna/candidates/.",
+      "Mine repo history (TODOs, commits, PRs) for candidate notes and invariants. Tiered by confidence: safe (TODOs/FIXMEs only), medium (+ recent commits/PRs), aggressive (+ blame, weaker signals). Returns proposals — does not auto-write. Pair with `gps init --seed <tier>` for the CLI flow that drops candidates into .gps/candidates/.",
     input: SeedProposeInput,
     output: SeedProposeResult,
   },

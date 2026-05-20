@@ -6,9 +6,9 @@ import {
   listLessons,
   reclassifyLesson,
   type ClassifyResult,
-} from "@invariance/dna-core";
-import { llmClassify } from "@invariance/dna-llm";
-import type { NoteScope, NoteSeverity, ClassifierMeta } from "@invariance/dna-schemas";
+} from "@invariance/gps-core";
+import { llmClassify } from "@invariance/gps-llm";
+import type { NoteScope, NoteSeverity, ClassifierMeta } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface RecordOpts extends RootOption {
@@ -62,7 +62,7 @@ function classifierMeta(
 }
 
 export function registerLessons(program: Command): void {
-  const cmd = program.command("lessons").description("Manage tiered repo lessons (global → CLAUDE.md, scoped → .dna/notes/*)");
+  const cmd = program.command("lessons").description("Manage tiered repo lessons (global → CLAUDE.md, scoped → .gps/notes/*)");
 
   addRootOption(
     cmd

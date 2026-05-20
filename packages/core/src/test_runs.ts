@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 
-const REL = ".dna/test_runs.jsonl";
+const REL = ".gps/test_runs.jsonl";
 
 export interface TestRun {
   at: string;
@@ -74,13 +74,13 @@ export function parseFailedTests(output: string): string[] {
 }
 
 /**
- * Write a sidecar file in `.dna/sessions/last-prepared.txt`-style form so that
+ * Write a sidecar file in `.gps/sessions/last-prepared.txt`-style form so that
  * the test-run picks up the active symbol. We just read the existing one if
  * present.
  */
 export async function readLastPreparedSymbol(root: string): Promise<string | undefined> {
   try {
-    const raw = await readFile(path.join(root, ".dna/sessions/last-prepared.txt"), "utf8");
+    const raw = await readFile(path.join(root, ".gps/sessions/last-prepared.txt"), "utf8");
     return raw.trim() || undefined;
   } catch {
     return undefined;

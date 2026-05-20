@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
-import { Invariant } from "@invariance/dna-schemas";
+import { Invariant } from "@invariance/gps-schemas";
 
-const REL = ".dna/invariants.yml";
+const REL = ".gps/invariants.yml";
 
 export async function loadInvariants(root: string): Promise<Invariant[]> {
   try {

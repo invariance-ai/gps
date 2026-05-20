@@ -2,7 +2,7 @@
 
 # Command reference
 
-`dna` exposes its full surface as a CLI. Every read command supports `--json` (stable contract) and `--markdown` (LLM-optimal); ANSI colors auto-strip when piped.
+`gps` exposes its full surface as a CLI. Every read command supports `--json` (stable contract) and `--markdown` (LLM-optimal); ANSI colors auto-strip when piped.
 
 ## `alias`
 
@@ -135,7 +135,7 @@ attach [options]
 - `--symbol <name>` — Constrain extraction to these symbols; repeatable *(default: [])*
 - `--dry-run` — Render the prompt for a native agent (default)
 - `--call-api` — Call the bundled Anthropic client instead of printing a prompt
-- `--save-without-confirm` — Write extracted decisions to .dna/decisions/ without interactive prompt
+- `--save-without-confirm` — Write extracted decisions to .gps/decisions/ without interactive prompt
 - `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
 - `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
 - `--json` — Emit JSON
@@ -157,7 +157,7 @@ audit [options]
 
 ## `bench`
 
-Repo-edit-bench: A/B coding agents with and without DNA
+Repo-edit-bench: A/B coding agents with and without GPS
 
 ```
 bench [options] [command]
@@ -178,7 +178,7 @@ bench tasks [options]
 
 ### `bench run`
 
-Run bench: each task twice (baseline + dna) × n attempts × agent(s)
+Run bench: each task twice (baseline + gps) × n attempts × agent(s)
 
 ```
 bench run [options]
@@ -196,7 +196,7 @@ bench run [options]
 
 ### `bench report`
 
-Print the markdown report from a previous `dna bench run`
+Print the markdown report from a previous `gps bench run`
 
 ```
 bench report [options]
@@ -437,7 +437,7 @@ directive list [options]
 
 ## `doctor`
 
-Check that dna is installed, indexed, and wired into your agent
+Check that gps is installed, indexed, and wired into your agent
 
 ```
 doctor [options]
@@ -722,7 +722,7 @@ impact [options] [symbol]
 
 ## `index`
 
-Scan repo, build symbol graph, write .dna/index/symbols.json
+Scan repo, build symbol graph, write .gps/index/symbols.json
 
 ```
 index [options]
@@ -735,7 +735,7 @@ index [options]
 
 ## `init`
 
-Initialize .dna/ in this directory (config + invariants)
+Initialize .gps/ in this directory (config + invariants)
 
 ```
 init [options]
@@ -749,7 +749,7 @@ init [options]
 
 ## `install`
 
-Install dna agent integrations
+Install gps agent integrations
 
 ```
 install [options] [command]
@@ -765,9 +765,10 @@ install claude [options]
 
 **Options:**
 
-- `--force` — Overwrite existing dna-managed Claude files
-- `--skip-claude-md` — Do not append dna instructions to CLAUDE.md
-- `--use-global` — Generate hooks that call `dna` directly (requires global install)
+- `--force` — Overwrite existing gps-managed Claude files
+- `--skip-claude-md` — Do not append gps instructions to CLAUDE.md
+- `--use-global` — Generate hooks that call `gps` directly (requires global install)
+- `--use-local` — Generate hooks that call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--root <path>` — Repo root (default: cwd)
 
@@ -781,15 +782,16 @@ install codex [options]
 
 **Options:**
 
-- `--force` — Overwrite existing dna-managed Codex files
-- `--skip-agents-md` — Do not append dna instructions to AGENTS.md
-- `--use-global` — Configure Codex to call `dna` directly (requires global install)
+- `--force` — Overwrite existing gps-managed Codex files
+- `--skip-agents-md` — Do not append gps instructions to AGENTS.md
+- `--use-global` — Configure Codex to call `gps` directly (requires global install)
+- `--use-local` — Configure Codex to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install cursor`
 
-Install Cursor integration: .cursor/rules/dna.mdc + .cursor/mcp.json
+Install Cursor integration: .cursor/rules/gps.mdc + .cursor/mcp.json
 
 ```
 install cursor [options]
@@ -797,9 +799,10 @@ install cursor [options]
 
 **Options:**
 
-- `--force` — Overwrite existing dna-managed Cursor files
+- `--force` — Overwrite existing gps-managed Cursor files
 - `--skip-mcp` — Do not write .cursor/mcp.json (rule file only)
-- `--use-global` — Configure MCP to call `dna` directly (requires global install)
+- `--use-global` — Configure MCP to call `gps` directly (requires global install)
+- `--use-local` — Configure MCP to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--root <path>` — Repo root (default: cwd)
 
@@ -813,7 +816,7 @@ invariant [options] [command]
 
 ### `invariant init`
 
-Append a starter pack of invariants to .dna/invariants.yml
+Append a starter pack of invariants to .gps/invariants.yml
 
 ```
 invariant init [options]
@@ -874,7 +877,7 @@ learn-todos [options]
 
 ## `lessons`
 
-Manage tiered repo lessons (global → CLAUDE.md, scoped → .dna/notes/*)
+Manage tiered repo lessons (global → CLAUDE.md, scoped → .gps/notes/*)
 
 ```
 lessons [options] [command]
@@ -997,7 +1000,7 @@ pr-intent [options]
 - `--pr <number>` — PR number to read
 - `--dry-run` — Render the prompt for a native agent (default)
 - `--call-api` — Call the bundled Anthropic client instead of printing a prompt
-- `--save-without-confirm` — Write extracted decisions to .dna/decisions/ without interactive prompt
+- `--save-without-confirm` — Write extracted decisions to .gps/decisions/ without interactive prompt
 - `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
 - `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
 - `--json` — Emit JSON
@@ -1033,7 +1036,7 @@ preferences [options]
 - `--topic <t>` — Filter by topic
 - `--limit <n>` — Max to show *(default: 50)*
 - `--json` — Emit JSON
-- `--markdown` — Emit dna-auto-prefs markdown block (for hooks)
+- `--markdown` — Emit gps-auto-prefs markdown block (for hooks)
 - `--root <path>` — Repo root (default: cwd)
 
 ## `prepare`
@@ -1119,7 +1122,7 @@ questions [options] [symbol]
 
 ## `record-failure`
 
-Record a tool/test failure against a symbol (fed into `dna suggest`)
+Record a tool/test failure against a symbol (fed into `gps suggest`)
 
 ```
 record-failure [options]
@@ -1197,7 +1200,7 @@ runtime show [options] <symbol>
 
 ## `seed`
 
-Bootstrap proposed notes/decisions from git log + gh PRs. Writes to .dna/proposals.yml unless --apply.
+Bootstrap proposed notes/decisions from git log + gh PRs. Writes to .gps/proposals.yml unless --apply.
 
 ```
 seed [options]
@@ -1207,13 +1210,13 @@ seed [options]
 
 - `--commits <n>` — Number of commits to scan *(default: "200")*
 - `--prs <n>` — Number of merged PRs to scan *(default: "50")*
-- `--apply` — Append to .dna/notes and .dna/decisions instead of writing to proposals.yml *(default: false)*
+- `--apply` — Append to .gps/notes and .gps/decisions instead of writing to proposals.yml *(default: false)*
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
 ## `serve`
 
-Start the dna MCP server (stdio)
+Start the gps MCP server (stdio)
 
 ```
 serve [options]
@@ -1221,7 +1224,7 @@ serve [options]
 
 **Options:**
 
-- `--observe` — Record per-symbol query counts to .dna/observations.json (metadata only — symbol name, count, timestamp; never tool arguments or results)
+- `--observe` — Record per-symbol query counts to .gps/observations.json (metadata only — symbol name, count, timestamp; never tool arguments or results)
 
 ## `session`
 
@@ -1317,7 +1320,7 @@ suggest [options]
 
 ## `sync`
 
-Fetch + merge .dna/ from the repo's git remote; dedupe notes/decisions by id
+Fetch + merge .gps/ from the repo's git remote; dedupe notes/decisions by id
 
 ```
 sync [options]
@@ -1333,7 +1336,7 @@ sync [options]
 
 ## `test-record`
 
-Record a test run tied to active symbols (surfaces in `dna prepare` later)
+Record a test run tied to active symbols (surfaces in `gps prepare` later)
 
 ```
 test-record [options]
@@ -1451,7 +1454,7 @@ verify-contract [options]
 
 ## `verify-index`
 
-Score DNA's symbol graph against a type checker (precision/recall/coverage)
+Score GPS's symbol graph against a type checker (precision/recall/coverage)
 
 ```
 verify-index [options]
@@ -1460,7 +1463,7 @@ verify-index [options]
 **Options:**
 
 - `--sample <n>` — Sampled edges & callsites (default 200)
-- `--seed <n>` — Deterministic sampling seed (also honored via DNA_VERIFY_SEED)
+- `--seed <n>` — Deterministic sampling seed (also honored via GPS_VERIFY_SEED)
 - `--lang <lang>` — Language: typescript | python | auto (default auto)
 - `--no-cache` — Don't write the cached report
 - `--json` — Emit JSON instead of text
@@ -1482,7 +1485,7 @@ waive [options] <invariant>
 
 ## `why`
 
-Everything dna knows about a symbol, in one answer
+Everything gps knows about a symbol, in one answer
 
 ```
 why [options] <symbol>

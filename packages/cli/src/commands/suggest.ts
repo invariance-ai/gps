@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { suggest } from "@invariance/dna-core";
+import { suggest } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerSuggest(program: Command): void {
@@ -25,7 +25,7 @@ export function registerSuggest(program: Command): void {
         if (results.length === 0) {
           console.log(
             kleur.dim(
-              "no suggestions — either no observations recorded yet (start `dna serve --observe`) or all hot symbols already have invariants.",
+              "no suggestions — either no observations recorded yet (start `gps serve --observe`) or all hot symbols already have invariants.",
             ),
           );
           return;

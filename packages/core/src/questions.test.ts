@@ -13,7 +13,7 @@ import {
 const roots: string[] = [];
 
 async function tempRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "dna-questions-"));
+  const root = await mkdtemp(path.join(os.tmpdir(), "gps-questions-"));
   roots.push(root);
   return root;
 }

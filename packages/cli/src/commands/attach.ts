@@ -2,15 +2,15 @@ import type { Command } from "commander";
 import { readFile } from "node:fs/promises";
 import kleur from "kleur";
 import { stringify as stringifyYaml } from "yaml";
-import { appendDecision, appendQuestion } from "@invariance/dna-core";
-import { DnaLlm, extractDecisions } from "@invariance/dna-llm";
+import { appendDecision, appendQuestion } from "@invariance/gps-core";
+import { GpsLlm, extractDecisions } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 /**
- * `dna attach --transcript <path>` — distill a conversation transcript into
+ * `gps attach --transcript <path>` — distill a conversation transcript into
  * structured Decision records anchored to symbols. The transcript is read
  * once; only the distilled records are persisted. Raw text never lands on
- * disk under .dna/.
+ * disk under .gps/.
  *
  * Native --session <id> integration (Claude Code / Codex session IDs) lands
  * once those formats stabilize; for now use --transcript with a dumped file.
@@ -51,7 +51,7 @@ export function registerAttach(program: Command): void {
       .option("--call-api", "Call the bundled Anthropic client instead of printing a prompt")
       .option(
         "--save-without-confirm",
-        "Write extracted decisions to .dna/decisions/ without interactive prompt",
+        "Write extracted decisions to .gps/decisions/ without interactive prompt",
       )
       .option("--api-key <key>", "Anthropic API key (default: ANTHROPIC_API_KEY env)")
       .option("--model <id>", "Anthropic model ID (default: claude-opus-4-7)")
@@ -63,7 +63,7 @@ export function registerAttach(program: Command): void {
         throw new Error("--transcript <path> required (--session-id integration is v0.5)");
       }
       const transcript = await readFile(opts.transcript, "utf8");
-      const llm = new DnaLlm({
+      const llm = new GpsLlm({
         apiKey: opts.apiKey,
         model: opts.model,
         dryRun: !opts.callApi || !!opts.dryRun,
@@ -82,7 +82,7 @@ export function registerAttach(program: Command): void {
         console.log(kleur.dim("--- user ---"));
         console.log(result.dry_run_prompt!.user);
         console.log("");
-        console.log(kleur.dim("Have the native agent return YAML, then persist decisions with `dna decide`."));
+        console.log(kleur.dim("Have the native agent return YAML, then persist decisions with `gps decide`."));
         return;
       }
 
@@ -127,13 +127,13 @@ export function registerAttach(program: Command): void {
         }
         console.log(
           kleur.green(
-            `wrote ${result.decisions.length} decision(s) and ${result.questions.length} question(s) to .dna/`,
+            `wrote ${result.decisions.length} decision(s) and ${result.questions.length} question(s) to .gps/`,
           ),
         );
       } else {
         console.log(
           kleur.dim(
-            "Run again with --save-without-confirm to persist to .dna/, or copy YAML manually.",
+            "Run again with --save-without-confirm to persist to .gps/, or copy YAML manually.",
           ),
         );
       }
