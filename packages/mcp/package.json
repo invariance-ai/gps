@@ -22,9 +22,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "tsc"
+    "prepublishOnly": "rm -rf dist && tsc"
   },
   "dependencies": {
     "@invariance/gps-core": "workspace:*",
