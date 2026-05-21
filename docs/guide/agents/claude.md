@@ -19,7 +19,7 @@ Writes:
 | `UserPromptSubmit` | Every prompt | `gps capture-preference --emit` (catches "from now on…" rules), `gps context-from-prompt` (auto-inject context for named symbols) |
 | `PreToolUse` Edit\|MultiEdit\|Write | Before any edit | `gps index` — keep graph fresh |
 | `PostToolUse` Bash | After every Bash | If exit code ≠ 0, `gps record-failure --kind bash` against the last-prepared symbol |
-| `Stop` | Turn end | `gps attach --transcript -` (distill session into Decisions), `gps feature attribute --git-diff` (only if `gps validate` passes — stale graphs poison attribution), `gps session end` |
+| `Stop` | Turn end | `gps attach --hook-stdin` (distill the session transcript into Decisions/Questions — auto-persists with an API key, else stashes a prompt under `.gps/pending-distill/`), `gps feature attribute --git-diff` (only if `gps validate` passes — stale graphs poison attribution), `gps session end` |
 
 All hooks pipe to `>/dev/null 2>&1 || true`. A broken hook never breaks the agent.
 

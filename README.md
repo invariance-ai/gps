@@ -47,7 +47,7 @@ Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-
 
 Honest, up-front:
 
-- **Parser is regex-based** for TS/JS/Python — ~90% precision on typical code, lower on decorators-as-factories, dynamic dispatch, and heavy macros. Trade-off documented in [`packages/core/src/parser.ts:5`](packages/core/src/parser.ts). Tree-sitter (WASM) is the next accuracy step.
+- **Parser precision is ~90% on typical code**, lower on decorators-as-factories, dynamic dispatch, and heavy macros. The default backend is tree-sitter (WASM, zero native deps) for TS/JS/Python with body/`end_line` tracking; a regex backend (8 languages) is the fallback. Trade-off documented in [`packages/core/src/parser.ts:5`](packages/core/src/parser.ts). LSP-backed reference resolution is the next accuracy step.
 - **No semantic import resolution.** Re-exports and barrel files may miss call edges.
 - **No cross-repo / monorepo-aware symbol IDs** yet — each repo is its own graph.
 - **Proof base is n=1.** The +11% quality win above is one repo, 10 prompts. We're running this against more repos next; see [`docs/dogfood-runbook.md`](docs/dogfood-runbook.md) and contribute a result.
@@ -95,7 +95,7 @@ gps serve --observe                                   # ⚡ opt-in: record per-s
 gps suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
 ```
 
-Run `gps --help` for the full 49-command surface (postmortem, promote, gate, runtime, audit, …).
+Run `gps --help` for the full command surface — 66 top-level commands (postmortem, promote, gate, runtime, audit, …). Full reference: [`docs/guide/commands.md`](docs/guide/commands.md).
 
 ### Passive observer — opt-in, metadata only
 
@@ -255,11 +255,11 @@ API execution is an explicit opt-in for automation: pass `--call-api` plus `ANTH
 
 ## Status
 
-v0.2 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions. The current index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. It still uses a zero-native-deps regex parser for TS/JS/Python (see [What gps is not (yet)](#what-gps-is-not-yet)); tree-sitter WASM and LSP-backed reference resolution are the next accuracy step. Single-file JSON index — SQLite when repos push past ~500k LOC.
+v0.1.0 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback (see [What gps is not (yet)](#what-gps-is-not-yet)). Single-file JSON index — SQLite when repos push past ~500k LOC.
 
-v0.3 roadmap: passive metadata observer (`gps observe` — symbol query frequencies only, never conversation content) + `gps suggest` for the invariant authoring queue + LLM-assisted postmortem promotion.
+Also shipping: passive metadata observer (`gps serve --observe` — symbol query frequencies only, never conversation content), `gps suggest` for the authoring queue (now also surfaces lessons near promotion), and LLM-assisted postmortem promotion.
 
-v0.4 roadmap: session anchoring (`gps attach --session`) — distill a Claude Code / Codex thread into structured `Decision` records attached to the symbols touched.
+Next: native `gps attach --session <id>` lookup (the Stop hook already auto-distills via the transcript path), LSP-backed reference resolution, and cross-repo / monorepo symbol IDs.
 
 ## License
 

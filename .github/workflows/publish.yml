@@ -1,0 +1,55 @@
+name: publish
+
+# Publish all @invariance/gps* packages to npm when a v* tag is pushed.
+# Cut a release with: `pnpm tsx scripts/release.ts <version>` (bumps + commits +
+# tags), then `git push --follow-tags`. This workflow does the npm publish.
+# Requires repo secret NPM_TOKEN (an npm automation token with publish rights).
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - run: pnpm install --frozen-lockfile
+
+      # Gate the publish on a green build before anything hits the registry.
+      - run: pnpm -r build
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+
+      # All packages must be at one version (release.ts bumps them in lockstep).
+      - name: Verify lockstep versions
+        run: pnpm tsx scripts/release.ts --check
+
+      # The pushed tag (vX.Y.Z) must match the package version, so we never
+      # publish a version that disagrees with the release tag.
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag $GITHUB_REF_NAME ($TAG) != package version $PKG" >&2
+            exit 1
+          fi
+
+      # pnpm publishes in topological order and rewrites workspace:* to the
+      # concrete version at publish time. --access public for scoped packages.
+      - name: Publish to npm
+        run: pnpm -r publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -3,20 +3,21 @@ import path from "node:path";
 import type { SymbolRef } from "@invariance/gps-schemas";
 
 /**
- * v0.1 parser: regex-based extraction of declarations and call sites for
- * TypeScript/JavaScript and Python. tree-sitter (WASM) is planned for v0.2 —
- * shipped this way to keep `npm install -g @invariance/gps` zero-native-deps.
+ * Parser. The default backend is tree-sitter (WASM) for TypeScript/JavaScript
+ * and Python — vendored .wasm grammars, no native build step, so
+ * `npm install -g @invariance/gps` stays zero-native-deps. It parses bodies and
+ * tracks `end_line`, so the hunk→symbol mapper resolves mid-body edits.
  *
- * Trade-off (honest): ~90% precision on typical code, lower on heavy macros,
- * decorators-as-factories, and dynamic dispatch. Good enough for v0.1 because
- * downstream consumers (CLI/MCP) can fall back to grep verification.
+ * A regex backend is the fallback: zero-dependency declaration/call extraction
+ * across 8 languages (TS/JS/Python/Go/Rust/Java/Ruby/C#). It locates
+ * declaration lines only — no body parse, so `end_line` is left undefined and
+ * diff_to_symbols treats those as 1-line symbols (long functions touched
+ * mid-body may be missed). Honest precision: ~90% on typical code, lower on
+ * decorators-as-factories, dynamic dispatch, and heavy macros; downstream
+ * consumers (CLI/MCP) fall back to grep verification.
  *
- * Note on end_line: the regex parser only locates declaration lines — it
- * does not parse bodies, so `end_line` is left undefined. Downstream
- * (diff_to_symbols) treats absent end_line as a 1-line symbol, which is the
- * pre-v0.6a behavior: long functions touched mid-body via the regex parser
- * may still be missed by the hunk→symbol mapper. Tree-sitter (default) does
- * track end_line.
+ * Backend selection: GPS_PARSER=tree-sitter (require it), GPS_PARSER=regex
+ * (force the fallback), default = tree-sitter with per-file graceful fallback.
  */
 export type ParsedLanguage =
   | "typescript"

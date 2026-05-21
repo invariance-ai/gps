@@ -12,7 +12,7 @@ Re-runs of every measurable claim in PRs #22, #24, #25, #26, #27, #28 on current
 | gps-brief vs rg tokens (self) | 23% cheaper | **12% cheaper** (129 vs 1080) | held |
 | gps-brief vs rg tokens (flask) | — | **20% cheaper** (190 vs 962), recall tied at 100% | new |
 | gps-brief vs rg tokens (django) | — | **97.6% cheaper** (819 vs 34,717), +29pp recall | new — GPS's strongest result |
-| repo-edit-bench (claude -p, n=3) | — | **baseline 66.7% / gps 100%**, Δ +33pp | new — GPS helped |
+| repo-edit-bench (claude -p, n=3) | — | ~~baseline 66.7% / gps 100%, Δ +33pp~~ | **RETRACTED — prompt artifact, see Addendum / §below. Do not cite.** |
 
 ## 1. verify-index (PR #24 — fix changed sampling methodology)
 
