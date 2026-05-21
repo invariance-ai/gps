@@ -131,6 +131,7 @@ attach [options]
 **Options:**
 
 - `--transcript <path>` — Path to the conversation transcript file
+- `--hook-stdin` — Claude Code Stop-hook mode: read the hook JSON from stdin, resolve transcript_path, and auto-persist (never fails)
 - `--session <id>` — Logical session/PR/conversation ID to tag decisions with *(default: "transcript")*
 - `--symbol <name>` — Constrain extraction to these symbols; repeatable *(default: [])*
 - `--dry-run` — Render the prompt for a native agent (default)
@@ -873,6 +874,8 @@ learn-todos [options]
 **Options:**
 
 - `--dry-run` — Print what would be recorded; write nothing
+- `--prune` — Also drop todo-sourced notes whose backing comment is gone (keeps the loop in sync)
+- `--quiet` — Suppress per-item output (for hook use)
 - `--root <path>` — Repo root (default: cwd)
 
 ## `lessons`
@@ -1037,6 +1040,7 @@ preferences [options]
 - `--limit <n>` — Max to show *(default: 50)*
 - `--json` — Emit JSON
 - `--markdown` — Emit gps-auto-prefs markdown block (for hooks)
+- `--write` — Persist the gps:auto-prefs block into CLAUDE.md (idempotent; regenerated each SessionStart)
 - `--root <path>` — Repo root (default: cwd)
 
 ## `prepare`

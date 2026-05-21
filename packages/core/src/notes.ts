@@ -405,6 +405,52 @@ export async function loadAllNotes(root: string): Promise<NoteT[]> {
 }
 
 /**
+ * Drop todo-sourced symbol notes whose (symbol, lesson) is no longer present
+ * in `live` — i.e. the backing `TODO(symbol):` comment was removed. This keeps
+ * `prepare` from surfacing dead TODOs as the codebase changes. Returns the
+ * number of stale notes found (and removed unless `dryRun`). todo notes are
+ * always symbol-scoped, so only the top-level notes dir is scanned.
+ */
+export async function pruneStaleTodoNotes(
+  root: string,
+  live: Map<string, Set<string>>,
+  opts: { dryRun?: boolean } = {},
+): Promise<number> {
+  let pruned = 0;
+  let files: string[];
+  try {
+    files = await readdir(path.join(root, DIR));
+  } catch {
+    return 0;
+  }
+  for (const f of files) {
+    if (!f.endsWith(".yml")) continue;
+    const filePath = path.join(root, DIR, f);
+    let notes: NoteT[];
+    try {
+      const data = parseYaml(await readFile(filePath, "utf8"));
+      if (!Array.isArray(data)) continue;
+      notes = data.map((d: unknown) => Note.parse(d));
+    } catch {
+      continue;
+    }
+    const kept = notes.filter((n) => {
+      if (n.source !== "todo") return true;
+      if (live.get(n.symbol)?.has(n.lesson)) return true;
+      pruned++;
+      return false;
+    });
+    if (kept.length === notes.length || opts.dryRun) continue;
+    if (kept.length === 0) {
+      await unlinkSafe(filePath);
+    } else {
+      await writeFile(filePath, stringifyYaml(kept));
+    }
+  }
+  return pruned;
+}
+
+/**
  * Scan repo files for `TODO(symbol):` and `FIXME(symbol):` markers and lift
  * them into notes. One-shot day-zero corpus from comments your code already
  * carries. Re-running is idempotent: lessons collide on (symbol, lesson, source)

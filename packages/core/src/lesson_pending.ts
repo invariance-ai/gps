@@ -1,11 +1,19 @@
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { tokenize, jaccard } from "./text_similarity.js";
 
 const REL = ".gps/pending-lessons.json";
 
 export const DEFAULT_CONFIDENCE_GATE = 0.75;
 export const DEFAULT_COUNT_GATE = 2;
+/**
+ * Lexical-overlap threshold above which a new observation is treated as a
+ * recurrence of an existing pending lesson (reworded), folding onto the same
+ * counter instead of minting a fresh id. Higher than promote.ts's clustering
+ * gate (0.4) — folding is destructive to the count, so we want real overlap.
+ */
+export const DEFAULT_SIMILARITY_GATE = 0.5;
 
 export interface PendingLesson {
   id: string;
@@ -56,11 +64,37 @@ export interface ObservationResult {
 export interface GateOpts {
   confidenceGate?: number;
   countGate?: number;
+  /** Lexical-overlap threshold for folding reworded recurrences (default 0.5). */
+  similarityGate?: number;
+}
+
+/**
+ * Find an existing pending lesson that is a reworded version of `text`
+ * (Jaccard overlap ≥ gate), so recurrences accumulate on one counter rather
+ * than fragmenting across near-duplicate ids. Returns the best match's id.
+ */
+function findSimilarId(
+  lessons: Record<string, PendingLesson>,
+  text: string,
+  gate: number,
+): string | null {
+  const incoming = tokenize(text);
+  let bestId: string | null = null;
+  let bestScore = gate;
+  for (const [id, p] of Object.entries(lessons)) {
+    const score = jaccard(incoming, tokenize(p.text));
+    if (score >= bestScore) {
+      bestScore = score;
+      bestId = id;
+    }
+  }
+  return bestId;
 }
 
 /**
  * Record an observation of a candidate global lesson. Increments the count and
- * updates max confidence seen. Returns promoted=true when both gates pass.
+ * updates max confidence seen. Reworded recurrences fold onto the same pending
+ * entry (see findSimilarId). Returns promoted=true when both gates pass.
  *
  * The caller is responsible for actually writing CLAUDE.md when promoted; this
  * module only tracks the gate state.
@@ -72,7 +106,13 @@ export async function recordLessonObservation(
   opts: GateOpts = {},
 ): Promise<ObservationResult> {
   const file = await load(root);
-  const id = idFor(text);
+  const exactId = idFor(text);
+  // Exact hash wins; otherwise fold onto a sufficiently-similar pending lesson.
+  const id =
+    file.lessons[exactId]
+      ? exactId
+      : findSimilarId(file.lessons, text, opts.similarityGate ?? DEFAULT_SIMILARITY_GATE) ??
+        exactId;
   const now = new Date().toISOString();
   const existing = file.lessons[id];
   const pending: PendingLesson = existing

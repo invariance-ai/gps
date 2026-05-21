@@ -314,8 +314,14 @@ function claudeSettings(cmd: string): unknown {
               type: "command",
               command:
                 `${cmd} index --root "$PWD"${silent}; ` +
+                // Continuously sync TODO(symbol): comments into notes and drop
+                // any whose comment was removed — prepare surfaces the live set.
+                `${cmd} learn-todos --root "$PWD" --prune --quiet${silent}; ` +
                 `${cmd} feature clear-active --root "$PWD"${silent}; ` +
                 `${cmd} session start --root "$PWD"${silent}; ` +
+                // Persist standing preferences as a managed CLAUDE.md block so
+                // they're always loaded, then also echo them into this session.
+                `${cmd} preferences --root "$PWD" --write${silent}; ` +
                 `${cmd} preferences --root "$PWD" --markdown 2>/dev/null || true`,
             },
           ],
@@ -371,7 +377,12 @@ function claudeSettings(cmd: string): unknown {
             {
               type: "command",
               command:
-                `${cmd} attach --transcript -${silent}; ` +
+                // Distill this session's transcript into Decisions/Questions.
+                // Reads the Stop-hook JSON on stdin, resolves transcript_path,
+                // and auto-persists (degrades to .gps/pending-distill/ with no
+                // API key). Self-silencing + always exits 0; keep stderr so the
+                // one-line distill summary shows in the transcript.
+                `${cmd} attach --hook-stdin --root "$PWD" >/dev/null || true; ` +
                 // Gate attribution on a clean index — a stale graph maps touched
                 // files to the wrong symbols and silently pollutes weights.
                 `if ${cmd} validate --quiet --root "$PWD" >/dev/null 2>&1; then ` +

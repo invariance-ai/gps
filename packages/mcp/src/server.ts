@@ -83,13 +83,20 @@ const server = new Server(
   { capabilities: { tools: {} } },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: Object.entries(TOOLS).map(([name, def]) => ({
+/** The MCP tool list derived from the shared TOOLS registry. Exported for tests. */
+export function listTools(): Array<{
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}> {
+  return Object.entries(TOOLS).map(([name, def]) => ({
     name,
     description: def.description,
     inputSchema: toJsonSchema(def.input),
-  })),
-}));
+  }));
+}
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: listTools() }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const name = req.params.name as ToolName;
@@ -107,7 +114,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
 });
 
-async function dispatch(name: ToolName, args: unknown): Promise<unknown> {
+export async function dispatch(name: ToolName, args: unknown): Promise<unknown> {
   const root = process.cwd();
   switch (name) {
     case "prepare_edit": {
@@ -487,8 +494,13 @@ async function dispatch(name: ToolName, args: unknown): Promise<unknown> {
   }
 }
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+// Connect on import (this is how `gps serve` launches us). Tests set
+// GPS_MCP_NO_CONNECT=1 to import the module for its exports without binding
+// stdio.
+if (!process.env.GPS_MCP_NO_CONNECT) {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
 
 function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   if (schema instanceof z.ZodDefault || schema instanceof z.ZodOptional) {

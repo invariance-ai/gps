@@ -25,6 +25,9 @@ export const LESSONS_CLOSE = "<!-- /gps:global-lessons -->";
 const LESSONS_BLOCK_RE =
   /<!-- gps:global-lessons -->([\s\S]*?)<!-- \/gps:global-lessons -->\n?/m;
 
+export const PREFS_OPEN = "<!-- gps:auto-prefs -->";
+export const PREFS_CLOSE = "<!-- /gps:auto-prefs -->";
+
 export interface GlobalLesson {
   id: string;
   lesson: string;
@@ -192,4 +195,62 @@ export async function readGlobalLessonsBody(
   const existing = await readFileOrEmpty(claudeMdPath(root, filename));
   const m = LESSONS_BLOCK_RE.exec(existing);
   return (m?.[1] ?? "").toLowerCase();
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function managedBlockRe(open: string, close: string): RegExp {
+  return new RegExp(`${escapeRe(open)}([\\s\\S]*?)${escapeRe(close)}\\n?`, "m");
+}
+
+/**
+ * Replace (or insert) a fully-regenerated managed block delimited by
+ * `open`/`close` markers. Unlike upsertGlobalLesson (incremental, id-keyed),
+ * this overwrites the whole block from a caller-owned source of truth — used
+ * for the auto-prefs block, which is regenerated from .gps/preferences.yml on
+ * every SessionStart. Bytes outside the markers are untouched; no-ops (and
+ * skips the backup) when the block is already byte-identical.
+ */
+export async function upsertManagedBlock(
+  root: string,
+  open: string,
+  close: string,
+  body: string,
+  filename = "CLAUDE.md",
+): Promise<{ path: string; changed: boolean }> {
+  const file = claudeMdPath(root, filename);
+  const existing = await readFileOrEmpty(file);
+  const re = managedBlockRe(open, close);
+  const block = `${open}\n${body.trimEnd()}\n${close}\n`;
+  const m = re.exec(existing);
+  if (m && m[0].replace(/\n+$/, "") === block.replace(/\n+$/, "")) {
+    return { path: path.relative(root, file), changed: false };
+  }
+  await snapshot(root, existing);
+  const updated = m
+    ? existing.replace(re, block)
+    : existing.trimEnd().length > 0
+      ? `${existing.trimEnd()}\n\n${block}`
+      : block;
+  await atomicWrite(file, updated);
+  return { path: path.relative(root, file), changed: true };
+}
+
+/** Remove a managed block if present. Bytes outside the markers are untouched. */
+export async function removeManagedBlock(
+  root: string,
+  open: string,
+  close: string,
+  filename = "CLAUDE.md",
+): Promise<{ path: string; changed: boolean }> {
+  const file = claudeMdPath(root, filename);
+  const existing = await readFileOrEmpty(file);
+  const re = managedBlockRe(open, close);
+  if (!re.test(existing)) return { path: path.relative(root, file), changed: false };
+  await snapshot(root, existing);
+  const updated = existing.replace(re, "").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  await atomicWrite(file, updated);
+  return { path: path.relative(root, file), changed: true };
 }

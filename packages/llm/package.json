@@ -25,6 +25,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "prepublishOnly": "rm -rf dist && tsc"
   },
   "dependencies": {

@@ -1,5 +1,6 @@
 import type { Command } from "commander";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import path from "node:path";
 import kleur from "kleur";
 import { stringify as stringifyYaml } from "yaml";
 import { appendDecision, appendQuestion } from "@invariance/gps-core";
@@ -12,12 +13,20 @@ import { addRootOption, resolveRoot, type RootOption } from "../root.js";
  * once; only the distilled records are persisted. Raw text never lands on
  * disk under .gps/.
  *
+ * `gps attach --hook-stdin` — the Claude Code Stop-hook entrypoint. Reads the
+ * hook's JSON payload from stdin, resolves `transcript_path`, distills the
+ * conversation, and auto-persists Decisions/Questions. When no API key is
+ * configured it degrades to writing the native-agent prompt under
+ * `.gps/pending-distill/` so the loop is never silently dropped. Always exits
+ * 0 — a Stop hook must never fail the session.
+ *
  * Native --session <id> integration (Claude Code / Codex session IDs) lands
  * once those formats stabilize; for now use --transcript with a dumped file.
  */
 
 interface Opts extends RootOption {
   transcript?: string;
+  hookStdin?: boolean;
   session?: string;
   symbol?: string[];
   dryRun?: boolean;
@@ -28,6 +37,55 @@ interface Opts extends RootOption {
   json?: boolean;
 }
 
+/** Read all of stdin (used for the Claude Code Stop-hook JSON payload). */
+async function readStdin(): Promise<string> {
+  if (process.stdin.isTTY) return "";
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Flatten a Claude Code transcript (JSONL of message objects) into a clean
+ * role-tagged plaintext transcript for distillation. Tool calls/results are
+ * dropped — decisions live in the prose. Keeps the most recent `maxChars`.
+ * Falls back to the raw text if the file isn't recognizable JSONL.
+ */
+export function claudeTranscriptToText(raw: string, maxChars = 60000): string {
+  const out: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    let obj: { message?: { role?: string; content?: unknown } };
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const msg = obj?.message;
+    if (!msg?.role) continue;
+    let text = "";
+    if (typeof msg.content === "string") {
+      text = msg.content;
+    } else if (Array.isArray(msg.content)) {
+      text = msg.content
+        .filter(
+          (b): b is { type: string; text: string } =>
+            !!b && typeof b === "object" && (b as { type?: string }).type === "text" &&
+            typeof (b as { text?: unknown }).text === "string",
+        )
+        .map((b) => b.text)
+        .join("\n");
+    }
+    text = text.trim();
+    if (text) out.push(`${msg.role}: ${text}`);
+  }
+  const joined = out.join("\n\n");
+  const text = joined || raw;
+  return text.length > maxChars ? text.slice(text.length - maxChars) : text;
+}
+
 export function registerAttach(program: Command): void {
   addRootOption(
     program
@@ -36,6 +94,10 @@ export function registerAttach(program: Command): void {
         "Distill a conversation transcript into Decision records anchored to symbols",
       )
       .option("--transcript <path>", "Path to the conversation transcript file")
+      .option(
+        "--hook-stdin",
+        "Claude Code Stop-hook mode: read the hook JSON from stdin, resolve transcript_path, and auto-persist (never fails)",
+      )
       .option(
         "--session <id>",
         "Logical session/PR/conversation ID to tag decisions with",
@@ -57,6 +119,10 @@ export function registerAttach(program: Command): void {
       .option("--model <id>", "Anthropic model ID (default: claude-opus-4-7)")
       .option("--json", "Emit JSON"),
   ).action(async (opts: Opts) => {
+    if (opts.hookStdin) {
+      await runHookStdin(opts);
+      return;
+    }
     const root = resolveRoot(opts);
     try {
       if (!opts.transcript) {
@@ -142,4 +208,91 @@ export function registerAttach(program: Command): void {
       process.exitCode = 1;
     }
   });
+}
+
+/**
+ * Stop-hook entrypoint. Reads Claude Code's hook JSON from stdin, distills the
+ * referenced transcript, and persists Decisions/Questions. Swallows every
+ * error and exits 0 — a Stop hook must never break the session.
+ */
+async function runHookStdin(opts: Opts): Promise<void> {
+  try {
+    const payloadRaw = await readStdin();
+    if (!payloadRaw.trim()) return;
+    let payload: { transcript_path?: string; session_id?: string; cwd?: string };
+    try {
+      payload = JSON.parse(payloadRaw);
+    } catch {
+      return; // not a hook JSON payload — nothing to do
+    }
+    const transcriptPath = payload.transcript_path;
+    if (!transcriptPath) return;
+
+    const root = path.resolve(opts.root ?? payload.cwd ?? process.cwd());
+    const sessionId = payload.session_id ?? opts.session ?? "session";
+
+    let raw: string;
+    try {
+      raw = await readFile(transcriptPath, "utf8");
+    } catch {
+      return; // transcript gone or unreadable — silent no-op
+    }
+    const transcript = claudeTranscriptToText(raw);
+    if (!transcript.trim()) return;
+
+    const haveApiKey = !!(opts.apiKey ?? process.env.ANTHROPIC_API_KEY);
+
+    // Degraded mode: no key configured. Stash the native-agent prompt so the
+    // loop is recorded rather than dropped — the next session can process it.
+    if (!opts.callApi && !haveApiKey) {
+      const dryLlm = new GpsLlm({ model: opts.model, dryRun: true });
+      const dry = await extractDecisions(dryLlm, {
+        transcript,
+        symbols_in_scope: opts.symbol?.length ? opts.symbol : undefined,
+        session_id: sessionId,
+      });
+      const prompt = dry.dry_run_prompt;
+      if (!prompt) return;
+      const dir = path.join(root, ".gps", "pending-distill");
+      await mkdir(dir, { recursive: true });
+      const safe = sessionId.replace(/[^A-Za-z0-9_-]/g, "_");
+      const file = path.join(dir, `${safe}.md`);
+      await writeFile(
+        file,
+        `<!-- gps:pending-distill session=${sessionId} -->\n` +
+          `Set ANTHROPIC_API_KEY (or rerun \`gps attach --transcript <file> --call-api --save-without-confirm\`)\n` +
+          `to auto-persist. Or answer the prompt below and run \`gps decide\`.\n\n` +
+          `## system\n\n${prompt.system}\n\n## user\n\n${prompt.user}\n`,
+      );
+      return;
+    }
+
+    const llm = new GpsLlm({ apiKey: opts.apiKey, model: opts.model, dryRun: false });
+    const result = await extractDecisions(llm, {
+      transcript,
+      symbols_in_scope: opts.symbol?.length ? opts.symbol : undefined,
+      session_id: sessionId,
+    });
+    for (const d of result.decisions) {
+      await appendDecision(root, d);
+    }
+    for (const q of result.questions) {
+      await appendQuestion(root, {
+        symbol: q.symbol,
+        question: q.question,
+        asked_by: q.asked_by,
+        session: q.session,
+      });
+    }
+    if (result.decisions.length || result.questions.length) {
+      // stderr keeps it visible in the transcript without altering the result.
+      console.error(
+        kleur.dim(
+          `gps: distilled ${result.decisions.length} decision(s), ${result.questions.length} question(s) from this session`,
+        ),
+      );
+    }
+  } catch {
+    // Never fail the Stop hook.
+  }
 }
