@@ -6,6 +6,7 @@ import { PREPARE_EDIT_SCHEMA_VERSION, PrepareEditResult } from "@invariance/gps-
 import { parseFile } from "./parser.js";
 import { buildIndex, writeIndex } from "./index_store.js";
 import { open, prepareEdit } from "./query.js";
+import { appendAreaNote, appendFileNote } from "./notes.js";
 
 const roots: string[] = [];
 
@@ -96,5 +97,42 @@ describe("prepareEdit result schema", () => {
       expect(idx, `missing or out-of-order: ${want}`).toBeGreaterThanOrEqual(0);
       cursor = idx + 1;
     }
+  });
+});
+
+describe("prepareEdit surfaces approved path/area directives", () => {
+  it("renders area + file notes for the symbol's path in a dedicated section", async () => {
+    const root = await fixtureRepo();
+    // refundEndpoint lives in src/api.ts → ancestor dir "src".
+    await appendAreaNote(root, {
+      id: "dir1",
+      target: "src",
+      lesson: "in src, don't build error strings inline — use the errors module",
+    });
+    await appendFileNote(root, {
+      id: "file1",
+      target: "src/api.ts",
+      lesson: "validate the amount in this file before calling createRefund",
+    });
+
+    const ctx = await open(root);
+    const result = await prepareEdit({ symbol: "refundEndpoint", intent: "return a typed error" }, ctx);
+
+    expect(result.markdown).toContain("## Directives for this path");
+    expect(result.markdown).toContain("don't build error strings inline");
+    expect(result.markdown).toContain("[area: `src`]");
+    expect(result.markdown).toContain("validate the amount in this file");
+
+    // The structured payload carries the area/file notes too.
+    const scopes = result.notes.map((n) => n.scope ?? "symbol");
+    expect(scopes).toContain("area");
+    expect(scopes).toContain("file");
+  });
+
+  it("omits the directives section when no path/area notes exist", async () => {
+    const root = await fixtureRepo();
+    const ctx = await open(root);
+    const result = await prepareEdit({ symbol: "createRefund", intent: "cap at 5000" }, ctx);
+    expect(result.markdown).not.toContain("## Directives for this path");
   });
 });

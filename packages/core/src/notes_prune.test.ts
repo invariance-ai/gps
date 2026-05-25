@@ -2,7 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { appendNote, loadNotes, pruneStaleTodoNotes } from "./notes.js";
+import { access } from "node:fs/promises";
+import { appendNote, appendAreaNote, loadAreaNotes, loadNotes, pruneStaleTodoNotes, touchSurfacedNotes } from "./notes.js";
 
 const roots: string[] = [];
 async function tempRepo(): Promise<string> {
@@ -45,5 +46,27 @@ describe("pruneStaleTodoNotes", () => {
     await appendNote(root, { symbol: "bar", lesson: "gone", source: "todo" });
     await pruneStaleTodoNotes(root, new Map());
     expect(await loadNotes(root, "bar")).toHaveLength(0);
+  });
+});
+
+describe("touchSurfacedNotes does not misroute scoped notes", () => {
+  it("never writes a symbol-notes file for an area note", async () => {
+    const root = await tempRepo();
+    await appendAreaNote(root, { id: "a1", target: "src/api", lesson: "area directive" });
+    const [areaNote] = await loadAreaNotes(root, "src/api");
+
+    // Passing an area note must not create .gps/notes/<dir-slug>.yml.
+    await touchSurfacedNotes(root, [areaNote!]);
+
+    const slug = "src/api".replace(/[/\\:]/g, "__").replace(/\./g, "_");
+    let exists = true;
+    try {
+      await access(path.join(root, ".gps/notes", `${slug}.yml`));
+    } catch {
+      exists = false;
+    }
+    expect(exists).toBe(false);
+    // The area file is intact.
+    expect(await loadAreaNotes(root, "src/api")).toHaveLength(1);
   });
 });

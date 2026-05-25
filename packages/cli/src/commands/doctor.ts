@@ -2,14 +2,27 @@ import type { Command } from "commander";
 import { access, stat, readFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
-import { indexPath, readIndex, staleFiles } from "@invariance/gps-core";
+import {
+  indexPath,
+  readIndex,
+  staleFiles,
+  loadInbox,
+  loadInvariants,
+  loadPreferences,
+  loadAllNotes,
+  loadAllFileNotes,
+  loadAllFeatureNotes,
+  loadAllAreaNotes,
+  loadAllDecisions,
+  findStale,
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   json?: boolean;
 }
 
-interface Check {
+export interface Check {
   name: string;
   ok: boolean;
   detail: string;
@@ -25,7 +38,7 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-async function runChecks(root: string): Promise<Check[]> {
+export async function runChecks(root: string): Promise<Check[]> {
   const checks: Check[] = [];
 
   const gpsDir = path.join(root, ".gps");
@@ -139,6 +152,61 @@ async function runChecks(root: string): Promise<Check[]> {
       // ignore
     }
   }
+
+  // Informational checks below — they report counts, never fail the run.
+
+  // Inbox: how much captured memory is waiting for human review.
+  const inbox = await loadInbox(root);
+  const pending = inbox.filter((i) => i.status === "pending");
+  const riskyPending = pending.filter((i) => i.risk_topics.length > 0);
+  checks.push({
+    name: "inbox (pending review)",
+    ok: true,
+    detail:
+      pending.length === 0
+        ? "empty"
+        : `${pending.length} pending${riskyPending.length ? `, ${riskyPending.length} touch risk topics` : ""}`,
+    hint: pending.length > 0 ? "run `gps inbox list`, then `gps inbox approve <id>`" : undefined,
+  });
+
+  // Active memory: how much durable knowledge is in play.
+  const [allNotes, fileN, featN, areaN, invs, decisions, prefs] = await Promise.all([
+    loadAllNotes(root),
+    loadAllFileNotes(root),
+    loadAllFeatureNotes(root),
+    loadAllAreaNotes(root),
+    loadInvariants(root),
+    loadAllDecisions(root),
+    loadPreferences(root),
+  ]);
+  const noteCount =
+    allNotes.length +
+    fileN.reduce((s, e) => s + e.notes.length, 0) +
+    featN.reduce((s, e) => s + e.notes.length, 0) +
+    areaN.reduce((s, e) => s + e.notes.length, 0);
+  checks.push({
+    name: "active memory",
+    ok: true,
+    detail: `${noteCount} notes, ${invs.length} invariants, ${decisions.length} decisions, ${prefs.length} preferences`,
+  });
+
+  // Stale memory: knowledge older than 90d whose code moved since (best-effort —
+  // findStale reads the index + git, so guard against repos without either).
+  let staleDetail = "n/a";
+  let staleCount = 0;
+  try {
+    const stale = await findStale(root, { days: 90 });
+    staleCount = stale.length;
+    staleDetail = staleCount === 0 ? "none >90d on changed code" : `${staleCount} entries >90d on changed code`;
+  } catch {
+    // informational only — leave as n/a
+  }
+  checks.push({
+    name: "stale memory",
+    ok: true,
+    detail: staleDetail,
+    hint: staleCount > 0 ? "run `gps stale` to review, `gps prune` to clean up" : undefined,
+  });
 
   return checks;
 }
