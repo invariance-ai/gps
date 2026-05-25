@@ -45,6 +45,7 @@ import {
   loadAssumptions,
   rankContributors,
   addPreference,
+  recordPreference,
   loadPreferences,
   buildContract,
   saveContract,
@@ -418,7 +419,10 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "record_preference": {
       const a = args as Parameters<typeof addPreference>[1];
-      return addPreference(root, a);
+      // Honor the capture gate (Fix 4, option A): under capture=inbox this
+      // queues for review instead of writing straight to active memory. The
+      // response states where the memory went and why.
+      return recordPreference(root, a);
     }
     case "preferences_list": {
       const preferences = await loadPreferences(root);

@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { addPreference } from "@invariance/gps-core";
+import { recordPreference } from "@invariance/gps-core";
 import type { PreferenceScope, PreferenceSource } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
@@ -24,7 +24,9 @@ export function registerPrefer(program: Command): void {
       .option("--json", "Emit JSON"),
   ).action(async (text: string[], opts: Opts) => {
     const root = resolveRoot(opts);
-    const result = await addPreference(root, {
+    // Routes through the shared capture gate: under capture=inbox this queues
+    // for review instead of writing straight to active memory (Fix 4, A).
+    const result = await recordPreference(root, {
       text: text.join(" "),
       scope: opts.scope as PreferenceScope,
       topic: opts.topic,
@@ -35,9 +37,18 @@ export function registerPrefer(program: Command): void {
       console.log(JSON.stringify(result, null, 2));
       return;
     }
+    if (result.placement === "inbox") {
+      const item = result.inbox!.item;
+      const verb = result.deduped ? "already queued" : "queued";
+      console.log(
+        `${kleur.yellow(verb)} preference ${kleur.dim(item.id)} for review ${kleur.dim("(capture=inbox)")} — run ${kleur.bold("gps inbox")} to approve`,
+      );
+      return;
+    }
+    const pref = result.preference!;
     const verb = result.deduped ? "deduped" : "recorded";
     console.log(
-      `${kleur.green(verb)} preference ${kleur.dim(result.preference.id)} → ${kleur.dim(result.file)}`,
+      `${kleur.green(verb)} preference ${kleur.dim(pref.preference.id)} → active memory ${kleur.dim(pref.file)}`,
     );
   });
 }

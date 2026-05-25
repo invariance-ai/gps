@@ -8,8 +8,9 @@ import {
   type InboxItemKind,
 } from "@invariance/gps-schemas";
 import { matchedRiskTopics } from "./risk_topics.js";
-import { addPreference } from "./preferences.js";
+import { addPreference, type AddPreferenceOpts, type AddPreferenceResult } from "./preferences.js";
 import { recordDirective } from "./lessons.js";
+import { loadPolicy } from "./scan.js";
 
 /**
  * The inbox is a single flat YAML array (`.gps/inbox.yml`) — a chronological
@@ -155,4 +156,57 @@ export async function approveInboxItem(
   item.status = "approved";
   await persist(root, items);
   return { item, persisted };
+}
+
+/** Where an explicit preference write landed, and why. */
+export interface RecordPreferenceResult {
+  /** "active" → written to live memory; "inbox" → queued pending review. */
+  placement: "active" | "inbox";
+  /** Active-store result (present iff placement === "active"). */
+  preference?: AddPreferenceResult;
+  /** Inbox result (present iff placement === "inbox"). */
+  inbox?: AddToInboxResult;
+  deduped: boolean;
+  /** Human-readable explanation of the routing decision. */
+  message: string;
+}
+
+/**
+ * Single routing decision for an EXPLICIT preference write (`gps prefer`,
+ * `mcp__gps__record_preference`). Honors the capture gate (Fix 4, option A):
+ * under `capture=inbox` the preference is queued for review instead of being
+ * written straight to active memory; under `capture=auto` it writes active.
+ * The hook-driven passive capture commands and this shared helper therefore
+ * route identically, so explicit and passive captures obey the same policy.
+ */
+export async function recordPreference(
+  root: string,
+  opts: AddPreferenceOpts,
+): Promise<RecordPreferenceResult> {
+  const { capture } = await loadPolicy(root);
+  if (capture === "inbox") {
+    const inbox = await addToInbox(root, {
+      kind: "preference",
+      text: opts.text,
+      source: opts.source ?? "manual",
+      evidence: opts.evidence,
+    });
+    return {
+      placement: "inbox",
+      inbox,
+      deduped: inbox.deduped,
+      message: inbox.deduped
+        ? "already queued for review (capture=inbox)"
+        : "queued for review (capture=inbox)",
+    };
+  }
+  const preference = await addPreference(root, opts);
+  return {
+    placement: "active",
+    preference,
+    deduped: preference.deduped,
+    message: preference.deduped
+      ? "already in active memory"
+      : "recorded to active memory",
+  };
 }

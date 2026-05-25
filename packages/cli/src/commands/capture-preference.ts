@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { addPreference, addToInbox, extractPreferences, loadPolicy } from "@invariance/gps-core";
+import { extractPreferences, recordPreference } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -53,41 +53,36 @@ export function registerCapturePreference(program: Command): void {
     const extracted = extractPreferences(prompt);
     if (extracted.length === 0) return;
 
-    // capture=inbox → queue for review instead of persisting live.
-    const { capture } = await loadPolicy(root);
-    if (capture === "inbox") {
-      const queued = [];
-      for (const e of extracted) {
-        const r = await addToInbox(root, {
-          kind: "preference",
-          text: e.text,
-          source: `cue:${e.cue}`,
-        });
-        if (!r.deduped) queued.push(r.item);
-      }
+    // Route every extraction through the shared capture gate so passive and
+    // explicit captures obey the same policy. recordPreference queues to the
+    // inbox under capture=inbox and writes active under capture=auto.
+    const queued = [];
+    const recorded = [];
+    for (const e of extracted) {
+      const r = await recordPreference(root, {
+        text: e.text,
+        source: "auto",
+        evidence: `cue:${e.cue}`,
+      });
+      if (r.deduped) continue;
+      if (r.placement === "inbox") queued.push(r.inbox!.item);
+      else recorded.push(r.preference!.preference);
+    }
+
+    if (queued.length > 0) {
       if (opts.json) {
         console.log(JSON.stringify({ queued }, null, 2));
         return;
       }
-      if (opts.emit && queued.length > 0) {
+      if (opts.emit) {
         const lines = ["<!-- gps:captured-prefs -->"];
-        lines.push(`gps queued ${queued.length} preference${queued.length === 1 ? "" : "s"} to the inbox for review:`);
+        lines.push(`gps queued ${queued.length} preference${queued.length === 1 ? "" : "s"} to the inbox for review (capture=inbox):`);
         for (const p of queued) lines.push(`- ${p.text}`);
         lines.push("Run `gps inbox` to review, then `gps inbox approve <id>`.");
         lines.push("<!-- /gps:captured-prefs -->");
         console.log(lines.join("\n"));
       }
       return;
-    }
-
-    const recorded = [];
-    for (const e of extracted) {
-      const r = await addPreference(root, {
-        text: e.text,
-        source: "auto",
-        evidence: `cue:${e.cue}`,
-      });
-      if (!r.deduped) recorded.push(r.preference);
     }
 
     if (opts.json) {
