@@ -41,6 +41,24 @@ Prefer a global install? `npm install -g @invariance/gps`, then drop the `npx -y
 
 Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and [`docs/guide/agents/`](docs/guide/agents/) for per-IDE setup details.
 
+## Capture & promotion policy
+
+Every installer (`claude` / `codex` / `cursor`) takes two governance flags that persist to `.gps/config.yml`:
+
+```bash
+gps install codex --capture=inbox              # captured memory waits in `gps inbox` for review
+gps install codex --capture=auto --promote=never   # capture live, never auto-graduate (default)
+gps install codex --capture=auto --promote=safe     # auto-graduate clusters, except risky topics
+gps install codex --capture=auto --promote=all      # auto-graduate everything — visibly dangerous
+```
+
+Two independent axes:
+
+- **`--capture`** — where freshly captured memory lands. `auto` (default) persists it live, exactly as today. `inbox` queues it for human approval via `gps inbox` before anything activates.
+- **`--promote`** — whether recurring note clusters auto-graduate into invariants. `never` (default) keeps promotion manual (`gps promote <symbol>`). `safe` auto-promotes, but holds back any cluster touching a `require_approval_for` risk topic (auth, payments, billing, security, migrations, compliance, destructive actions). `all` promotes everything that clusters and **bypasses the risk gate** — the installer prints a loud warning, and it only applies with `--capture=auto`.
+
+Defaults (`capture=auto`, `promote=never`) preserve current behavior, so existing setups are unaffected.
+
 ## The generated skill
 
 `gps install claude` writes `.claude/skills/gps/SKILL.md` — a Claude Code skill that auto-loads whenever you're editing code or starting a task. Paste it yourself if you prefer:

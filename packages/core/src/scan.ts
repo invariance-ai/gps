@@ -1,7 +1,7 @@
 import fg from "fast-glob";
 import path from "node:path";
-import { readFile } from "node:fs/promises";
-import { parse as parseYaml } from "yaml";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { GpsPolicy, type CaptureMode, type PromoteMode } from "@invariance/gps-schemas";
 import {
   TS_GLOB,
@@ -84,6 +84,26 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
 export async function loadPolicy(root: string): Promise<GpsPolicy> {
   const cfg = await loadConfig(root);
   return GpsPolicy.parse({ capture: cfg.capture, promote: cfg.promote });
+}
+
+/**
+ * Merge the capture/promote policy into `.gps/config.yml`, preserving every
+ * other key (languages/exclude/depth/strands/quality/…) verbatim. The file is
+ * round-tripped through the YAML parser, so hand-authored comments and flow
+ * style are not preserved — only the values survive. `gps install` calls this.
+ */
+export async function writePolicy(root: string, policy: GpsPolicy): Promise<void> {
+  const file = path.join(root, ".gps/config.yml");
+  let existing: Record<string, unknown> = {};
+  try {
+    const parsed = parseYaml(await readFile(file, "utf8"));
+    if (parsed && typeof parsed === "object") existing = parsed as Record<string, unknown>;
+  } catch {
+    // no config yet — create one
+  }
+  const next = { ...existing, capture: policy.capture, promote: policy.promote };
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, stringifyYaml(next));
 }
 
 export async function scanFiles(root: string, config: GpsConfig): Promise<string[]> {

@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GpsPolicy } from "@invariance/gps-schemas";
-import { loadConfig, loadPolicy } from "./scan.js";
+import { loadConfig, loadPolicy, writePolicy } from "./scan.js";
 
 const roots: string[] = [];
 async function tempRepo(configBody?: string): Promise<string> {
@@ -67,5 +67,26 @@ describe("loadPolicy", () => {
   it("returns just the policy", async () => {
     const root = await tempRepo("capture: inbox\npromote: all\n");
     expect(await loadPolicy(root)).toEqual({ capture: "inbox", promote: "all" });
+  });
+});
+
+describe("writePolicy", () => {
+  it("merges policy into config.yml, preserving other keys", async () => {
+    const root = await tempRepo(
+      "languages: [typescript, python]\nexclude:\n  - tmp\ndepth: 4\nstrands:\n  - structural\n",
+    );
+    await writePolicy(root, GpsPolicy.parse({ capture: "inbox", promote: "never" }));
+    const cfg = await loadConfig(root);
+    expect(cfg.capture).toBe("inbox");
+    expect(cfg.languages).toEqual(["typescript", "python"]);
+    expect(cfg.depth).toBe(4);
+    expect(cfg.exclude).toContain("tmp");
+    expect(cfg.strands).toEqual(["structural"]);
+  });
+
+  it("creates config.yml when none exists", async () => {
+    const root = await tempRepo();
+    await writePolicy(root, GpsPolicy.parse({ capture: "auto", promote: "safe" }));
+    expect(await loadPolicy(root)).toEqual({ capture: "auto", promote: "safe" });
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { resolveCmd, runInstallClaude, runInstallCodex } from "./install.js";
+import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex } from "./install.js";
 
 describe("resolveCmd", () => {
   it("errors when both --use-global and --use-local are passed", () => {
@@ -53,6 +53,37 @@ describe("resolveCmd", () => {
     } finally {
       if (prev !== undefined) process.env.CI = prev;
     }
+  });
+});
+
+describe("resolvePolicy", () => {
+  it("defaults to capture=auto / promote=never with no flags", () => {
+    expect(resolvePolicy({})).toEqual({ capture: "auto", promote: "never" });
+  });
+
+  it("accepts --capture=inbox", () => {
+    expect(resolvePolicy({ capture: "inbox" })).toEqual({ capture: "inbox", promote: "never" });
+  });
+
+  it("accepts --capture=auto --promote=all", () => {
+    expect(resolvePolicy({ capture: "auto", promote: "all" })).toEqual({
+      capture: "auto",
+      promote: "all",
+    });
+  });
+
+  it("rejects --promote without --capture=auto", () => {
+    expect(() => resolvePolicy({ capture: "inbox", promote: "safe" })).toThrow(
+      /requires --capture=auto/,
+    );
+    // promote given while capture defaults to auto is fine; promote given with
+    // an explicit non-auto capture is the error case
+    expect(() => resolvePolicy({ promote: "safe" })).not.toThrow();
+  });
+
+  it("rejects invalid enum values", () => {
+    expect(() => resolvePolicy({ capture: "bogus" })).toThrow(/invalid --capture/);
+    expect(() => resolvePolicy({ promote: "bogus" })).toThrow(/invalid --promote/);
   });
 });
 
