@@ -5,11 +5,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   addToInbox,
   loadInbox,
+  annotateInboxDuplicates,
   approveInboxItem,
   rejectInboxItem,
   editInboxItem,
 } from "./inbox.js";
-import { loadPreferences } from "./preferences.js";
+import { loadPreferences, addPreference } from "./preferences.js";
+import { recordDirective } from "./lessons.js";
 
 const roots: string[] = [];
 async function tempRepo(): Promise<string> {
@@ -78,6 +80,87 @@ describe("approveInboxItem", () => {
     await approveInboxItem(root, item.id);
     expect(await approveInboxItem(root, item.id)).toBeNull();
     expect(await approveInboxItem(root, "deadbeef")).toBeNull();
+  });
+});
+
+describe("annotateInboxDuplicates", () => {
+  it("tags a pending preference whose text already exists as an active preference (exact)", async () => {
+    const root = await tempRepo();
+    // active memory gains the preference via a separate path (e.g. `gps prefer`)
+    await addPreference(root, { text: "always add retry logic to network calls" });
+
+    // a pending inbox capture with equivalent text (different casing/whitespace)
+    const { item: dupe } = await addToInbox(root, {
+      kind: "preference",
+      text: "  Always add retry logic to network calls  ",
+    });
+
+    const annotated = await annotateInboxDuplicates(root, await loadInbox(root));
+    const dupeAnn = annotated.find((a) => a.item.id === dupe.id);
+    expect(dupeAnn?.duplicate_of).toMatch(/retry logic/);
+    expect(dupeAnn?.match).toBe("exact");
+  });
+
+  it("tags a reworded pending preference as a near-duplicate but leaves a near-miss separate", async () => {
+    const root = await tempRepo();
+    const { item: approved } = await addToInbox(root, {
+      kind: "preference",
+      text: "always add retry logic with exponential backoff to outbound network calls",
+    });
+    await approveInboxItem(root, approved.id);
+
+    // TRUE near-duplicate: same rule, reworded
+    const { item: near } = await addToInbox(root, {
+      kind: "preference",
+      text: "add retry logic with exponential backoff to outbound network calls always",
+    });
+    // NEAR-MISS: same topic words but a genuinely different rule
+    const { item: miss } = await addToInbox(root, {
+      kind: "preference",
+      text: "never add caching to outbound network calls",
+    });
+
+    const annotated = await annotateInboxDuplicates(root, await loadInbox(root));
+    const byId = new Map(annotated.map((a) => [a.item.id, a]));
+
+    expect(byId.get(near.id)?.duplicate_of).toBeDefined();
+    expect(byId.get(miss.id)?.duplicate_of).toBeUndefined();
+  });
+
+  it("leaves a distinct pending preference unannotated", async () => {
+    const root = await tempRepo();
+    const { item: approved } = await addToInbox(root, {
+      kind: "preference",
+      text: "always add retry logic to network calls",
+    });
+    await approveInboxItem(root, approved.id);
+    const { item: other } = await addToInbox(root, {
+      kind: "preference",
+      text: "prefer four space indentation in python files",
+    });
+    const annotated = await annotateInboxDuplicates(root, await loadInbox(root));
+    const ann = annotated.find((a) => a.item.id === other.id);
+    expect(ann?.duplicate_of).toBeUndefined();
+  });
+
+  it("tags a pending directive duplicating an active area note", async () => {
+    const root = await tempRepo();
+    // active area note recorded directly (e.g. via record_lesson path)
+    await recordDirective(root, {
+      directive: "do not log secrets in this directory",
+      polarity: "dont",
+      area: "src/api",
+    });
+
+    const { item: dupe } = await addToInbox(root, {
+      kind: "directive",
+      text: "Do not log secrets in this directory",
+      polarity: "dont",
+      area: "src/api",
+    });
+    const annotated = await annotateInboxDuplicates(root, await loadInbox(root));
+    const ann = annotated.find((a) => a.item.id === dupe.id);
+    expect(ann?.duplicate_of).toMatch(/area note/);
   });
 });
 

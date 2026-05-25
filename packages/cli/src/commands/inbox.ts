@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import kleur from "kleur";
 import {
   loadInbox,
+  annotateInboxDuplicates,
   approveInboxItem,
   rejectInboxItem,
   editInboxItem,
@@ -33,28 +34,60 @@ export function registerInbox(program: Command): void {
       .option("--json", "Emit JSON"),
   ).action(async (opts: ListOpts) => {
     const root = resolveRoot(opts);
-    let items = await loadInbox(root);
-    if (!opts.all) items = items.filter((i) => i.status === "pending");
-    if (opts.risk) items = items.filter((i) => i.risk_topics.includes(opts.risk!));
+    const all = await loadInbox(root);
+    // Tag pending items that already exist in active memory (approved
+    // preference / area note) so we don't re-surface a resolved duplicate.
+    let annotated = await annotateInboxDuplicates(root, all);
+    if (!opts.all) annotated = annotated.filter((a) => a.item.status === "pending");
+    if (opts.risk) annotated = annotated.filter((a) => a.item.risk_topics.includes(opts.risk!));
+    // Hide duplicates from the default actionable view; --all reveals them.
+    const hiddenDupes = !opts.all
+      ? annotated.filter((a) => a.duplicate_of).length
+      : 0;
+    if (!opts.all) annotated = annotated.filter((a) => !a.duplicate_of);
 
     if (opts.json) {
-      console.log(JSON.stringify(items, null, 2));
+      console.log(
+        JSON.stringify(
+          annotated.map((a) => ({ ...a.item, duplicate_of: a.duplicate_of, match: a.match })),
+          null,
+          2,
+        ),
+      );
       return;
     }
-    if (items.length === 0) {
+    if (annotated.length === 0) {
       console.log(kleur.dim("inbox empty — nothing waiting for review"));
+      if (hiddenDupes > 0) {
+        console.log(
+          kleur.dim(
+            `(${hiddenDupes} duplicate${hiddenDupes === 1 ? "" : "s"} of active memory hidden — \`gps inbox list --all\` to show)`,
+          ),
+        );
+      }
       return;
     }
-    console.log(kleur.bold(`${items.length} item${items.length === 1 ? "" : "s"} in inbox:`));
+    console.log(kleur.bold(`${annotated.length} item${annotated.length === 1 ? "" : "s"} in inbox:`));
     console.log("");
-    for (const i of items) {
+    for (const a of annotated) {
+      const i = a.item;
       const risk = i.risk_topics.length
         ? " " + kleur.red(`⚠ ${i.risk_topics.join(", ")}`)
         : "";
       const status = i.status === "pending" ? "" : " " + kleur.dim(`[${i.status}]`);
-      console.log(`${kleur.cyan(i.id)} ${kleur.dim(`(${i.kind})`)} ${i.text}${risk}${status}`);
+      const dupe = a.duplicate_of
+        ? " " + kleur.yellow(`[duplicate of ${a.duplicate_of}]`)
+        : "";
+      console.log(`${kleur.cyan(i.id)} ${kleur.dim(`(${i.kind})`)} ${i.text}${risk}${dupe}${status}`);
     }
     console.log("");
+    if (hiddenDupes > 0) {
+      console.log(
+        kleur.dim(
+          `${hiddenDupes} duplicate${hiddenDupes === 1 ? "" : "s"} of active memory hidden — \`gps inbox list --all\` to show`,
+        ),
+      );
+    }
     console.log(kleur.dim("Approve: `gps inbox approve <id>` · Reject: `gps inbox reject <id>` · Edit: `gps inbox edit <id> --text \"…\"`"));
   });
 
