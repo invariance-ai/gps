@@ -421,7 +421,7 @@ async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
     `[mcp_servers.gps]\n` +
     `command = ${JSON.stringify(spec.command)}\n` +
     `args = ${tomlArr([...spec.baseArgs, "serve"])}\n`;
-  const notifyArgs = tomlArr([spec.command, ...spec.baseArgs, "attach", "--transcript", "-"]);
+  const notifyArgs = tomlArr([spec.command, ...spec.baseArgs, "attach", "--transcript", "-", "--capture-prefs"]);
 
   const block =
     `# gps:start — managed by \`gps install codex\`. Edit outside markers freely.\n` +

@@ -3,7 +3,17 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import { stringify as stringifyYaml } from "yaml";
-import { appendDecision, appendQuestion } from "@invariance/gps-core";
+import {
+  appendDecision,
+  appendQuestion,
+  appendNote,
+  addPreference,
+  extractPreferences,
+  extractDirectives,
+  recordDirective,
+  resolveActiveArea,
+  redact,
+} from "@invariance/gps-core";
 import { GpsLlm, extractDecisions } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
@@ -35,6 +45,7 @@ interface Opts extends RootOption {
   apiKey?: string;
   model?: string;
   json?: boolean;
+  capturePrefs?: boolean;
 }
 
 /** Read all of stdin (used for the Claude Code Stop-hook JSON payload). */
@@ -86,6 +97,66 @@ export function claudeTranscriptToText(raw: string, maxChars = 60000): string {
   return text.length > maxChars ? text.slice(text.length - maxChars) : text;
 }
 
+/**
+ * Extract only the user-turn bodies from a role-tagged transcript.
+ * Lines prefixed "user: " are included (prefix stripped); all other lines dropped.
+ * Used so preference extraction can't be influenced by assistant prose.
+ */
+export function userTurnsFromTranscript(text: string): string {
+  const lines: string[] = [];
+  for (const para of text.split(/\n\n+/)) {
+    const trimmed = para.trim();
+    if (trimmed.startsWith("user: ")) {
+      lines.push(trimmed.slice("user: ".length));
+    }
+  }
+  return lines.join("\n\n");
+}
+
+/**
+ * Capture preferences and directives from user turns of the transcript.
+ * Always silent, never throws, exits cleanly.
+ */
+async function capturePrefsFromText(root: string, transcriptText: string): Promise<void> {
+  try {
+    const userText = userTurnsFromTranscript(transcriptText);
+    if (!userText.trim()) return;
+
+    // Extract and store preferences from user turns only.
+    const extracted = extractPreferences(userText);
+    for (const e of extracted) {
+      try {
+        await addPreference(root, {
+          text: redact(e.text).text,
+          source: "auto",
+          evidence: `cue:${e.cue}`,
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+
+    // Extract directives from user turns (resolve active area once).
+    const area = await resolveActiveArea(root).catch(() => undefined);
+    if (area) {
+      const directives = extractDirectives(userText);
+      for (const d of directives) {
+        try {
+          await recordDirective(root, {
+            directive: redact(d.text).text,
+            polarity: d.polarity,
+            area,
+          });
+        } catch {
+          /* best-effort */
+        }
+      }
+    }
+  } catch {
+    /* never throw from capture path */
+  }
+}
+
 export function registerAttach(program: Command): void {
   addRootOption(
     program
@@ -93,7 +164,7 @@ export function registerAttach(program: Command): void {
       .description(
         "Distill a conversation transcript into Decision records anchored to symbols",
       )
-      .option("--transcript <path>", "Path to the conversation transcript file")
+      .option("--transcript <path>", "Path to the conversation transcript file (use - for stdin)")
       .option(
         "--hook-stdin",
         "Claude Code Stop-hook mode: read the hook JSON from stdin, resolve transcript_path, and auto-persist (never fails)",
@@ -117,7 +188,11 @@ export function registerAttach(program: Command): void {
       )
       .option("--api-key <key>", "Anthropic API key (default: ANTHROPIC_API_KEY env)")
       .option("--model <id>", "Anthropic model ID (default: claude-opus-4-7)")
-      .option("--json", "Emit JSON"),
+      .option("--json", "Emit JSON")
+      .option(
+        "--capture-prefs",
+        "Also extract preferences and directives from user turns of the transcript",
+      ),
   ).action(async (opts: Opts) => {
     if (opts.hookStdin) {
       await runHookStdin(opts);
@@ -128,7 +203,22 @@ export function registerAttach(program: Command): void {
       if (!opts.transcript) {
         throw new Error("--transcript <path> required (--session-id integration is v0.5)");
       }
-      const transcript = await readFile(opts.transcript, "utf8");
+
+      // Fix: when transcript is "-", read from stdin instead of readFile("-")
+      let rawTranscript: string;
+      if (opts.transcript === "-") {
+        rawTranscript = await readStdin();
+      } else {
+        rawTranscript = await readFile(opts.transcript, "utf8");
+      }
+
+      const transcript = claudeTranscriptToText(rawTranscript);
+
+      // Capture preferences from user turns if requested.
+      if (opts.capturePrefs) {
+        await capturePrefsFromText(root, transcript);
+      }
+
       const llm = new GpsLlm({
         apiKey: opts.apiKey,
         model: opts.model,
@@ -157,8 +247,13 @@ export function registerAttach(program: Command): void {
         return;
       }
 
-      if (result.decisions.length === 0 && result.questions.length === 0) {
-        console.log(kleur.dim("no decisions or questions extracted from this transcript"));
+      if (
+        result.decisions.length === 0 &&
+        result.questions.length === 0 &&
+        result.auto_lessons.length === 0 &&
+        result.user_corrections.length === 0
+      ) {
+        console.log(kleur.dim("no decisions, questions, or lessons extracted from this transcript"));
         return;
       }
 
@@ -178,6 +273,22 @@ export function registerAttach(program: Command): void {
         console.log("```");
         console.log("");
       }
+      if (result.auto_lessons.length > 0) {
+        console.log(kleur.bold(`${result.auto_lessons.length} auto-lesson(s) extracted:`));
+        console.log("");
+        console.log("```yaml");
+        console.log(stringifyYaml(result.auto_lessons).trimEnd());
+        console.log("```");
+        console.log("");
+      }
+      if (result.user_corrections.length > 0) {
+        console.log(kleur.bold(`${result.user_corrections.length} user-correction(s) extracted:`));
+        console.log("");
+        console.log("```yaml");
+        console.log(stringifyYaml(result.user_corrections).trimEnd());
+        console.log("```");
+        console.log("");
+      }
 
       if (opts.saveWithoutConfirm) {
         for (const d of result.decisions) {
@@ -191,9 +302,26 @@ export function registerAttach(program: Command): void {
             session: q.session,
           });
         }
+        for (const l of result.auto_lessons) {
+          await appendNote(root, {
+            symbol: l.symbol,
+            lesson: redact(l.lesson).text,
+            source: "auto-lesson",
+            evidence: l.evidence ? redact(l.evidence).text : undefined,
+          });
+        }
+        for (const c of result.user_corrections) {
+          await appendNote(root, {
+            symbol: c.symbol,
+            lesson: redact(c.lesson).text,
+            source: "user-correction",
+            evidence: c.evidence ? redact(c.evidence).text : undefined,
+          });
+        }
         console.log(
           kleur.green(
-            `wrote ${result.decisions.length} decision(s) and ${result.questions.length} question(s) to .gps/`,
+            `wrote ${result.decisions.length} decision(s), ${result.questions.length} question(s), ` +
+            `${result.auto_lessons.length} auto-lesson(s), ${result.user_corrections.length} user-correction(s) to .gps/`,
           ),
         );
       } else {
@@ -212,8 +340,8 @@ export function registerAttach(program: Command): void {
 
 /**
  * Stop-hook entrypoint. Reads Claude Code's hook JSON from stdin, distills the
- * referenced transcript, and persists Decisions/Questions. Swallows every
- * error and exits 0 — a Stop hook must never break the session.
+ * referenced transcript, and persists Decisions/Questions/auto-lessons/user-corrections.
+ * Swallows every error and exits 0 — a Stop hook must never break the session.
  */
 async function runHookStdin(opts: Opts): Promise<void> {
   try {
@@ -284,11 +412,41 @@ async function runHookStdin(opts: Opts): Promise<void> {
         session: q.session,
       });
     }
-    if (result.decisions.length || result.questions.length) {
+    for (const l of result.auto_lessons) {
+      try {
+        await appendNote(root, {
+          symbol: l.symbol,
+          lesson: redact(l.lesson).text,
+          source: "auto-lesson",
+          evidence: l.evidence ? redact(l.evidence).text : undefined,
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+    for (const c of result.user_corrections) {
+      try {
+        await appendNote(root, {
+          symbol: c.symbol,
+          lesson: redact(c.lesson).text,
+          source: "user-correction",
+          evidence: c.evidence ? redact(c.evidence).text : undefined,
+        });
+      } catch {
+        /* best-effort */
+      }
+    }
+    if (
+      result.decisions.length ||
+      result.questions.length ||
+      result.auto_lessons.length ||
+      result.user_corrections.length
+    ) {
       // stderr keeps it visible in the transcript without altering the result.
       console.error(
         kleur.dim(
-          `gps: distilled ${result.decisions.length} decision(s), ${result.questions.length} question(s) from this session`,
+          `gps: distilled ${result.decisions.length} decision(s), ${result.questions.length} question(s), ` +
+          `${result.auto_lessons.length} auto-lesson(s), ${result.user_corrections.length} user-correction(s) from this session`,
         ),
       );
     }
