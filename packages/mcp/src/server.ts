@@ -60,6 +60,8 @@ import {
   ALL_SOURCE_GLOBS,
   validateKnowledge,
   brief,
+  pruneNotes,
+  resume,
 } from "@invariance/gps-core";
 import { llmClassify } from "@invariance/gps-llm";
 
@@ -488,6 +490,13 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       );
       if (a.limit) proposals = proposals.slice(0, a.limit);
       return { tier, proposals, scanned: r.scanned };
+    }
+    case "prune": {
+      const a = args as { days?: number; dry_run?: boolean };
+      return pruneNotes(root, { days: a.days, dryRun: a.dry_run });
+    }
+    case "resume": {
+      return resume(root);
     }
     default:
       throw new Error(`Tool ${name} dispatch not implemented`);

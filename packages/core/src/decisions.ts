@@ -3,6 +3,62 @@ import path from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { Decision, type Decision as DecisionT } from "@invariance/gps-schemas";
 
+/** Returns true if a decision has expired (expires_at is in the past). */
+export function isDecisionExpired(decision: DecisionT, now: Date = new Date()): boolean {
+  if (!decision.expires_at) return false;
+  const ms = Date.parse(decision.expires_at);
+  if (Number.isNaN(ms)) return false;
+  return ms < now.getTime();
+}
+
+/** Filter out expired decisions from an array. */
+export function filterExpiredDecisions(decisions: DecisionT[], now: Date = new Date()): DecisionT[] {
+  return decisions.filter((d) => !isDecisionExpired(d, now));
+}
+
+/**
+ * Stamp `last_surfaced_at` on the given decisions (in-place) and persist back to disk.
+ * Best-effort: never throws.
+ */
+export async function touchSurfacedDecisions(root: string, decisions: DecisionT[]): Promise<void> {
+  if (decisions.length === 0) return;
+  const now = new Date().toISOString();
+  const bySymbol = new Map<string, DecisionT[]>();
+  for (const d of decisions) {
+    const arr = bySymbol.get(d.symbol) ?? [];
+    arr.push(d);
+    bySymbol.set(d.symbol, arr);
+  }
+  for (const d of decisions) {
+    (d as DecisionT & { last_surfaced_at?: string }).last_surfaced_at = now;
+  }
+  for (const [symbol, surfaced] of bySymbol) {
+    try {
+      const surfacedIds = new Set(surfaced.map((d) => d.id).filter(Boolean));
+      const surfacedDecisions = new Set(surfaced.map((d) => d.decision));
+      const filePath = fileFor(root, symbol);
+      const raw = await readFile(filePath, "utf8");
+      const data = parseYaml(raw);
+      if (!Array.isArray(data)) continue;
+      const updated = data.map((item: unknown) => {
+        try {
+          const existing = Decision.parse(item);
+          const match =
+            (existing.id && surfacedIds.has(existing.id)) ||
+            (!existing.id && surfacedDecisions.has(existing.decision));
+          if (!match) return existing;
+          return { ...existing, last_surfaced_at: now };
+        } catch {
+          return item;
+        }
+      });
+      await writeFile(filePath, stringifyYaml(updated));
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
 const DIR = ".gps/decisions";
 
 function fileFor(root: string, symbol: string): string {

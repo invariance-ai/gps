@@ -161,6 +161,8 @@ export const Note = z.object({
   source_commit: z.string().optional(),
   /** ISO date after which this note auto-archives. */
   expires_at: z.string().optional(),
+  /** ISO date of the last time this note was surfaced to an agent. */
+  last_surfaced_at: z.string().optional(),
 });
 export type Note = z.infer<typeof Note>;
 
@@ -196,6 +198,8 @@ export const Decision = z.object({
   anchor_id: z.string().optional(),
   source_commit: z.string().optional(),
   expires_at: z.string().optional(),
+  /** ISO date of the last time this decision was surfaced to an agent. */
+  last_surfaced_at: z.string().optional(),
 });
 export type Decision = z.infer<typeof Decision>;
 
@@ -1104,6 +1108,39 @@ export type BriefResult = z.infer<typeof BriefResult>;
  * Tool catalogue — referenced by CLI command registration and MCP server
  * registration so the surfaces cannot drift.
  */
+/* ---------- Prune + Resume I/O (v0.9) ---------- */
+
+export const PruneInput = z.object({
+  days: z.number().int().min(1).default(90).describe(
+    "Notes unsurfaced (or never surfaced) for this many days are candidates for pruning.",
+  ),
+  dry_run: z.boolean().default(false).describe("Print what would be removed without writing."),
+});
+export type PruneInput = z.infer<typeof PruneInput>;
+
+export const PruneResult = z.object({
+  removed: z.number().int().nonnegative(),
+  dry_run: z.boolean(),
+  details: z.array(z.object({
+    symbol: z.string(),
+    lesson: z.string(),
+    reason: z.string(),
+  })),
+});
+export type PruneResult = z.infer<typeof PruneResult>;
+
+export const ResumeInput = z.object({});
+export type ResumeInput = z.infer<typeof ResumeInput>;
+
+export const ResumeResult = z.object({
+  todos: z.array(TodoItem),
+  questions: z.array(Question),
+  decisions: z.array(Decision),
+  changed_files: z.array(z.string()),
+  markdown: z.string(),
+});
+export type ResumeResult = z.infer<typeof ResumeResult>;
+
 export const TOOLS = {
   prepare_edit: {
     description:
@@ -1347,6 +1384,18 @@ export const TOOLS = {
       "Pre-finalize briefing for the dirty diff. Returns changed symbols, invariants that apply to them, notes attached to changed symbols/files/areas, tests likely to run, and a list of changed symbols with no test coverage. Call this as the last step before declaring an edit done — pairs with prepare_edit on the front end.",
     input: BriefInput,
     output: BriefResult,
+  },
+  prune: {
+    description:
+      "Remove stale notes that have not been surfaced to an agent for more than `days` days (default 90), are not promoted, are not high-severity, and are not from a trusted human source (human/doc/incident/pr). Also removes any note/decision past its expires_at. Pass dry_run=true to see what would be removed without writing. Run periodically to prevent memory bloat.",
+    input: PruneInput,
+    output: PruneResult,
+  },
+  resume: {
+    description:
+      "\"Where was I?\" — surface the TODO(symbol): notes, open questions, and recent decisions tied to the files in the current git diff. Returns a markdown brief plus structured data. Call at the start of a session to orient quickly without re-reading all source files.",
+    input: ResumeInput,
+    output: ResumeResult,
   },
 } as const;
 

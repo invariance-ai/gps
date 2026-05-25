@@ -62,6 +62,8 @@ import { registerPulse } from "./commands/pulse.js";
 import { registerSeed } from "./commands/seed.js";
 import { registerVerify } from "./commands/verify.js";
 import { registerSync } from "./commands/sync.js";
+import { registerPrune } from "./commands/prune.js";
+import { registerResume } from "./commands/resume.js";
 
 export function buildProgram(): Command {
   const program = new Command()
@@ -187,6 +189,8 @@ registerReviewMemory(program);
   registerSeed(program);
   registerVerify(program);
   registerSync(program);
+  registerPrune(program);
+  registerResume(program);
 }
 
 const isMain = (() => {

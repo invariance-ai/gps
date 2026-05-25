@@ -119,6 +119,9 @@
         },
         "expires_at": {
           "type": "string"
+        },
+        "last_surfaced_at": {
+          "type": "string"
         }
       },
       "required": [

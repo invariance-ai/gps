@@ -8,6 +8,19 @@ import {
   type Note as NoteT,
 } from "@invariance/gps-schemas";
 
+/** Returns true if a note has expired (expires_at is in the past). */
+export function isNoteExpired(note: NoteT, now: Date = new Date()): boolean {
+  if (!note.expires_at) return false;
+  const ms = Date.parse(note.expires_at);
+  if (Number.isNaN(ms)) return false;
+  return ms < now.getTime();
+}
+
+/** Filter out expired notes from an array. */
+export function filterExpiredNotes(notes: NoteT[], now: Date = new Date()): NoteT[] {
+  return notes.filter((n) => !isNoteExpired(n, now));
+}
+
 const DIR = ".gps/notes";
 const FILE_DIR = ".gps/notes/file";
 const FEATURE_DIR = ".gps/notes/feature";
@@ -78,6 +91,57 @@ export async function appendNote(
 }
 
 const SEV_RANK: Record<NoteSeverity, number> = { high: 0, medium: 1, low: 2 };
+
+/**
+ * Stamp `last_surfaced_at` on the given notes (in-place mutation) and persist
+ * them back to disk. Best-effort: never throws — a write failure is silently
+ * swallowed so callers never fail a read because the write failed.
+ *
+ * The function matches notes to their on-disk file by `symbol` (standard notes
+ * only — scoped notes in file/feature/area subdirs are not updated because they
+ * use a different file-per-target layout and `loadNotes` doesn't touch them).
+ */
+export async function touchSurfacedNotes(root: string, notes: NoteT[]): Promise<void> {
+  if (notes.length === 0) return;
+  const now = new Date().toISOString();
+  // Group by symbol so we only load each file once.
+  const bySymbol = new Map<string, NoteT[]>();
+  for (const n of notes) {
+    const arr = bySymbol.get(n.symbol) ?? [];
+    arr.push(n);
+    bySymbol.set(n.symbol, arr);
+  }
+  // Stamp in-place on the surfaced objects.
+  for (const n of notes) {
+    (n as NoteT & { last_surfaced_at?: string }).last_surfaced_at = now;
+  }
+  // Persist each symbol file.
+  for (const [symbol, surfaced] of bySymbol) {
+    try {
+      const surfacedIds = new Set(surfaced.map((n) => n.id).filter(Boolean));
+      const surfacedLessons = new Set(surfaced.map((n) => n.lesson));
+      const filePath = fileFor(root, symbol);
+      const raw = await readFile(filePath, "utf8");
+      const data = parseYaml(raw);
+      if (!Array.isArray(data)) continue;
+      const updated = data.map((d: unknown) => {
+        try {
+          const existing = Note.parse(d);
+          const match =
+            (existing.id && surfacedIds.has(existing.id)) ||
+            (!existing.id && surfacedLessons.has(existing.lesson));
+          if (!match) return existing;
+          return { ...existing, last_surfaced_at: now };
+        } catch {
+          return d;
+        }
+      });
+      await writeFile(filePath, stringifyYaml(updated));
+    } catch {
+      /* best-effort: swallow read/write errors */
+    }
+  }
+}
 
 export function rankNotes(notes: NoteT[], limit = 5, includePromoted = false): NoteT[] {
   return notes
