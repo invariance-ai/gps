@@ -1,6 +1,8 @@
 # Getting started
 
-A 10-minute walkthrough: install gps in a real repo, see it surface context to an agent, then teach it something that sticks.
+gps is a plug-in memory layer for your coding agents. One install gives Claude Code, Codex, and Cursor durable, automatic, symbol-anchored repo memory — notes, decisions, preferences, and invariants captured by lifecycle hooks and surfaced only when the relevant code is touched.
+
+A 10-minute walkthrough: install gps in a real repo, see it surface memory to an agent, then teach it something that sticks.
 
 ## 1. Install (1 min)
 

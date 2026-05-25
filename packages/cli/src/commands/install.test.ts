@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveCmd } from "./install.js";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { resolveCmd, runInstallClaude, runInstallCodex } from "./install.js";
 
 describe("resolveCmd", () => {
   it("errors when both --use-global and --use-local are passed", () => {
@@ -49,6 +52,36 @@ describe("resolveCmd", () => {
       expect(spec.mode).toBe("npx");
     } finally {
       if (prev !== undefined) process.env.CI = prev;
+    }
+  });
+});
+
+describe("install codex: notifyArgs contains --capture-prefs", () => {
+  it("Codex config.toml notify line includes --capture-prefs", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "gps-install-codex-test-"));
+    const spec = resolveCmd({ useGlobal: true });
+    await runInstallCodex(root, { force: true, skipAgentsMd: true, spec });
+    const config = await readFile(path.join(root, ".codex/config.toml"), "utf8");
+    expect(config).toContain("--capture-prefs");
+    expect(config).toContain("--transcript");
+    expect(config).toContain('"-"');
+  });
+});
+
+describe("install claude: Stop hook does NOT contain --capture-prefs", () => {
+  it("Claude .claude/settings.json Stop hook does not include --capture-prefs", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "gps-install-claude-test-"));
+    const spec = resolveCmd({ useGlobal: true });
+    await runInstallClaude(root, { force: true, skipClaudeMd: true, spec });
+    const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+    const parsed = JSON.parse(settings) as { hooks?: { Stop?: Array<{ hooks?: Array<{ command?: string }> }> } };
+    const stopHooks = parsed.hooks?.Stop ?? [];
+    for (const hookGroup of stopHooks) {
+      for (const hook of hookGroup.hooks ?? []) {
+        if (hook.command) {
+          expect(hook.command).not.toContain("--capture-prefs");
+        }
+      }
     }
   });
 });

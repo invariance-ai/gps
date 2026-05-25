@@ -1,7 +1,7 @@
 # Compare-All: flask
 
 - Date: 2026-05-16T20:11:35.425Z
-- Corpus root: `/Users/hardiksingh/.cache/gps-bench/corpora/flask`
+- Corpus root: `~/.cache/gps-bench/corpora/flask`
 - Sample size: 10
 - Token estimation: chars / 4
 
