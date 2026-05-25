@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { addPreference, extractPreferences } from "@invariance/gps-core";
+import { addPreference, addToInbox, extractPreferences, loadPolicy } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -52,6 +52,33 @@ export function registerCapturePreference(program: Command): void {
 
     const extracted = extractPreferences(prompt);
     if (extracted.length === 0) return;
+
+    // capture=inbox → queue for review instead of persisting live.
+    const { capture } = await loadPolicy(root);
+    if (capture === "inbox") {
+      const queued = [];
+      for (const e of extracted) {
+        const r = await addToInbox(root, {
+          kind: "preference",
+          text: e.text,
+          source: `cue:${e.cue}`,
+        });
+        if (!r.deduped) queued.push(r.item);
+      }
+      if (opts.json) {
+        console.log(JSON.stringify({ queued }, null, 2));
+        return;
+      }
+      if (opts.emit && queued.length > 0) {
+        const lines = ["<!-- gps:captured-prefs -->"];
+        lines.push(`gps queued ${queued.length} preference${queued.length === 1 ? "" : "s"} to the inbox for review:`);
+        for (const p of queued) lines.push(`- ${p.text}`);
+        lines.push("Run `gps inbox` to review, then `gps inbox approve <id>`.");
+        lines.push("<!-- /gps:captured-prefs -->");
+        console.log(lines.join("\n"));
+      }
+      return;
+    }
 
     const recorded = [];
     for (const e of extracted) {
