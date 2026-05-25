@@ -2,9 +2,11 @@
 
 This note captures product ideas for GPS as a plug-in memory layer for coding agents. The core positioning is:
 
-> GPS turns a repository into a version-controlled operating manual for AI coding agents.
+> GPS is repo memory that keeps agents from rediscovering the same facts every session.
 
-The strongest wedge is not generic "agent memory." It is repo-scoped, reviewable, committed knowledge that every coding agent can use consistently.
+The strongest wedge is not generic "agent memory." It is repo-scoped knowledge that Claude, Codex, Cursor, and other coding agents can reuse instead of forcing developers to repeat the same corrections.
+
+Trust is not the billboard. The billboard is speed, fewer repeated mistakes, better test selection, better PRs, and agents that remember how the repo works. Trust mechanics are the plumbing that keeps the memory layer from becoming junk.
 
 > **Implementation status (v0.5).** The capture/promotion governance described below is now partly shipped and configurable per repo via `gps install --capture=<inbox|auto> --promote=<never|safe|all>` (persisted to `.gps/config.yml`):
 > - **Inbox capture** — `--capture=inbox` routes captured preferences/directives into `.gps/inbox.yml` for review. Manage with `gps inbox` / `gps inbox approve|reject|edit <id>`. Approving runs the real persist. (`--capture=auto`, the default, persists live as before.)
@@ -1291,14 +1293,48 @@ That demonstrates the product better than a benchmark alone.
 
 ## Positioning
 
-Avoid leading with generic memory. Lead with repo knowledge and reviewability.
+Avoid leading with generic memory or abstract trust. Lead with fewer repeated corrections and agents that stop forgetting the repo.
 
-Stronger:
+Primary:
 
-> A version-controlled knowledge layer that helps every coding agent understand your codebase the way your team does.
+> GPS is repo memory that keeps agents from rediscovering the same facts every session.
 
 Also strong:
 
+> A version-controlled knowledge layer that helps every coding agent understand your codebase the way your team does.
+
+Another option:
+
 > The repo gets an operating manual that agents can read, update, and cite.
 
-The durable differentiator is committed, cross-agent, symbol-anchored, reviewable operational knowledge.
+What developers actually care about:
+
+- Stop correcting the same agent mistake twice.
+- Make agents find the right files faster.
+- Make agents run the right tests.
+- Avoid reviewer nitpicks based on repo-specific conventions.
+- Keep useful context across Claude, Codex, Cursor, and future agents.
+- Turn corrections, decisions, warnings, and gotchas into reusable repo knowledge.
+
+The durable differentiator is committed, cross-agent, symbol-anchored operational knowledge with enough review and audit plumbing to stay useful.
+
+## Market Gap
+
+Many tools own ingredients. None clearly package the full GPS shape.
+
+Graphify has persistent graph artifacts, cross-agent installation, confidence tags, suggested questions, rationale extraction, and queryable graph paths. Zep has temporal memory primitives. Cursor rules and Claude memory provide narrower memory surfaces. Semgrep and CodeQL provide enforceable rules. Greptile and Sourcegraph provide review and code intelligence.
+
+The missing bundle:
+
+- Repo-committed memory.
+- Cross-agent usage.
+- Symbol and path anchoring.
+- Captured corrections and session lessons.
+- Inbox-first activation.
+- Human-approved graduation.
+- Invariants, decisions, warnings, preferences, and TODOs.
+- PR reasoning and reviewer hints.
+- Influence auditing showing where memory steered later sessions.
+- Plain `.gps/` files developers can inspect and edit.
+
+The category is not "memory system" in the abstract. The category is repo memory for coding agents.
