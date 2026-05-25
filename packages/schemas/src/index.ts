@@ -227,6 +227,38 @@ export const Preference = z.object({
 });
 export type Preference = z.infer<typeof Preference>;
 
+/* ---------- Capture & promotion policy (v0.5) ---------- */
+
+/**
+ * Where freshly captured memory lands.
+ *   auto  — persisted live immediately (the always-on default; non-breaking).
+ *   inbox — queued for human review; nothing activates until `gps inbox approve`.
+ */
+export const CaptureMode = z.enum(["inbox", "auto"]);
+export type CaptureMode = z.infer<typeof CaptureMode>;
+
+/**
+ * Whether recurring note clusters auto-graduate into invariants.
+ *   never — manual only (`gps promote <symbol>`); current behavior.
+ *   safe  — auto-promote, EXCEPT clusters touching require_approval_for risk
+ *           topics (auth/payments/security/…), which still need a human.
+ *   all   — auto-promote everything that clusters. Visibly dangerous: bypasses
+ *           the risk gate. Opt-in only.
+ */
+export const PromoteMode = z.enum(["never", "safe", "all"]);
+export type PromoteMode = z.infer<typeof PromoteMode>;
+
+/**
+ * The governance policy persisted to `.gps/config.yml` by `gps install`.
+ * Defaults are baked in here so this schema is the single source of truth:
+ * `GpsPolicy.parse({})` yields the locked defaults (auto / never).
+ */
+export const GpsPolicy = z.object({
+  capture: CaptureMode.default("auto"),
+  promote: PromoteMode.default("never"),
+});
+export type GpsPolicy = z.infer<typeof GpsPolicy>;
+
 /* ---------- Features (v0.4) ---------- */
 
 export const FeatureSymbol = z.object({

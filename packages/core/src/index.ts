@@ -56,5 +56,6 @@ export * from "./gate_stream.js";
 export * from "./validate_knowledge.js";
 export * from "./prune.js";
 export * from "./resume.js";
+export * from "./risk_topics.js";
 export { runBench, runTask, loadTasks, summarize, resetWorkingTree, parseShellArgs, parseMatrix, AGENT_PRESETS } from "./bench.js";
 export type { BenchTask, RunResult, BenchSummary, RunOptions, BenchAgent, CellSummary, PerTaskAgentRow } from "./bench.js";
