@@ -29,6 +29,15 @@ export const SymbolRef = z.object({
    */
   end_line: z.number().int().nonnegative().optional(),
   kind: SymbolKind,
+  /**
+   * Bounded, deduped lowercased token set drawn from the symbol's source slice
+   * (identifiers split on camelCase/snake_case, comment and signature words),
+   * stored space-joined to keep the pretty-printed index compact. Powers
+   * semantic `gps find` — matching what a symbol *does*, not just its name.
+   * Populated at index time (index version ≥ 2); absent on older indexes, in
+   * which case search degrades to name-only.
+   */
+  tokens: z.string().optional(),
 });
 export type SymbolRef = z.infer<typeof SymbolRef>;
 

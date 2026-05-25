@@ -1,46 +1,42 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { readIndex } from "@invariance/gps-core";
+import { readIndex, searchSymbols } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerFind(program: Command): void {
   addRootOption(program
     .command("find <query>")
-    .description("Fuzzy search for symbols")
+    .description("Fuzzy search for symbols (matches names and, on v2 indexes, body/doc tokens)")
     .option("--json", "Emit JSON instead of pretty output")
     .option("--limit <n>", "Max results", (v) => parseInt(v, 10), 20))
     .action(async (query: string, opts: RootOption & { json?: boolean; limit: number }) => {
       const root = resolveRoot(opts);
       try {
         const index = await readIndex(root);
-        const q = query.toLowerCase();
-        const scored = index.symbols
-          .map((s) => {
-            const name = s.name.toLowerCase();
-            const qualified = s.qualified_name?.toLowerCase();
-            let score = 0;
-            if (qualified === q) score = 100;
-            else if (name === q) score = 95;
-            else if (qualified?.startsWith(q)) score = 85;
-            else if (name.startsWith(q)) score = 80;
-            else if (qualified?.includes(q)) score = 65;
-            else if (name.includes(q)) score = 60;
-            else return null;
-            return { s, score };
-          })
-          .filter((x): x is { s: typeof index.symbols[0]; score: number } => !!x)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, opts.limit);
+        const matches = searchSymbols(index, query, opts.limit);
         if (opts.json) {
-          console.log(JSON.stringify(scored.map((x) => x.s), null, 2));
+          // Additive contract: every prior SymbolRef field is preserved and we
+          // add match_reason + score. `tokens` is an index-internal recall aid,
+          // not useful in result output, so it's dropped here.
+          console.log(
+            JSON.stringify(
+              matches.map(({ symbol, match_reason, score }) => {
+                const { tokens: _tokens, ...rest } = symbol;
+                return { ...rest, match_reason, score };
+              }),
+              null,
+              2,
+            ),
+          );
           return;
         }
-        if (scored.length === 0) {
+        if (matches.length === 0) {
           console.log(kleur.dim(`no symbols match "${query}"`));
           return;
         }
-        for (const { s } of scored) {
-          console.log(`${s.name}  ${kleur.dim(`(${s.kind})  ${s.file}:${s.line}`)}`);
+        for (const { symbol: s, match_reason } of matches) {
+          const why = match_reason === "tokens" ? kleur.dim("  ← matched in body/docs") : "";
+          console.log(`${s.name}  ${kleur.dim(`(${s.kind})  ${s.file}:${s.line}`)}${why}`);
         }
       } catch (e) {
         console.error(kleur.red(`error: ${(e as Error).message}`));
