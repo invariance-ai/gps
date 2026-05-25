@@ -57,7 +57,7 @@ gps prepare <symbol> --intent "<…>"   # same, with explicit symbol
 gps brief                             # pre-finalize: changed symbols, invariants, notes, tests, no-test warnings
 \`\`\`
 
-When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), gps records it for you — automatically via hook in agents that support them, otherwise call the MCP tool \`record_preference\` (or \`gps prefer "<rule>"\`). Treat \`gps preferences\` output as soft constraints in every session.
+When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), gps records it for you — automatically via hook in agents that support them, otherwise call the MCP tool \`record_preference\` (or \`gps prefer "<rule>"\`). Both passive and explicit captures honor the repo's capture policy: under \`capture=auto\` they land in active memory, under \`capture=inbox\` they're queued for review (\`gps inbox approve <id>\`) — so don't assume an explicit call is immediately live. The response says where it went. Treat \`gps preferences\` output as soft constraints in every session.
 
 When you learn something the next agent should know, persist it:
 \`\`\`bash
@@ -227,6 +227,8 @@ record_directive { "text": "<instruction>", "area": "<directory or alias>" }
 \`\`\`
 
 gps stores preferences in a managed CLAUDE.md / AGENTS.md block (global scope) and directives as area-scoped notes that resurface whenever you edit files in that directory. Because Cursor has no hooks to capture these automatically, calling \`record_preference\` and \`record_directive\` yourself is how the memory layer stays current.
+
+\`record_preference\` honors the repo's capture policy: under \`capture=auto\` it writes active memory immediately, under \`capture=inbox\` it queues the preference for review (the tool response's \`placement\` and \`message\` say which, and queued items need \`gps inbox approve <id>\`).
 
 The MCP server registered in \`.cursor/mcp.json\` exposes the same surface as a set of tools — use whichever interface (CLI or MCP) fits the moment.
 `;

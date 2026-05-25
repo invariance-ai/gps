@@ -8,8 +8,16 @@ import {
   type InboxItemKind,
 } from "@invariance/gps-schemas";
 import { matchedRiskTopics } from "./risk_topics.js";
-import { addPreference } from "./preferences.js";
+import {
+  addPreference,
+  loadPreferences,
+  type AddPreferenceOpts,
+  type AddPreferenceResult,
+} from "./preferences.js";
 import { recordDirective } from "./lessons.js";
+import { loadPolicy } from "./scan.js";
+import { loadAreaNotes } from "./notes.js";
+import { tokenize, jaccard } from "./text_similarity.js";
 
 /**
  * The inbox is a single flat YAML array (`.gps/inbox.yml`) — a chronological
@@ -27,6 +35,15 @@ function idFor(kind: string, text: string): string {
     .update(`${kind}\0${text.trim().toLowerCase()}`)
     .digest("hex")
     .slice(0, 12);
+}
+
+/**
+ * sha1 of the normalized text alone — the SAME formula `preferences.ts` uses
+ * for its ids. So `preferenceIdFor(item.text) === pref.id` is an exact-content
+ * duplicate, independent of the kind-prefixed inbox id above.
+ */
+function preferenceIdFor(text: string): string {
+  return createHash("sha1").update(text.trim().toLowerCase()).digest("hex").slice(0, 12);
 }
 
 export async function loadInbox(root: string): Promise<InboxItemT[]> {
@@ -52,6 +69,112 @@ export function findByIdOrPrefix(items: InboxItemT[], idOrPrefix: string): Inbox
   if (exact) return exact;
   const matches = items.filter((i) => i.id.startsWith(idOrPrefix));
   return matches.length === 1 ? matches[0]! : null;
+}
+
+/**
+ * A pending inbox item paired with an optional duplicate marker. When set,
+ * `duplicate_of` carries a short description of the ALREADY-ACTIVE memory entry
+ * (an approved preference or an area note) that the item reproduces, so the CLI
+ * can tag it `[duplicate]` instead of re-surfacing it as a fresh, actionable
+ * lesson. `match` distinguishes an exact id collision from a near-equal rewrite.
+ */
+export interface AnnotatedInboxItem {
+  item: InboxItemT;
+  /** Set iff the item duplicates active memory; a human-readable handle. */
+  duplicate_of?: string;
+  match?: "exact" | "near";
+}
+
+/**
+ * Lexical-overlap gate for flagging a pending item as a near-duplicate of an
+ * already-active entry. Deliberately conservative: reworded copies of the same
+ * rule clear it, but genuinely different rules (even on the same topic) must
+ * stay separate, so a borderline pair is left UNtagged rather than merged.
+ */
+export const INBOX_DUPLICATE_GATE = 0.7;
+
+/**
+ * Compare each pending item against ACTIVE memory and mark the ones that
+ * reproduce something already approved. Preferences are matched against
+ * `preferences.yml`; directives against the area notes of their resolved area.
+ * Exact matches use the shared sha1 id; near matches use a conservative jaccard
+ * gate. Non-pending items and items with no active counterpart pass through
+ * unmarked. Pure read — never mutates the inbox.
+ */
+export async function annotateInboxDuplicates(
+  root: string,
+  items: InboxItemT[],
+): Promise<AnnotatedInboxItem[]> {
+  // Active preferences keyed by their sha1 id (== idFor("preference", text)).
+  const prefs = await loadPreferences(root);
+  const prefById = new Map(prefs.map((p) => [p.id, p] as const));
+  const prefTokens = prefs.map((p) => ({ p, tokens: tokenize(p.text) }));
+
+  // Area notes are loaded lazily per resolved area (directives only).
+  const notesByArea = new Map<string, { lesson: string; tokens: Set<string> }[]>();
+  async function notesFor(area: string) {
+    let cached = notesByArea.get(area);
+    if (!cached) {
+      const notes = await loadAreaNotes(root, area);
+      cached = notes.map((n) => ({ lesson: n.lesson, tokens: tokenize(n.lesson) }));
+      notesByArea.set(area, cached);
+    }
+    return cached;
+  }
+
+  const out: AnnotatedInboxItem[] = [];
+  for (const item of items) {
+    if (item.status !== "pending") {
+      out.push({ item });
+      continue;
+    }
+
+    if (item.kind === "preference") {
+      // Exact: same normalized text → same sha1 as the stored preference.
+      const exact = prefById.get(preferenceIdFor(item.text));
+      if (exact) {
+        out.push({ item, duplicate_of: `preference "${exact.text}"`, match: "exact" });
+        continue;
+      }
+      const tokens = tokenize(item.text);
+      let best: { text: string; score: number } | null = null;
+      for (const { p, tokens: pt } of prefTokens) {
+        const score = jaccard(tokens, pt);
+        if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+          best = { text: p.text, score };
+        }
+      }
+      out.push(
+        best ? { item, duplicate_of: `preference "${best.text}"`, match: "near" } : { item },
+      );
+      continue;
+    }
+
+    // directive → compare against the area notes of its resolved area.
+    if (!item.area) {
+      out.push({ item });
+      continue;
+    }
+    const notes = await notesFor(item.area);
+    const norm = item.text.trim().toLowerCase();
+    const exactNote = notes.find((n) => n.lesson.trim().toLowerCase() === norm);
+    if (exactNote) {
+      out.push({ item, duplicate_of: `area note "${exactNote.lesson}"`, match: "exact" });
+      continue;
+    }
+    const tokens = tokenize(item.text);
+    let best: { lesson: string; score: number } | null = null;
+    for (const n of notes) {
+      const score = jaccard(tokens, n.tokens);
+      if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+        best = { lesson: n.lesson, score };
+      }
+    }
+    out.push(
+      best ? { item, duplicate_of: `area note "${best.lesson}"`, match: "near" } : { item },
+    );
+  }
+  return out;
 }
 
 export interface AddToInboxOpts {
@@ -155,4 +278,57 @@ export async function approveInboxItem(
   item.status = "approved";
   await persist(root, items);
   return { item, persisted };
+}
+
+/** Where an explicit preference write landed, and why. */
+export interface RecordPreferenceResult {
+  /** "active" → written to live memory; "inbox" → queued pending review. */
+  placement: "active" | "inbox";
+  /** Active-store result (present iff placement === "active"). */
+  preference?: AddPreferenceResult;
+  /** Inbox result (present iff placement === "inbox"). */
+  inbox?: AddToInboxResult;
+  deduped: boolean;
+  /** Human-readable explanation of the routing decision. */
+  message: string;
+}
+
+/**
+ * Single routing decision for an EXPLICIT preference write (`gps prefer`,
+ * `mcp__gps__record_preference`). Honors the capture gate (Fix 4, option A):
+ * under `capture=inbox` the preference is queued for review instead of being
+ * written straight to active memory; under `capture=auto` it writes active.
+ * The hook-driven passive capture commands and this shared helper therefore
+ * route identically, so explicit and passive captures obey the same policy.
+ */
+export async function recordPreference(
+  root: string,
+  opts: AddPreferenceOpts,
+): Promise<RecordPreferenceResult> {
+  const { capture } = await loadPolicy(root);
+  if (capture === "inbox") {
+    const inbox = await addToInbox(root, {
+      kind: "preference",
+      text: opts.text,
+      source: opts.source ?? "manual",
+      evidence: opts.evidence,
+    });
+    return {
+      placement: "inbox",
+      inbox,
+      deduped: inbox.deduped,
+      message: inbox.deduped
+        ? "already queued for review (capture=inbox)"
+        : "queued for review (capture=inbox)",
+    };
+  }
+  const preference = await addPreference(root, opts);
+  return {
+    placement: "active",
+    preference,
+    deduped: preference.deduped,
+    message: preference.deduped
+      ? "already in active memory"
+      : "recorded to active memory",
+  };
 }

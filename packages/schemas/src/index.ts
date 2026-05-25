@@ -29,6 +29,15 @@ export const SymbolRef = z.object({
    */
   end_line: z.number().int().nonnegative().optional(),
   kind: SymbolKind,
+  /**
+   * Bounded, deduped lowercased token set drawn from the symbol's source slice
+   * (identifiers split on camelCase/snake_case, comment and signature words),
+   * stored space-joined to keep the pretty-printed index compact. Powers
+   * semantic `gps find` — matching what a symbol *does*, not just its name.
+   * Populated at index time (index version ≥ 2); absent on older indexes, in
+   * which case search degrades to name-only.
+   */
+  tokens: z.string().optional(),
 });
 export type SymbolRef = z.infer<typeof SymbolRef>;
 
@@ -397,6 +406,14 @@ export const GetContextInput = z.object({
   authored_by: z.string().optional(),
   mode: ContextMode.optional(),
   budget: z.number().int().nonnegative().optional(),
+  /**
+   * Optional ranked alternates from intent inference (Fix 2). When present and
+   * the resolved symbol is weak (zero callers), a better-connected alternate is
+   * surfaced as a "did you mean" hint.
+   */
+  candidates: z
+    .array(z.object({ symbol: z.string(), score: z.number(), via: z.string() }))
+    .optional(),
 });
 export type GetContextInput = z.infer<typeof GetContextInput>;
 
@@ -411,6 +428,26 @@ export const TodoItem = z.object({
   resolved_at: z.string().optional(),
 });
 export type TodoItem = z.infer<typeof TodoItem>;
+
+/* ---------- Resolution signals (Fix 2: empty-callers confidence) ---------- */
+// Kept in its own region so additive edits git-auto-merge cleanly.
+
+/** A "you might mean X instead" hint when the resolved symbol looks weak. */
+export const DidYouMeanEntry = z.object({
+  symbol: z.string(),
+  reason: z.string(),
+});
+export type DidYouMeanEntry = z.infer<typeof DidYouMeanEntry>;
+
+/** Reusable optional fields for results that resolve a symbol. */
+export const ResolutionSignalFields = {
+  /** Human-readable warnings about the resolution (e.g. zero callers found). */
+  resolution_warnings: z.array(z.string()).optional(),
+  /** Better-connected alternatives the caller may have intended. */
+  did_you_mean: z.array(DidYouMeanEntry).optional(),
+} as const;
+
+/* ---------- end resolution signals ---------- */
 
 export const ContextResult = z.object({
   symbol: SymbolRef,
@@ -427,6 +464,7 @@ export const ContextResult = z.object({
   truncated: z
     .object({ sections: z.array(z.string()), droppedCount: z.number().int().nonnegative() })
     .optional(),
+  ...ResolutionSignalFields,
 });
 export type ContextResult = z.infer<typeof ContextResult>;
 
@@ -654,6 +692,14 @@ export const PrepareEditInput = z.object({
   depth: z.number().int().min(1).max(3).optional().describe(
     "Neighborhood depth for callee context (1 = symbol only).",
   ),
+  /**
+   * Optional ranked alternates from intent inference (Fix 2). When present and
+   * the resolved symbol is weak (zero callers), a better-connected alternate is
+   * surfaced as a "did you mean" hint.
+   */
+  candidates: z
+    .array(z.object({ symbol: z.string(), score: z.number(), via: z.string() }))
+    .optional(),
 });
 export type PrepareEditInput = z.infer<typeof PrepareEditInput>;
 
@@ -675,6 +721,7 @@ export const PrepareEditResult = z.object({
   candidates: z
     .array(z.object({ symbol: z.string(), score: z.number(), via: z.string() }))
     .optional(),
+  ...ResolutionSignalFields,
 });
 export type PrepareEditResult = z.infer<typeof PrepareEditResult>;
 
@@ -1169,6 +1216,8 @@ export const BriefResult = z.object({
   per_symbol: z.array(BriefSymbolEntry),
   untested_symbols: z.array(z.string()),
   truncated: z.boolean(),
+  /** True when at least one indexed source symbol changed. False when only config/docs/non-indexed files changed. */
+  source_changes: z.boolean(),
 });
 export type BriefResult = z.infer<typeof BriefResult>;
 

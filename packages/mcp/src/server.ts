@@ -45,6 +45,7 @@ import {
   loadAssumptions,
   rankContributors,
   addPreference,
+  recordPreference,
   loadPreferences,
   buildContract,
   saveContract,
@@ -139,7 +140,17 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         lowConfidence = candidates.length === 1 && (candidates[0]!.score ?? 0) < LOW_CONFIDENCE_THRESHOLD;
       }
       if (!symbol) throw new Error("prepare_edit: symbol or intent required");
-      const result = await prepareEdit({ symbol, intent: a.intent, budget: a.budget, since: a.since, depth: a.depth }, root);
+      const result = await prepareEdit(
+        {
+          symbol,
+          intent: a.intent,
+          budget: a.budget,
+          since: a.since,
+          depth: a.depth,
+          ...(candidates && candidates.length > 0 ? { candidates } : {}),
+        },
+        root,
+      );
       const withCandidates = candidates && candidates.length > 1 ? { ...result, candidates } : result;
       return lowConfidence ? { ...withCandidates, low_confidence: true } : withCandidates;
     }
@@ -408,7 +419,10 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "record_preference": {
       const a = args as Parameters<typeof addPreference>[1];
-      return addPreference(root, a);
+      // Honor the capture gate (Fix 4, option A): under capture=inbox this
+      // queues for review instead of writing straight to active memory. The
+      // response states where the memory went and why.
+      return recordPreference(root, a);
     }
     case "preferences_list": {
       const preferences = await loadPreferences(root);

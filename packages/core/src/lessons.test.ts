@@ -2,7 +2,13 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { classifyHeuristic, persistLesson, listLessons, reclassifyLesson } from "./lessons.js";
+import {
+  classifyHeuristic,
+  persistLesson,
+  listLessons,
+  reclassifyLesson,
+  extractDirectives,
+} from "./lessons.js";
 import {
   upsertGlobalLesson,
   readGlobalLessons,
@@ -187,5 +193,28 @@ describe("persistLesson + listLessons + reclassifyLesson", () => {
 
     const claudeRaw = await readFile(path.join(root, "CLAUDE.md"), "utf8");
     expect(claudeRaw).toContain(text);
+  });
+});
+
+describe("extractDirectives — transient guard", () => {
+  it.each([
+    "Don't edit this file yet.",
+    "You do not need to change anything here right now.",
+    "Don't write code in this folder for now.",
+  ])("ignores transient phrasing: %s", (prompt) => {
+    expect(extractDirectives(prompt)).toEqual([]);
+  });
+
+  it("still captures durable positional+policy directives", () => {
+    const d = extractDirectives("Don't use default exports in this folder.");
+    expect(d.length).toBe(1);
+    expect(d[0]?.polarity).toBe("dont");
+    expect(d[0]?.text).toMatch(/default exports in this folder/i);
+  });
+
+  it("captures positive directives with positional + policy phrasing", () => {
+    const d = extractDirectives("You should prefer named exports in this file.");
+    expect(d.length).toBe(1);
+    expect(d[0]?.polarity).toBe("do");
   });
 });

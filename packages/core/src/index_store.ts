@@ -4,6 +4,7 @@ import type { SymbolRef } from "@invariance/gps-schemas";
 import type { ParsedFile } from "./parser.js";
 import { buildResolver, type Resolver } from "./resolver.js";
 import { stableSymbolId } from "./symbol_id.js";
+import { extractTokens } from "./tokens.js";
 
 /**
  * v0.1 storage: a single JSON file at .gps/index/symbols.json.
@@ -15,7 +16,12 @@ import { stableSymbolId } from "./symbol_id.js";
  * persistence between watch ticks.
  */
 export interface GpsIndex {
-  version: 1;
+  /**
+   * 1 — name-only symbols. 2 — symbols carry a `tokens` set for semantic
+   * `gps find`. Old (v1) indexes still load; search degrades to name-only
+   * until `gps index` rebuilds them at v2.
+   */
+  version: 1 | 2;
   built_at: string;
   root: string;
   files: string[];
@@ -134,13 +140,23 @@ export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<Gp
     const relFile = path.relative(root, absFile);
     const fileMap = new Map<string, SymbolRef>();
     relByAbs.set(absFile, fileMap);
+    // Read source once per file to extract per-symbol search tokens. Best-effort:
+    // a file that vanished between parse and index just yields name-only symbols.
+    let srcLines: string[] | null = null;
+    try {
+      srcLines = (await readFile(absFile, "utf8")).split("\n");
+    } catch {
+      srcLines = null;
+    }
     for (const s of file.symbols) {
       const qualified_name = s.qualified_name ?? s.name;
+      const tokens = srcLines ? symbolTokens(srcLines, s) : "";
       const rel: SymbolRef = {
         ...s,
         id: stableSymbolId({ file: relFile, qualifiedName: qualified_name, body: `${qualified_name}:${s.line}` }),
         qualified_name,
         file: relFile,
+        ...(tokens ? { tokens } : {}),
       };
       symbols.push(rel);
       push(byName, rel.name, rel);
@@ -204,13 +220,51 @@ export async function buildIndex(root: string, parsed: ParsedFile[]): Promise<Gp
   }
 
   return {
-    version: 1,
+    version: 2,
     built_at: new Date().toISOString(),
     root,
     files: parsed.map((file) => path.relative(root, file.path)),
     symbols,
     edges,
   };
+}
+
+/** Cap on distinct tokens per symbol — bounds index growth (~25% on `ky`). */
+const SYMBOL_TOKEN_CAP = 32;
+
+/**
+ * Space-joined token set for one symbol: identifiers + comment words from its
+ * source slice (`line`..`end_line`, inclusive, 1-indexed) plus any contiguous
+ * leading comment block immediately above the declaration (JSDoc / `//` / `#`).
+ * With no `end_line` (regex backend) the slice is just the declaration line —
+ * still captures the signature and the leading comment. Returns "" when empty.
+ */
+function symbolTokens(lines: string[], s: SymbolRef): string {
+  const start = Math.max(0, s.line - 1);
+  const end = s.end_line && s.end_line >= s.line ? s.end_line : s.line;
+  const body = lines.slice(start, end);
+  const lead = leadingCommentLines(lines, start);
+  return extractTokens([...lead, ...body].join("\n"), SYMBOL_TOKEN_CAP).join(" ");
+}
+
+/**
+ * Walk upward from the declaration line collecting a contiguous run of comment
+ * lines (block `/* … *\/`, JSDoc `*`, line `//`, or Python `#`). Stops at the
+ * first non-comment, non-blank line. Bounded so a giant license header above a
+ * top-level symbol can't dominate the token budget.
+ */
+function leadingCommentLines(lines: string[], declIdx: number, max = 12): string[] {
+  const out: string[] = [];
+  for (let i = declIdx - 1; i >= 0 && out.length < max; i--) {
+    const t = (lines[i] ?? "").trim();
+    if (t === "") continue; // blank gaps inside a comment block are fine
+    if (/^(\/\/|\/\*|\*|#)/.test(t) || t.endsWith("*/")) {
+      out.unshift(lines[i] ?? "");
+    } else {
+      break;
+    }
+  }
+  return out;
 }
 
 function symbolId(file: string, qualifiedName: string, line: number): string {

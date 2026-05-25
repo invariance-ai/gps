@@ -37,6 +37,14 @@ export function registerBrief(program: Command): void {
         return;
       }
 
+      if (!result.source_changes) {
+        // Files changed but none map to indexed source symbols (only .gps/,
+        // docs, config, etc.). Print one explicit status line — not empty
+        // Invariants/Notes/Tests sections that look like a clean pass. Exit 0.
+        console.log(formatBriefMarkdown(result).trimEnd());
+        return;
+      }
+
       console.log(formatBriefMarkdown(result));
 
       // Inline coloured warnings (markdown above stays neutral for piping to LLMs).

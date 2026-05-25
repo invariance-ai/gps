@@ -546,6 +546,15 @@ export async function listLessons(
 const NEGATIVE_DIRECTIVE_RE =
   /\b(don'?t|do not|never|avoid|stop|no longer|shouldn'?t|must not)\b/i;
 
+// Transient-phrasing guard for directive extraction: even when a clause has
+// both positional + policy phrasing, these markers mean it's a one-shot task
+// instruction ("don't edit this file yet"), not a durable area directive.
+const DIRECTIVE_TRANSIENT_GUARD: RegExp[] = [
+  /\b(?:yet|for now|right now|at the moment|just for this|this time|today)\b/i,
+  /\byou (?:do not|don'?t) need to\b/i,
+  /\b(?:don'?t|do not) (?:bother|write code|change code|edit this|run|start|begin)\b/i,
+];
+
 /** Heuristic do/avoid polarity from directive phrasing. */
 export function detectPolarity(text: string): "do" | "dont" {
   return NEGATIVE_DIRECTIVE_RE.test(text) ? "dont" : "do";
@@ -573,6 +582,7 @@ export function extractDirectives(prompt: string): ExtractedDirective[] {
   for (const raw of prompt.split(/(?<=[.!?\n])\s+|;\s+/)) {
     const s = raw.trim();
     if (!s || s.length > 280) continue;
+    if (DIRECTIVE_TRANSIENT_GUARD.some((re) => re.test(s))) continue;
     if (positional.test(s) && policy.test(s) && !seen.has(s)) {
       seen.add(s);
       out.push({ text: s, polarity: detectPolarity(s) });

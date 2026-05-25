@@ -217,6 +217,91 @@ export function callersOf(symbol: SymbolRef | string, ctx: QueryContext): Symbol
   return out;
 }
 
+/* ---------- Resolution signals (Fix 2: empty-callers confidence) ---------- */
+
+export interface ResolutionSignals {
+  resolution_warnings: string[];
+  did_you_mean: Array<{ symbol: string; reason: string }>;
+}
+
+const ZERO_CALLER_WARNING =
+  "No callers found — this symbol may be unexported, dynamically dispatched, or the index may be incomplete.";
+const LOW_CONFIDENCE_SCORE = 70;
+
+/**
+ * Compute confidence signals for a resolved symbol. A zero-caller resolution is
+ * easy to mistake for "genuinely none", so we (a) emit an explicit warning and
+ * (b) point at a better-connected alternative when one exists. Alternatives are
+ * drawn from same-name collisions in the index plus any intent candidates the
+ * caller passed through. Read-only and side-effect free.
+ */
+export function resolutionSignals(
+  resolved: SymbolRef,
+  resolvedCallers: SymbolRef[],
+  ctx: QueryContext,
+  candidates?: Array<{ symbol: string; score: number; via: string }>,
+): ResolutionSignals {
+  const warnings: string[] = [];
+  const didYouMean: Array<{ symbol: string; reason: string }> = [];
+  const resolvedHasCallers = resolvedCallers.length > 0;
+
+  if (!resolvedHasCallers) {
+    warnings.push(ZERO_CALLER_WARNING);
+  }
+
+  const L = lookups(ctx);
+  const resolvedKey = resolved.id ?? resolved.qualified_name ?? resolved.name;
+  const seen = new Set<string>([resolvedKey]);
+  const pushHint = (sym: SymbolRef, reason: string) => {
+    const key = sym.id ?? sym.qualified_name ?? sym.name;
+    if (seen.has(key)) return;
+    seen.add(key);
+    didYouMean.push({ symbol: sym.qualified_name ?? sym.name, reason });
+  };
+
+  // Only surface alternatives when the resolution itself is weak: zero callers,
+  // or a low-confidence intent pick. A confident, well-connected symbol gets no
+  // spurious "did you mean".
+  const topCandidateScore = candidates?.[0]?.score;
+  const lowConfidence =
+    topCandidateScore !== undefined && topCandidateScore < LOW_CONFIDENCE_SCORE;
+
+  if (resolvedHasCallers && !lowConfidence) {
+    return { resolution_warnings: warnings, did_you_mean: didYouMean };
+  }
+
+  // 1) Same-name collisions in the index that ARE connected. The picked symbol
+  //    is byName[...][0]; a sibling with the same name but real callers is the
+  //    classic "thin re-export shadowed the real impl" case.
+  const siblings = L.byName.get(resolved.name) ?? [];
+  for (const sib of siblings) {
+    const sibKey = sib.id ?? sib.qualified_name ?? sib.name;
+    if (sibKey === resolvedKey) continue;
+    const n = callersOf(sib, ctx).length;
+    if (n > 0) {
+      pushHint(sib, `same name, has ${n} caller${n === 1 ? "" : "s"} — ${sib.file}:${sib.line}`);
+    }
+  }
+
+  // 2) Intent candidates the caller passed through: a lower-ranked alternate
+  //    that has callers while the top pick has none is worth re-targeting to.
+  for (const cand of candidates ?? []) {
+    if (cand.symbol === (resolved.qualified_name ?? resolved.name)) continue;
+    const sym = resolveSymbol(cand.symbol, ctx);
+    if (!sym) continue;
+    const n = callersOf(sym, ctx).length;
+    if (!resolvedHasCallers && n > 0) {
+      pushHint(sym, `candidate (score ${cand.score}, via ${cand.via}) with ${n} caller${n === 1 ? "" : "s"}`);
+    } else if (lowConfidence) {
+      pushHint(sym, `candidate (score ${cand.score}, via ${cand.via})`);
+    }
+  }
+
+  return { resolution_warnings: warnings, did_you_mean: didYouMean.slice(0, 5) };
+}
+
+/* ---------- end resolution signals ---------- */
+
 export function calleesOf(symbol: SymbolRef | string, ctx: QueryContext): SymbolRef[] {
   const L = lookups(ctx);
   const sym = typeof symbol === "string" ? resolveSymbol(symbol, ctx) : symbol;
@@ -314,6 +399,11 @@ export async function getContext(
 
   const risk = computeRisk({ callers, tests, invariants, churn: await safeChurn(ctx.root, sym.file) });
 
+  // Confidence signal: compute from the full caller set (not the capped slice)
+  // so a wide symbol is never mislabeled "no callers".
+  const allCallers = wants.has("structural") ? callersOf(sym, ctx) : callers;
+  const signals = resolutionSignals(sym, allCallers, ctx, args.candidates);
+
   const result: ContextResult = {
     symbol: sym,
     callers,
@@ -326,6 +416,8 @@ export async function getContext(
     preferences,
     risk,
     todos,
+    ...(signals.resolution_warnings.length ? { resolution_warnings: signals.resolution_warnings } : {}),
+    ...(signals.did_you_mean.length ? { did_you_mean: signals.did_you_mean } : {}),
   };
   return trimToBudget(result, args.budget ?? 1500);
 }
@@ -415,6 +507,7 @@ export async function prepareEdit(
       strands: ["structural", "tests", "provenance", "invariants"],
       mode: "full",
       budget: 0,
+      candidates: args.candidates,
     },
     ctx,
   );
@@ -462,6 +555,9 @@ export async function prepareEdit(
     preferences: c.preferences,
     tests_to_run: c.tests.map((t) => t.file),
     risk: c.risk,
+    // Confidence signals flow up from getContext (Fix 2). Additive: omitted when empty.
+    ...(c.resolution_warnings?.length ? { resolution_warnings: c.resolution_warnings } : {}),
+    ...(c.did_you_mean?.length ? { did_you_mean: c.did_you_mean } : {}),
   };
 }
 
@@ -516,6 +612,18 @@ function formatPrepareEdit(
   header.push(`**Defined in:** \`${c.symbol.file}:${c.symbol.line}\` (${c.symbol.kind})`);
   header.push(`**Risk:** ${c.risk.toUpperCase()}`);
   header.push("");
+
+  // Resolution confidence (Fix 2): keep in the header so the budget packer never
+  // drops a "you targeted a disconnected symbol" warning.
+  if (c.resolution_warnings && c.resolution_warnings.length > 0) {
+    for (const wmsg of c.resolution_warnings) header.push(`> ⚠️ ${wmsg}`);
+    header.push("");
+  }
+  if (c.did_you_mean && c.did_you_mean.length > 0) {
+    header.push("## You might mean");
+    for (const d of c.did_you_mean) header.push(`- \`${d.symbol}\` — ${d.reason}`);
+    header.push("");
+  }
 
   const sections: PackSection[] = [];
   const add = (key: string, s: PackSection) => {
