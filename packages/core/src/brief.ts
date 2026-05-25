@@ -37,6 +37,8 @@ export interface BriefResult {
   per_symbol: BriefSymbolEntry[];
   untested_symbols: string[];
   truncated: boolean;
+  /** True when at least one indexed source symbol changed. False when only config/docs/non-indexed files changed. */
+  source_changes: boolean;
 }
 
 type GateHitShape = {
@@ -132,12 +134,21 @@ export async function brief(root: string, input: BriefInput = {}): Promise<Brief
     per_symbol,
     untested_symbols,
     truncated,
+    source_changes: symbols.length > 0,
   };
 }
 
 /** Render a brief as a human-readable markdown report. */
 export function formatBriefMarkdown(b: BriefResult): string {
   const lines: string[] = [];
+
+  // No indexed source symbols changed, but files did change (e.g. only .gps/,
+  // docs, or other non-indexed files). Emit one explicit status line instead of
+  // a wall of empty Invariants/Notes/Tests sections that reads like a clean pass.
+  if (!b.source_changes && b.changed_files.length > 0) {
+    return `No source-file changes detected (only config/docs/non-indexed files changed) — nothing to check. (${b.changed_files.length} file(s) changed vs ${b.base})\n`;
+  }
+
   lines.push(`# Brief — ${b.changed_symbols.length} symbol(s) across ${b.changed_files.length} file(s) vs ${b.base}`);
   if (b.truncated) lines.push(`_(truncated to ${b.changed_symbols.length} symbols)_`);
 

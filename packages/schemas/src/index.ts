@@ -1216,6 +1216,8 @@ export const BriefResult = z.object({
   per_symbol: z.array(BriefSymbolEntry),
   untested_symbols: z.array(z.string()),
   truncated: z.boolean(),
+  /** True when at least one indexed source symbol changed. False when only config/docs/non-indexed files changed. */
+  source_changes: z.boolean(),
 });
 export type BriefResult = z.infer<typeof BriefResult>;
 
