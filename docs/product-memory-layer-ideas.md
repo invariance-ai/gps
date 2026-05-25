@@ -18,6 +18,129 @@ GPS should be conservative about trust and aggressive about capture.
 
 Developers will forgive missing memory. They will not forgive bad memory silently steering future sessions.
 
+## V1 Trust Contract
+
+V1 should have zero auto-graduation.
+
+GPS can automatically notice, summarize, score, and route memory candidates. It should not automatically promote an inferred candidate into active memory. Every durable memory that can be injected into agent context should pass through `gps inbox` and receive explicit human approval.
+
+This is not a limitation. It is the product being honest about its confidence. The system can automate the judgment layer later, after it has real approval and rejection data from teams.
+
+V1 behavior:
+
+- All captured lessons, inferred patterns, corrections, and session summaries go to inbox.
+- Inbox items can be approved, edited, rejected, quarantined, or archived.
+- Only approved memory is eligible for default retrieval.
+- Dangerous memory can only move from quarantine to active memory with explicit approval.
+- GPS records who made the approval decision, when, and from what evidence.
+- Auto-graduation experiments run in shadow mode only.
+
+The guiding rule:
+
+```text
+Automatic capture is allowed.
+Automatic activation is not allowed in v1.
+```
+
+## `.gps/` Directory Shape
+
+The `.gps/` directory should be readable, boring, and hand-editable. Developers will inspect it immediately after install. If it looks like an opaque cache or model artifact dump, they will distrust it.
+
+Suggested structure:
+
+```text
+.gps/
+  config.yml
+  inbox/
+    2026-05-24-refund-threshold.candidate.yml
+    2026-05-24-domain-errors.candidate.yml
+  memory/
+    invariants/
+      refunds.yml
+      auth.yml
+    notes/
+      billing.yml
+    decisions/
+      refund-validation.yml
+    warnings/
+      migrations.yml
+  index/
+    symbols.sqlite
+    anchors.json
+  review/
+    pr-203.md
+    pr-203-memory-delta.md
+  archive/
+    rejected/
+    stale/
+  observations.json
+```
+
+Rules for this directory:
+
+- `memory/` contains reviewed, active, durable knowledge.
+- `inbox/` contains proposed knowledge that is not active by default.
+- `index/` can be generated and ignored from review if needed.
+- `review/` contains human-readable PR artifacts.
+- `archive/` preserves rejected and stale decisions for provenance.
+- Files should be YAML or markdown unless there is a strong reason otherwise.
+
+The files themselves should be understandable without running GPS.
+
+Example inbox candidate:
+
+```yaml
+id: memcand_2026_05_24_refund_threshold
+type: invariant_candidate
+risk: high
+status: inbox
+summary: Refunds over $1,000 appear to require manager approval.
+scope:
+  paths:
+    - apps/api/src/refunds/**
+  symbols:
+    - RefundApprovalService
+evidence:
+  - type: test
+    path: tests/refunds/approval.test.ts
+    lines: "18-42"
+  - type: session
+    id: sess_2026_05_24_1014
+source:
+  captured_by: codex
+  captured_at: "2026-05-24T10:22:00Z"
+  trigger: developer_correction
+authority: inferred
+confidence: 0.74
+proposed_action: approve_as_invariant
+```
+
+Example approved memory:
+
+```yaml
+id: mem_2026_05_24_refund_threshold
+type: invariant
+risk: high
+status: active
+rule: Refunds over $1,000 require manager approval.
+scope:
+  paths:
+    - apps/api/src/refunds/**
+  symbols:
+    - RefundApprovalService
+evidence:
+  - type: test
+    path: tests/refunds/approval.test.ts
+    lines: "18-42"
+authority: codeowner_approved
+approved_by: "@billing-owner"
+approved_at: "2026-05-24T11:03:00Z"
+source_candidate: memcand_2026_05_24_refund_threshold
+validated_by:
+  - tests/refunds/approval.test.ts
+last_confirmed_at: "2026-05-24T11:03:00Z"
+```
+
 ## Memory Types
 
 Use explicit memory types so agents know how strongly to obey each entry.
@@ -41,9 +164,9 @@ authority: inferred | developer_confirmed | codeowner_approved | invariant
 
 A repeated inferred pattern can have high confidence but still lower authority than a human-approved invariant.
 
-## Inbox-First Activation
+## Inbox-Only Graduation
 
-The default v1 behavior should be auto-capture into an inbox, not auto-activation.
+The default v1 behavior should be auto-capture into an inbox with no auto-graduation.
 
 Example:
 
@@ -57,6 +180,42 @@ Approve / Edit / Reject
 ```
 
 This makes memory review a trust-building loop instead of an invisible background process.
+
+Concrete graduation states:
+
+```text
+captured -> inbox -> approved -> active
+captured -> inbox -> edited -> approved -> active
+captured -> inbox -> rejected -> archive/rejected
+captured -> quarantine -> approved_by_owner -> active
+active -> stale -> reconfirmed -> active
+active -> stale -> archived
+```
+
+Who makes the call:
+
+- Low-risk patterns can be approved by any repo contributor.
+- Medium-risk memories should be approved by a maintainer or path owner.
+- High-risk memories should be approved by the relevant CODEOWNER.
+- Dangerous memories require CODEOWNER approval and should show up as quarantined by default.
+- Agents can recommend an action, but they cannot approve their own captured memory in v1.
+
+What triggers a graduation proposal:
+
+- A developer explicitly corrects the agent.
+- The same lesson appears in multiple sessions.
+- A TODO/FIXME/comment maps cleanly to a symbol.
+- A test failure reveals a stable rule.
+- A PR review comment establishes a durable preference.
+- A human runs `gps remember` or edits an inbox candidate.
+
+What does not trigger activation:
+
+- Repeated retrieval alone.
+- High confidence score alone.
+- Agent-generated summary alone.
+- Passing tests alone.
+- Similarity to existing memory alone.
 
 Recommended defaults:
 
@@ -141,6 +300,62 @@ Requires approval from:
 ```
 
 This makes memory governance match code governance. It also prevents one developer or one agent from approving durable knowledge for a domain they do not own.
+
+## Team Dynamics
+
+The multi-developer case is where GPS becomes valuable and where it can get messy.
+
+When one developer's session creates a memory candidate, other developers need to understand its status before it affects their agents.
+
+Recommended behavior:
+
+- New candidates are visible in `gps inbox` for everyone after they are committed or synced.
+- Candidates are not active for other developers until approved.
+- The inbox shows author, source session, risk, affected paths, and required approver.
+- Rejections are preserved with a reason so the same bad memory is not repeatedly proposed.
+- Conflicting candidates block activation and route to the relevant owners.
+- Developers can subscribe to inbox changes for owned paths.
+- GPS should summarize memory deltas in PRs so team review catches bad additions.
+
+Example team inbox view:
+
+```text
+gps inbox
+
+[high] Refunds over $1,000 appear to require manager approval.
+  status: needs @billing-team approval
+  source: developer correction in sess_2026_05_24_1014
+  affects: apps/api/src/refunds/**
+
+[medium] Billing code prefers DomainError over generic Error.
+  status: awaiting maintainer review
+  source: repeated pattern across 4 files
+  affects: apps/api/src/billing/**
+
+[dangerous] Admin users can bypass approval checks.
+  status: quarantined
+  source: inferred from failed workaround
+  affects: apps/api/src/auth/**
+```
+
+Team-level permissions should be explicit:
+
+```yaml
+approval:
+  default: maintainer
+  low_risk: contributor
+  high_risk: codeowner
+  dangerous: codeowner
+
+owners:
+  payments:
+    paths:
+      - apps/api/src/payments/**
+    approvers:
+      - "@payments-team"
+```
+
+This keeps GPS from becoming a shared rumor engine. Memory becomes a reviewed team artifact.
 
 ## Memory Diff In PRs
 
@@ -665,19 +880,98 @@ gps validate-knowledge
 
 Borrow from tiered storage and moderation queues.
 
-Promotion path:
+For v1, promotion and demotion are human-reviewed state transitions, not autonomous classifier decisions.
 
-```text
-observed_pattern -> inbox -> approved note -> repeated note -> invariant candidate -> approved invariant
+Candidate representation before approval:
+
+```yaml
+id: memcand_2026_05_24_domain_errors
+type: developer_preference_candidate
+status: inbox
+risk: medium
+summary: Billing code should use DomainError instead of generic Error.
+scope:
+  paths:
+    - apps/api/src/billing/**
+evidence:
+  - type: developer_correction
+    session: sess_2026_05_24_1430
+  - type: code_pattern
+    examples:
+      - apps/api/src/billing/refunds.ts:88
+      - apps/api/src/billing/invoices.ts:121
+authority: inferred
+confidence: 0.81
+required_approval: maintainer
+proposed_active_type: warning
 ```
 
-Demotion path:
+Approved representation after graduation:
+
+```yaml
+id: mem_2026_05_24_domain_errors
+type: warning
+status: active
+risk: medium
+rule: Billing code should use DomainError instead of generic Error.
+scope:
+  paths:
+    - apps/api/src/billing/**
+evidence:
+  - type: developer_correction
+    session: sess_2026_05_24_1430
+  - type: code_pattern
+    examples:
+      - apps/api/src/billing/refunds.ts:88
+      - apps/api/src/billing/invoices.ts:121
+authority: maintainer_approved
+approved_by: "@repo-maintainer"
+approved_at: "2026-05-24T15:05:00Z"
+source_candidate: memcand_2026_05_24_domain_errors
+retrieval:
+  default: true
+  max_tokens: 120
+```
+
+V1 state path:
+
+```text
+candidate -> inbox/quarantine -> human decision -> active/archive
+```
+
+Future shadow-mode automation can score candidates, but the action remains advisory:
+
+```yaml
+graduation_recommendation:
+  action: approve_as_warning
+  model: gps-classifier-v0
+  confidence: 0.81
+  reasons:
+    - repeated developer correction
+    - consistent code examples
+    - path-scoped to billing
+```
+
+Demotion is also explicit:
 
 ```text
 active memory -> stale -> needs review -> archived or rewritten
 ```
 
-Promotion should require evidence. Demotion should happen when memories are contradicted, unused, or detached from code.
+Demotion triggers:
+
+- Anchor symbol deleted or uncertain after refactor.
+- Validating tests deleted or changed substantially.
+- New approved memory contradicts the active memory.
+- Human rejects the memory during review.
+- Production evidence contradicts the memory.
+- Owner lets a temporary memory expire.
+
+Demotion call:
+
+- GPS can mark memory `stale`, `conflicted`, or `needs_review`.
+- A human or code owner decides whether to reconfirm, edit, or archive it.
+- Agents should not receive stale or conflicted memory by default.
 
 ## Memory Query Language
 
@@ -720,6 +1014,59 @@ Symbol anchoring must survive renames. GPS needs a concrete story:
 
 Silent anchor breakage is a catastrophic failure mode. Uncertain reattachment should go to inbox.
 
+## Zep Comparison
+
+Zep is philosophically close to GPS at the reasoning layer because it treats memory as temporal knowledge, not just retrieved text. The important idea to borrow is not their buyer or deployment model. It is the ability to reconstruct what an agent knew at the time a decision was made.
+
+The difference in positioning:
+
+| Dimension | Zep | GPS |
+|---|---|---|
+| Buyer | App developers building memory into products | Developers using coding agents in repos |
+| Scope | Application/user memory | Repository/team/code memory |
+| Storage model | Temporal knowledge graph | Version-controlled `.gps/` files plus generated indexes |
+| Primary workflow | Product memory retrieval | Pre-edit context, PR review, team knowledge |
+| Trust surface | App-level memory policy | Code review, CODEOWNERS, committed diffs |
+| Debug question | What did the app know about this user? | What did the agent know about this code when it made this change? |
+
+The architectural lesson from Zep:
+
+- Memory should have temporal edges, not just current facts.
+- Retrieval should be able to answer "what was believed then?".
+- Facts should track provenance, supersession, and invalidation.
+- Decision records should cite the memory state that existed when the decision happened.
+
+GPS should model this in a repo-native way:
+
+```yaml
+id: decision_2026_05_24_refund_validation
+type: decision
+status: active
+decision: Validate refund amount before currency conversion.
+made_at: "2026-05-24T14:18:00Z"
+made_by: codex
+approved_by: "@billing-owner"
+memory_snapshot:
+  active:
+    - mem_2026_05_24_refund_threshold
+    - mem_2026_05_22_currency_zero_decimal
+  inbox:
+    - memcand_2026_05_24_domain_errors
+assumptions:
+  - id: assumption_001
+    text: JPY zero-decimal handling is implemented in CurrencyPolicy.
+    status: confirmed
+```
+
+This supports PR review questions like:
+
+- What active invariants were shown to the agent before it edited this symbol?
+- Which assumptions were unconfirmed at decision time?
+- Did the agent ignore an active memory?
+- Did a later memory invalidate the reasoning behind this change?
+
+GPS does not need to become a hosted temporal graph product to borrow this. The repo can store durable records as YAML/markdown, while generated indexes provide graph and time-travel queries.
+
 ## Suggested V1 Defaults
 
 For early trust:
@@ -732,6 +1079,7 @@ capture:
 activation:
   auto_activate: false
   approved_only: true
+  auto_graduation: false
 
 risk:
   dangerous: quarantine
@@ -754,6 +1102,11 @@ privacy:
 retrieval:
   include_low_confidence: false
   explainable: true
+
+graduation:
+  mode: human_review_only
+  shadow_recommendations: true
+  agents_can_approve: false
 ```
 
 ## Golden Path Demo
