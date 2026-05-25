@@ -418,6 +418,155 @@ Showing memory because:
 
 The user should always be able to ask why GPS injected a memory and what evidence supports it.
 
+## Passive Influence Auditing
+
+Approval does not make memory true forever. A bad invariant can be approved, sit in active memory, and steer several future sessions before anyone notices. GPS needs passive auditing of memory influence, not just up-front review.
+
+Every time active memory is injected, GPS should record a small influence event:
+
+```yaml
+id: influence_2026_05_25_0914_001
+session: sess_2026_05_25_0914
+memory_id: mem_2026_05_24_refund_threshold
+shown_at: "2026-05-25T09:16:03Z"
+shown_because:
+  paths:
+    - apps/api/src/refunds/create.ts
+  symbols:
+    - createRefund
+agent: codex
+task: "change refund approval flow for enterprise customers"
+agent_action:
+  touched_paths:
+    - apps/api/src/refunds/create.ts
+  cited_memory: true
+  followed_memory: likely
+outcome:
+  tests_run:
+    - tests/refunds/approval.test.ts
+  tests_passed: true
+  pr: 218
+audit_status: pending
+```
+
+This should not store raw chat by default. It should store enough metadata to reconstruct influence:
+
+- Which memory was shown.
+- Why it was shown.
+- Which session and agent saw it.
+- Which files and symbols were changed afterward.
+- Whether the agent cited, followed, ignored, or contradicted the memory.
+- Which tests or reviews later touched the same behavior.
+
+Then GPS can periodically surface an audit prompt:
+
+```text
+Memory audit: mem_2026_05_24_refund_threshold
+
+"Refunds over $1,000 require manager approval."
+
+This memory was active in 3 sessions:
+- PR #218 changed createRefund and followed this memory.
+- PR #221 changed RefundApprovalService and did not touch the threshold.
+- PR #224 changed enterprise refund approval and contradicted this memory.
+
+Does this memory still look correct?
+
+Actions:
+Reconfirm / Edit / Mark stale / Quarantine / Archive
+```
+
+Audit triggers:
+
+- A memory influenced N sessions or PRs.
+- A future diff appears to contradict the memory.
+- A reviewer comments on code that was changed after memory injection.
+- Tests tied to the memory fail or are edited.
+- A high-risk or dangerous memory is used for the first time.
+- Multiple agents use the same memory in different ways.
+- A memory has high influence but low recent human confirmation.
+
+This closes the trust hole where bad approved memory quietly poisons future context.
+
+## Influence Ledger
+
+Borrow from audit logs and model observability.
+
+GPS should maintain an influence ledger that is reviewable but compact:
+
+```text
+.gps/
+  audit/
+    influence/
+      2026-05-25.yml
+    memory/
+      mem_2026_05_24_refund_threshold.md
+```
+
+Memory-level audit view:
+
+```bash
+gps memory influence mem_2026_05_24_refund_threshold
+```
+
+Example output:
+
+```text
+Memory: Refunds over $1,000 require manager approval.
+Status: active
+Risk: high
+Approved by: @billing-owner on 2026-05-24
+
+Influence:
+- 3 sessions saw this memory
+- 2 PRs changed related code afterward
+- 1 contradiction candidate
+- 1 validating test edited
+
+Recommended action:
+Review before next injection.
+```
+
+Session-level audit view:
+
+```bash
+gps session influence sess_2026_05_25_0914
+```
+
+This answers:
+
+- What memories were active during this session?
+- Which ones were injected?
+- Which ones appear to have influenced the diff?
+- Which assumptions were made from memory rather than code?
+- Which memories should be rechecked during PR review?
+
+## Memory Rollback And Containment
+
+When a memory is discovered to be wrong, GPS needs a containment path.
+
+Actions:
+
+- Mark memory `quarantined` immediately.
+- Stop injecting it by default.
+- Show all sessions and PRs where it was active.
+- Create follow-up review tasks for affected PRs.
+- Add a rejected-memory tombstone so the same claim is not recaptured immediately.
+- Ask whether replacement memory should be created.
+
+Example tombstone:
+
+```yaml
+id: tombstone_2026_05_25_refund_threshold
+claim: Refunds over $1,000 require manager approval.
+reason: Incorrect for enterprise refunds; threshold differs by account tier.
+rejected_by: "@billing-owner"
+rejected_at: "2026-05-25T16:20:00Z"
+blocks_recapture_until: "2026-06-25"
+```
+
+Containment is especially important for approved invariants because they have higher authority and are more likely to steer agent behavior.
+
 ## Staleness Detection
 
 Borrow from dependency scanners and stale issue automation.
@@ -497,6 +646,8 @@ Borrow from package managers and infra CLIs.
 5 memories unused in 90 days
 2 dangerous memories quarantined
 4 memories missing provenance
+3 high-influence memories due for audit
+1 active memory with a contradiction candidate
 ```
 
 This gives teams confidence that the memory layer is maintained, not just accumulating junk.
@@ -720,6 +871,8 @@ Track how well each agent uses GPS:
 - Did it contradict injected memory?
 - Did it run recommended tests?
 - Did the user correct the same mistake again?
+- Which active memories most often influenced diffs?
+- Which memories were ignored, contradicted, or later rolled back?
 
 This helps teams debug whether failures are memory quality problems or agent behavior problems.
 
@@ -1107,6 +1260,13 @@ graduation:
   mode: human_review_only
   shadow_recommendations: true
   agents_can_approve: false
+
+auditing:
+  record_influence_events: true
+  raw_chat_capture: false
+  audit_after_influences: 3
+  audit_high_risk_first_use: true
+  quarantine_on_contradiction: true
 ```
 
 ## Golden Path Demo
