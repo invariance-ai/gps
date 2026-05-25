@@ -125,17 +125,21 @@ const SEV_RANK: Record<NoteSeverity, number> = { high: 0, medium: 1, low: 2 };
  * use a different file-per-target layout and `loadNotes` doesn't touch them).
  */
 export async function touchSurfacedNotes(root: string, notes: NoteT[]): Promise<void> {
-  if (notes.length === 0) return;
+  // Only symbol-scoped notes live in `fileFor(symbol)`. Scoped notes
+  // (file/feature/area) carry a path/dir in `.symbol` and would misroute to a
+  // spurious `.gps/notes/<dir>.yml` — skip them defensively.
+  const symbolOnly = notes.filter((n) => (n.scope ?? "symbol") === "symbol");
+  if (symbolOnly.length === 0) return;
   const now = new Date().toISOString();
   // Group by symbol so we only load each file once.
   const bySymbol = new Map<string, NoteT[]>();
-  for (const n of notes) {
+  for (const n of symbolOnly) {
     const arr = bySymbol.get(n.symbol) ?? [];
     arr.push(n);
     bySymbol.set(n.symbol, arr);
   }
   // Stamp in-place on the surfaced objects.
-  for (const n of notes) {
+  for (const n of symbolOnly) {
     (n as NoteT & { last_surfaced_at?: string }).last_surfaced_at = now;
   }
   // Persist each symbol file.

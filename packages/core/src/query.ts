@@ -15,7 +15,7 @@ import { testsForSymbol, testFilesIn, frameworkFor } from "./tests.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { logForFile, churn, isGitRepo } from "./git.js";
-import { loadNotes, rankNotes, filterExpiredNotes, touchSurfacedNotes } from "./notes.js";
+import { loadNotes, loadFileNotes, loadAreaNotes, rankNotes, filterExpiredNotes, touchSurfacedNotes } from "./notes.js";
 import { loadDecisions, rankDecisions, filterExpiredDecisions, touchSurfacedDecisions } from "./decisions.js";
 import { loadQuestions, filterByStatus } from "./questions.js";
 import { packByBudget, type PackSection } from "./budget.js";
@@ -33,6 +33,7 @@ interface ContextCaps {
   callers: number;
   callees: number;
   notes: number;
+  pathNotes: number;
   decisions: number;
   preferences: number;
   provenance: number;
@@ -43,6 +44,7 @@ const BRIEF_CAPS: ContextCaps = {
   callers: 5,
   callees: 5,
   notes: 1,
+  pathNotes: 2,
   decisions: 1,
   preferences: 1,
   provenance: 0,
@@ -53,6 +55,7 @@ const FULL_CAPS: ContextCaps = {
   callers: 25,
   callees: 25,
   notes: 5,
+  pathNotes: 5,
   decisions: 3,
   preferences: 5,
   provenance: 5,
@@ -112,6 +115,23 @@ export interface QueryContext {
 
 function symKey(s: SymbolRef): string {
   return s.id ?? s.qualified_name ?? s.name;
+}
+
+/**
+ * Repo-relative ancestor directories of a file, deepest first (excluding "."),
+ * so an area directive recorded on `src/` still covers `src/api/refunds.ts`.
+ * Each lookup that misses is a cheap empty read.
+ */
+function ancestorDirs(file: string): string[] {
+  const out: string[] = [];
+  let dir = path.dirname(file);
+  while (dir && dir !== "." && dir !== path.sep) {
+    out.push(dir);
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return out;
 }
 
 function buildLookups(index: GpsIndex): IndexLookups {
@@ -252,23 +272,39 @@ export async function getContext(
     : [];
   const notesAll = await loadNotes(ctx.root, sym.name);
   const decisionsAll = await loadDecisions(ctx.root, sym.name);
+  // Path-scoped memory: file notes for sym.file + area notes for every ancestor
+  // dir. Approved inbox directives land here (recordDirective → appendAreaNote),
+  // so they must surface independently of the symbol-note cap.
+  const fileNotesAll = await loadFileNotes(ctx.root, sym.file);
+  const areaNotesAll = (
+    await Promise.all(ancestorDirs(sym.file).map((d) => loadAreaNotes(ctx.root, d)))
+  ).flat();
   const since = args.since ? parseSince(args.since) : undefined;
   // Enforce expires_at: drop items whose expiry is in the past.
   const notesActive = filterExpiredNotes(notesAll);
   const decisionsActive = filterExpiredDecisions(decisionsAll);
+  const pathNotesActive = filterExpiredNotes([...fileNotesAll, ...areaNotesAll]);
   const notesFiltered = since
     ? notesActive.filter((n) => isAfter(n.recorded_at, since))
     : notesActive;
+  const pathNotesFiltered = since
+    ? pathNotesActive.filter((n) => isAfter(n.recorded_at, since))
+    : pathNotesActive;
   let decisionsFiltered = since
     ? decisionsActive.filter((d) => isAfter(d.recorded_at, since))
     : decisionsActive;
   if (args.authored_by) {
     decisionsFiltered = decisionsFiltered.filter((d) => d.made_by === args.authored_by);
   }
-  const notes = rankNotes(notesFiltered, caps.notes);
+  const symbolNotes = rankNotes(notesFiltered, caps.notes);
+  const pathNotes = rankNotes(pathNotesFiltered, caps.pathNotes);
+  // Directives are human-approved, higher signal — surface them first.
+  const notes = [...pathNotes, ...symbolNotes];
   const decisions = rankDecisions(decisionsFiltered, caps.decisions);
-  // Stamp last_surfaced_at on surfaced items (best-effort, never throws).
-  void touchSurfacedNotes(ctx.root, notes).catch(() => {});
+  // Stamp last_surfaced_at on surfaced items (best-effort, never throws). Only
+  // symbol-scoped notes — touchSurfacedNotes routes by `symbol`, and area/file
+  // notes carry a directory/path there (would misroute to .gps/notes/<dir>.yml).
+  void touchSurfacedNotes(ctx.root, symbolNotes).catch(() => {});
   void touchSurfacedDecisions(ctx.root, decisions).catch(() => {});
   const prefsAll = await loadPreferences(ctx.root);
   const preferences = rankPreferences(prefsAll, sym.name, sym.file, caps.preferences);
@@ -502,9 +538,25 @@ function formatPrepareEdit(
     }),
   });
 
+  // Path/area-scoped directives (approved inbox corrections) get their own
+  // prominent section; symbol notes stay in "Notes from previous edits".
+  const directiveNotes = c.notes.filter((n) => (n.scope ?? "symbol") !== "symbol");
+  const symbolNotes = c.notes.filter((n) => (n.scope ?? "symbol") === "symbol");
+
+  if (directiveNotes.length > 0) {
+    add("directives", {
+      heading: "## Directives for this path",
+      items: directiveNotes.map((n) => {
+        const loc = n.applies_to ?? n.symbol;
+        const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
+        return `- **[${n.scope}: \`${loc}\`]** ${n.lesson}${ev}`;
+      }),
+    });
+  }
+
   add("notes", {
     heading: "## Notes from previous edits",
-    items: c.notes.map((n) => {
+    items: symbolNotes.map((n) => {
       const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
       return `- **[${n.severity}]** ${n.lesson}${ev}`;
     }),

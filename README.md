@@ -59,7 +59,46 @@ Two independent axes:
 
 Defaults (`capture=auto`, `promote=never`) preserve current behavior, so existing setups are unaffected.
 
-Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`.
+Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`. Override the policy for a single run with `gps promote --auto=safe` (or `=never` / `=all`).
+
+## Demo: correction → review → reuse
+
+The full loop — an agent gets context, a developer's correction is captured for review, a human approves it, and the next session inherits it:
+
+```console
+# 1. Install with capture=inbox so corrections queue for review (nothing activates silently).
+$ npx -y @invariance/gps init
+$ npx -y @invariance/gps install claude --capture=inbox
+$ npx -y @invariance/gps index
+
+# 2. The agent prepares an edit and gets structure, tests, invariants, and risk.
+$ gps prepare createRefund --intent "add $5000 cap for non-enterprise"
+# prepare_edit: createRefund
+**Risk:** HIGH
+## Invariants that apply
+- **High-value refunds require approval** (block) — Refunds over 1000 require finance_approval_id.
+
+# 3. Mid-task the developer corrects the agent. The capture hook queues it (capture=inbox):
+#    "in apps/api, don't build error strings inline — use the errors module"
+$ gps inbox list
+1 item in inbox:
+
+3f9c1a2b8d7e (directive) in apps/api, don't build error strings inline — use the errors module
+
+Approve: `gps inbox approve <id>` · Reject: `gps inbox reject <id>` · Edit: `gps inbox edit <id> --text "…"`
+
+# 4. A human reviews and approves — the directive becomes an area-scoped note.
+$ gps inbox approve 3f9c1a2b8d7e
+approved 3f9c1a2b8d7e → area note (apps/api)
+
+# 5. Next session: any prepare for a symbol under apps/api now carries the directive.
+$ gps prepare refundEndpoint --intent "return a typed error on overflow"
+# prepare_edit: refundEndpoint
+## Directives for this path
+- **[area: `apps/api`]** in apps/api, don't build error strings inline — use the errors module
+```
+
+Captured once, approved once — and it now rides along on every edit in that directory, for every future agent and human. `--capture=auto` skips step 4 and activates corrections immediately; `inbox` is the reviewed path.
 
 ## The generated skill
 

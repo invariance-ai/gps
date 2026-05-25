@@ -1,13 +1,14 @@
 import type { Command } from "commander";
 import kleur from "kleur";
 import { autoPromote, findPromotionCandidates, loadPolicy } from "@invariance/gps-core";
+import { PromoteMode, type PromoteMode as PromoteModeT } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   min?: string;
   threshold?: string;
   json?: boolean;
-  auto?: boolean;
+  auto?: boolean | string;
   dryRun?: boolean;
 }
 
@@ -18,15 +19,30 @@ export function registerPromote(program: Command): void {
       .description(
         "Find clusters of similar un-promoted notes that should become invariants",
       )
-      .option("--auto", "Auto-promote per the configured policy (capture/promote in .gps/config.yml)")
+      .option(
+        "--auto [policy]",
+        "Auto-promote per configured policy; override for this run with --auto=safe|never|all",
+      )
       .option("--dry-run", "With --auto: show the promotion plan without writing")
       .option("--min <n>", "Minimum cluster size", "3")
       .option("--threshold <f>", "Jaccard similarity threshold (0-1)", "0.4")
       .option("--json", "Emit JSON"),
   ).action(async (symbol: string | undefined, opts: Opts) => {
     const root = resolveRoot(opts);
-    if (opts.auto) {
-      await runAuto(root, symbol, opts);
+    if (opts.auto !== undefined) {
+      let override: PromoteModeT | undefined;
+      if (typeof opts.auto === "string") {
+        const parsed = PromoteMode.safeParse(opts.auto);
+        if (!parsed.success) {
+          console.error(
+            kleur.red(`error: invalid --auto value '${opts.auto}' (expected: never|safe|all)`),
+          );
+          process.exitCode = 1;
+          return;
+        }
+        override = parsed.data;
+      }
+      await runAuto(root, symbol, opts, override);
       return;
     }
     if (!symbol) {
@@ -77,9 +93,10 @@ async function runAuto(
   root: string,
   symbol: string | undefined,
   opts: { json?: boolean; dryRun?: boolean },
+  override?: PromoteModeT,
 ): Promise<void> {
   try {
-    const { promote } = await loadPolicy(root);
+    const promote = override ?? (await loadPolicy(root)).promote;
     if (promote === "never") {
       if (opts.json) {
         console.log(JSON.stringify({ policy: "never", promoted: [], skipped_risk: [] }, null, 2));
