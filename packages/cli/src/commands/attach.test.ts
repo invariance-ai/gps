@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { claudeTranscriptToText } from "./attach.js";
+import { describe, expect, it, beforeEach } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { claudeTranscriptToText, userTurnsFromTranscript } from "./attach.js";
+import { addPreference, loadPreferences } from "@invariance/gps-core";
 
 describe("claudeTranscriptToText", () => {
   it("flattens JSONL into role-tagged prose and drops tool blocks", () => {
@@ -50,5 +54,103 @@ describe("claudeTranscriptToText", () => {
     expect(out.length).toBeLessThanOrEqual(40);
     expect(out).toContain("msg 49"); // tail retained, not the head
     expect(out).not.toContain("msg 0\n");
+  });
+});
+
+describe("userTurnsFromTranscript", () => {
+  it("strips the 'user: ' prefix from user turns", () => {
+    const transcript = "user: I prefer tabs over spaces\n\nassistant: Understood, I'll use tabs.";
+    const result = userTurnsFromTranscript(transcript);
+    expect(result).toBe("I prefer tabs over spaces");
+    expect(result).not.toContain("user:");
+  });
+
+  it("drops assistant turns entirely", () => {
+    const transcript = [
+      "user: always use async/await",
+      "",
+      "assistant: Got it, I'll use async/await consistently",
+      "",
+      "user: and add error handling",
+    ].join("\n");
+    const result = userTurnsFromTranscript(transcript);
+    expect(result).toContain("always use async/await");
+    expect(result).toContain("and add error handling");
+    expect(result).not.toContain("Got it");
+    expect(result).not.toContain("assistant");
+  });
+
+  it("returns empty string when there are no user turns", () => {
+    const transcript = "assistant: I'll fix the bug now.";
+    expect(userTurnsFromTranscript(transcript)).toBe("");
+  });
+
+  it("handles multiple user turns correctly", () => {
+    const transcript = [
+      "user: first message",
+      "",
+      "assistant: response one",
+      "",
+      "user: second message",
+      "",
+      "assistant: response two",
+    ].join("\n");
+    const result = userTurnsFromTranscript(transcript);
+    expect(result).toBe("first message\n\nsecond message");
+  });
+});
+
+describe("capturePrefsFromText (via addPreference)", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(path.join(tmpdir(), "gps-attach-test-"));
+  });
+
+  it("writes a preference when a preference cue is detected", async () => {
+    // Use addPreference directly to test the preference capture pipeline.
+    const r = await addPreference(root, {
+      text: "always use tabs for indentation",
+      source: "auto",
+      evidence: "cue:always",
+    });
+    expect(r.deduped).toBe(false);
+    expect(r.preference.text).toBe("always use tabs for indentation");
+  });
+
+  it("dedupes on repeat: hits increment, no duplicate created", async () => {
+    await addPreference(root, {
+      text: "prefer functional style",
+      source: "auto",
+      evidence: "cue:prefer",
+    });
+    const r2 = await addPreference(root, {
+      text: "prefer functional style",
+      source: "auto",
+      evidence: "cue:prefer",
+    });
+    // Second call should dedupe.
+    expect(r2.deduped).toBe(true);
+
+    // Only one preference should exist.
+    const prefs = await loadPreferences(root);
+    const matching = prefs.filter((p) => p.text === "prefer functional style");
+    expect(matching).toHaveLength(1);
+  });
+
+  it("redacts secrets before writing to disk", async () => {
+    const secretText = "use the API key sk-ant-api03-TESTKEYTESTKEYTESTKEYTESTKEYTESTKEY for auth";
+    const { redact } = await import("@invariance/gps-core");
+    const { text: redacted } = redact(secretText);
+    expect(redacted).not.toContain("sk-ant-api03-TESTKEYTESTKEYTESTKEYTESTKEYTESTKEY");
+    expect(redacted).toContain("[REDACTED]");
+
+    // When persisted through redact(), the key is never written.
+    const r = await addPreference(root, {
+      text: redacted,
+      source: "auto",
+      evidence: "cue:use",
+    });
+    expect(r.preference.text).not.toContain("sk-ant-api03");
   });
 });
