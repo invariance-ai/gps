@@ -1,7 +1,7 @@
 # Compare-All: django
 
 - Date: 2026-05-16T20:15:01.907Z
-- Corpus root: `/Users/hardiksingh/.cache/gps-bench/corpora/django`
+- Corpus root: `~/.cache/gps-bench/corpora/django`
 - Sample size: 8
 - Token estimation: chars / 4
 

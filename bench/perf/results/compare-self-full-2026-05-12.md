@@ -1,7 +1,7 @@
 # Compare-All: self
 
 - Date: 2026-05-12T21:00:24.660Z
-- Corpus root: `/Users/hardiksingh/CS/Projects/Invariance/gps/.claude/worktrees/gps-feature-observability`
+- Corpus root: `<repo>/.claude/worktrees/gps-feature-observability`
 - Sample size: 5
 - Token estimation: chars / 4
 
