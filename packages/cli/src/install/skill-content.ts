@@ -6,11 +6,30 @@
  *   - Codex CLI   → appended block in `AGENTS.md`
  *   - Cursor      → `.cursor/rules/gps.mdc`
  *
- * The shared body lives in SHARED_AGENT_BLOCK so a change to the gps CLI surface
- * only needs to be made once.
+ * The shared body lives in `sharedBlock()` so a change to the gps CLI surface
+ * only needs to be made once. Each surface supplies its own opening paragraph
+ * because the automatic-capture story differs per IDE: Claude Code has the full
+ * lifecycle-hook surface, Codex captures only at turn end, and Cursor has no
+ * hooks at all. Stating "hooks auto-fire" everywhere was inaccurate for Codex
+ * and self-contradictory for Cursor.
  */
 
-const SHARED_AGENT_BLOCK = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. Hooks auto-fire gps on session start, on prompts, before/after edits, and on failures — you usually don't need to call gps by hand.
+/** Claude Code: full lifecycle-hook surface fires gps automatically. */
+const CLAUDE_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. Hooks auto-fire gps on session start, on prompts, before/after edits, and on failures — you usually don't need to call gps by hand.`;
+
+/** Codex: a turn-end hook captures + distills; no pre-edit hook, index refreshes lazily. */
+const CODEX_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. A turn-end hook captures preferences/directives and distills the session automatically; there is no pre-edit hook, so the index refreshes when you call \`gps prepare\`. Run the loop below yourself before non-trivial edits.`;
+
+/** Cursor: no lifecycle hooks — the agent must run gps and capture memory explicitly. */
+const CURSOR_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. Cursor has no lifecycle hooks — run the loop below yourself before non-trivial edits, and capture preferences/directives via the MCP tools described at the bottom of this rule.`;
+
+/**
+ * The IDE-agnostic body. Capture sentences are phrased mechanism-neutrally
+ * ("via hook where supported, otherwise call the tool") so they stay true on
+ * every surface, including Cursor where nothing fires automatically.
+ */
+function sharedBlock(intro: string): string {
+  return `${intro}
 
 ## The 30-second loop
 
@@ -24,6 +43,8 @@ That loop catches the most expensive failure modes (re-implementing something, b
 
 **Before editing a non-trivial symbol, call the MCP tool \`prepare_edit\` first** (it's exposed as \`mcp__gps__prepare_edit\` in Claude Code, or just \`prepare_edit\` in Cursor/Codex). The brief it returns — invariants, callers, tests, prior decisions — is what gps exists for; relying on Glob/Read/Grep alone is what dogfood measured as the +28% output / no quality-win path. Treat \`prepare_edit\` like a code-search call you make *before* exploration, not after.
 
+The MCP tool and the CLI \`gps prepare\` return the **same** brief — pick one, never both: use the MCP tool when your agent exposes it (Claude Code), and the CLI inside Bash otherwise. The only reason to prefer MCP is fewer round-trips, not different data.
+
 Useful manual calls:
 
 \`\`\`bash
@@ -36,7 +57,7 @@ gps prepare <symbol> --intent "<…>"   # same, with explicit symbol
 gps brief                             # pre-finalize: changed symbols, invariants, notes, tests, no-test warnings
 \`\`\`
 
-When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), the capture-preference hook records it automatically. Treat \`gps preferences\` output as soft constraints in every session.
+When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), gps records it for you — automatically via hook in agents that support them, otherwise call the MCP tool \`record_preference\` (or \`gps prefer "<rule>"\`). Treat \`gps preferences\` output as soft constraints in every session.
 
 When you learn something the next agent should know, persist it:
 \`\`\`bash
@@ -51,17 +72,26 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 
 **Tag the session early.** When you understand what the user is working on (e.g. "the homepage", "the auth flow"), call \`gps feature use <short-kebab-label>\` once. Use the exact label if the user names a known feature; otherwise pick a short kebab-case label. gps then learns which symbols belong to that feature and surfaces them automatically on future sessions that mention the same label.
 
-**Location-scoped directives.** When the user gives an instruction tied to a *place* rather than a symbol — "don't do X here", "always Y in this folder", "in the home page, avoid Z" — call the MCP tool \`record_directive\` (or \`gps directive add "<text>"\`). gps resolves "here"/"this" to the active area (a directory) and stores it as an \`area\`-scoped note that resurfaces whenever you grep/read/edit files in that directory. The capture-directive hook also picks these up automatically from prompts, but calling \`record_directive\` yourself is more precise. Pass \`area\` or \`alias\` to target a specific location.
+**Location-scoped directives.** When the user gives an instruction tied to a *place* rather than a symbol — "don't do X here", "always Y in this folder", "in the home page, avoid Z" — call the MCP tool \`record_directive\` (or \`gps directive add "<text>"\`). gps resolves "here"/"this" to the active area (a directory) and stores it as an \`area\`-scoped note that resurfaces whenever you grep/read/edit files in that directory. In agents with hooks, the capture-directive hook also picks these up from prompts; either way, calling \`record_directive\` yourself is more precise. Pass \`area\` or \`alias\` to target a specific location.
 
 **Aliases tie names to locations.** A human name like "home" can be bound to a directory and a linked feature with \`gps alias set home --file src/pages/home.tsx --feature homepage\` (gps also auto-learns this binding when you edit files after \`gps feature use\`). Once bound, mentioning "home" in a prompt surfaces that directory's directives *and* the linked feature's notes.`;
+}
 
-/** Block appended to CLAUDE.md / AGENTS.md, bracketed by start/end markers. */
-export const AGENT_INSTRUCTIONS = `<!-- gps:start -->
+/** Wrap a body in the managed CLAUDE.md / AGENTS.md block markers. */
+function wrapAgentBlock(body: string): string {
+  return `<!-- gps:start -->
 ## gps
 
-${SHARED_AGENT_BLOCK}
+${body}
 <!-- gps:end -->
 `;
+}
+
+/** Block appended to CLAUDE.md (Claude Code). */
+export const CLAUDE_AGENT_INSTRUCTIONS = wrapAgentBlock(sharedBlock(CLAUDE_INTRO));
+
+/** Block appended to AGENTS.md (Codex CLI). */
+export const CODEX_AGENT_INSTRUCTIONS = wrapAgentBlock(sharedBlock(CODEX_INTRO));
 
 /** Standalone Claude Code skill written to `.claude/skills/gps/SKILL.md`. */
 export const CLAUDE_SKILL = `---
@@ -156,7 +186,7 @@ alwaysApply: true
 
 # gps
 
-${SHARED_AGENT_BLOCK}
+${sharedBlock(CURSOR_INTRO)}
 
 ## When to reach for gps in Cursor
 

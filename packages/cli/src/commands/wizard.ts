@@ -209,7 +209,7 @@ export function registerWizard(program: Command): void {
       if (wantClaude || wantCodex) {
         console.log(
           kleur.dim(
-            "Agents will now auto-fire gps on session start, before edits, after edits, and on failures.",
+            "Agents will now run gps automatically on session start, around edits, and on failures.",
           ),
         );
       }

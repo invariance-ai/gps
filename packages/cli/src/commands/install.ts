@@ -6,7 +6,12 @@ import kleur from "kleur";
 import { writePolicy } from "@invariance/gps-core";
 import { GpsPolicy } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
-import { AGENT_INSTRUCTIONS, CLAUDE_SKILL, CURSOR_RULE } from "../install/skill-content.js";
+import {
+  CLAUDE_AGENT_INSTRUCTIONS,
+  CLAUDE_SKILL,
+  CODEX_AGENT_INSTRUCTIONS,
+  CURSOR_RULE,
+} from "../install/skill-content.js";
 
 interface PolicyOpts {
   capture?: string;
@@ -301,7 +306,7 @@ export async function runInstallClaude(root: string, opts: RunInstallClaudeOpts)
     await writeManagedFile(root, file, content, opts.force);
   }
   await upsertClaudeMcp(root, opts.spec);
-  if (!opts.skipClaudeMd) await upsertAgentMd(root, "CLAUDE.md");
+  if (!opts.skipClaudeMd) await upsertAgentMd(root, "CLAUDE.md", CLAUDE_AGENT_INSTRUCTIONS);
 }
 
 export interface RunInstallCodexOpts {
@@ -311,7 +316,7 @@ export interface RunInstallCodexOpts {
 }
 
 export async function runInstallCodex(root: string, opts: RunInstallCodexOpts): Promise<void> {
-  if (!opts.skipAgentsMd) await upsertAgentMd(root, "AGENTS.md");
+  if (!opts.skipAgentsMd) await upsertAgentMd(root, "AGENTS.md", CODEX_AGENT_INSTRUCTIONS);
   await upsertCodexConfig(root, opts.spec);
 }
 
@@ -358,7 +363,7 @@ async function writeManagedFile(
   console.log(kleur.green(`wrote   ${path.relative(root, file)}`));
 }
 
-async function upsertAgentMd(root: string, filename: string): Promise<void> {
+async function upsertAgentMd(root: string, filename: string, block: string): Promise<void> {
   const file = path.join(root, filename);
   let existing = "";
   try {
@@ -367,8 +372,8 @@ async function upsertAgentMd(root: string, filename: string): Promise<void> {
     // create below
   }
   const next = existing.includes("<!-- gps:start -->")
-    ? existing.replace(/<!-- gps:start -->[\s\S]*?<!-- gps:end -->\n?/m, AGENT_INSTRUCTIONS)
-    : `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${AGENT_INSTRUCTIONS}`;
+    ? existing.replace(/<!-- gps:start -->[\s\S]*?<!-- gps:end -->\n?/m, block)
+    : `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${block}`;
   if (DRY_RUN) {
     const verb = existing.includes("<!-- gps:start -->") ? "would refresh gps block in" : existing ? "would append gps block to" : "would create";
     console.log(kleur.yellow(`${verb}  `) + path.relative(root, file));
