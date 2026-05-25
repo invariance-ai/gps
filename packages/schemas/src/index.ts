@@ -227,6 +227,70 @@ export const Preference = z.object({
 });
 export type Preference = z.infer<typeof Preference>;
 
+/* ---------- Capture & promotion policy (v0.5) ---------- */
+
+/**
+ * Where freshly captured memory lands.
+ *   auto  — persisted live immediately (the always-on default; non-breaking).
+ *   inbox — queued for human review; nothing activates until `gps inbox approve`.
+ */
+export const CaptureMode = z.enum(["inbox", "auto"]);
+export type CaptureMode = z.infer<typeof CaptureMode>;
+
+/**
+ * Whether recurring note clusters auto-graduate into invariants.
+ *   never — manual only (`gps promote <symbol>`); current behavior.
+ *   safe  — auto-promote, EXCEPT clusters touching require_approval_for risk
+ *           topics (auth/payments/security/…), which still need a human.
+ *   all   — auto-promote everything that clusters. Visibly dangerous: bypasses
+ *           the risk gate. Opt-in only.
+ */
+export const PromoteMode = z.enum(["never", "safe", "all"]);
+export type PromoteMode = z.infer<typeof PromoteMode>;
+
+/**
+ * The governance policy persisted to `.gps/config.yml` by `gps install`.
+ * Defaults are baked in here so this schema is the single source of truth:
+ * `GpsPolicy.parse({})` yields the locked defaults (auto / never).
+ */
+export const GpsPolicy = z.object({
+  capture: CaptureMode.default("auto"),
+  promote: PromoteMode.default("never"),
+});
+export type GpsPolicy = z.infer<typeof GpsPolicy>;
+
+/**
+ * An item queued in `.gps/inbox.yml` when `capture=inbox`. It captures the same
+ * payload the always-on path would persist, but holds it for human review.
+ * Approving an item runs the real persist (preference → preferences.yml,
+ * directive → area note); rejected/approved items stay for an audit trail.
+ */
+export const InboxItemKind = z.enum(["preference", "directive"]);
+export type InboxItemKind = z.infer<typeof InboxItemKind>;
+
+export const InboxItemStatus = z.enum(["pending", "approved", "rejected"]);
+export type InboxItemStatus = z.infer<typeof InboxItemStatus>;
+
+export const InboxItem = z.object({
+  /** sha1(kind + normalized text), 12 chars. Stable across edits. */
+  id: z.string(),
+  kind: InboxItemKind,
+  text: z.string(),
+  status: InboxItemStatus.default("pending"),
+  captured_at: z.string(),
+  /** Provenance of the capture, e.g. "cue:always" or "auto". */
+  source: z.string().default("auto"),
+  /** Risk topics matched at capture time (drives the red review marker). */
+  risk_topics: z.array(z.string()).default([]),
+  /** directive-only: polarity carried so approve can re-run the real persist. */
+  polarity: z.enum(["do", "dont"]).optional(),
+  /** directive-only: the resolved area (directory) the directive applies to. */
+  area: z.string().optional(),
+  /** preference-only: evidence string. */
+  evidence: z.string().optional(),
+});
+export type InboxItem = z.infer<typeof InboxItem>;
+
 /* ---------- Features (v0.4) ---------- */
 
 export const FeatureSymbol = z.object({

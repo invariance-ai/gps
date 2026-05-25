@@ -3,10 +3,17 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import kleur from "kleur";
+import { writePolicy } from "@invariance/gps-core";
+import { GpsPolicy } from "@invariance/gps-schemas";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 import { AGENT_INSTRUCTIONS, CLAUDE_SKILL, CURSOR_RULE } from "../install/skill-content.js";
 
-interface InstallOpts extends RootOption {
+interface PolicyOpts {
+  capture?: string;
+  promote?: string;
+}
+
+interface InstallOpts extends RootOption, PolicyOpts {
   force?: boolean;
   skipClaudeMd?: boolean;
   useGlobal?: boolean;
@@ -14,7 +21,7 @@ interface InstallOpts extends RootOption {
   dryRun?: boolean;
 }
 
-interface CodexInstallOpts extends RootOption {
+interface CodexInstallOpts extends RootOption, PolicyOpts {
   force?: boolean;
   skipAgentsMd?: boolean;
   useGlobal?: boolean;
@@ -22,7 +29,7 @@ interface CodexInstallOpts extends RootOption {
   dryRun?: boolean;
 }
 
-interface CursorInstallOpts extends RootOption {
+interface CursorInstallOpts extends RootOption, PolicyOpts {
   force?: boolean;
   skipMcp?: boolean;
   useGlobal?: boolean;
@@ -102,28 +109,104 @@ export function resolveCmd(opts: { useGlobal?: boolean; useLocal?: boolean }): C
   };
 }
 
+const CAPTURE_MODES = ["inbox", "auto"] as const;
+const PROMOTE_MODES = ["never", "safe", "all"] as const;
+
+/**
+ * Validate the governance flags and resolve them into a policy.
+ * Pure + exported so it can be unit-tested without Commander.
+ *
+ * - capture defaults to "auto" (preserve current always-on behavior).
+ * - promote defaults to "never" (manual promotion only).
+ * - --promote is only meaningful with --capture=auto: an inbox already gates
+ *   activation behind human review, so auto-graduation there is contradictory.
+ */
+export function resolvePolicy(opts: PolicyOpts): GpsPolicy {
+  const capture = opts.capture ?? "auto";
+  const promote = opts.promote ?? "never";
+  if (!CAPTURE_MODES.includes(capture as (typeof CAPTURE_MODES)[number])) {
+    throw new Error(`invalid --capture "${capture}" (expected: ${CAPTURE_MODES.join(" | ")})`);
+  }
+  if (!PROMOTE_MODES.includes(promote as (typeof PROMOTE_MODES)[number])) {
+    throw new Error(`invalid --promote "${promote}" (expected: ${PROMOTE_MODES.join(" | ")})`);
+  }
+  if (opts.promote !== undefined && capture !== "auto") {
+    throw new Error("--promote requires --capture=auto (an inbox already gates activation)");
+  }
+  return GpsPolicy.parse({ capture, promote });
+}
+
+/** Add the shared --capture / --promote options to an install subcommand. */
+function addPolicyOptions(cmd: Command): Command {
+  return cmd
+    .option("--capture <mode>", "Capture mode: inbox | auto (default: auto)")
+    .option(
+      "--promote <mode>",
+      "Auto-promotion: never | safe | all (default: never; requires --capture=auto)",
+    );
+}
+
+/**
+ * Persist the resolved policy to .gps/config.yml. Honors DRY_RUN and prints a
+ * loud, unmissable warning when auto-promotion is set to "all" — that bypasses
+ * the risk gate and writes invariants with zero human review.
+ */
+async function persistPolicy(root: string, policy: GpsPolicy): Promise<void> {
+  if (policy.promote === "all") {
+    console.log("");
+    console.log(
+      kleur.bgRed().white().bold(" DANGER ") +
+        " " +
+        kleur.red("--promote=all auto-writes EVERY recurring lesson into invariants.yml"),
+    );
+    console.log(
+      kleur.red(
+        "  with no human review — including auth, payments, and security rules. It bypasses",
+      ),
+    );
+    console.log(
+      kleur.red("  the risk gate entirely. Use --promote=safe unless you really mean this."),
+    );
+  }
+  if (DRY_RUN) {
+    console.log(
+      kleur.yellow(`would write policy  `) +
+        `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote})`,
+    );
+    return;
+  }
+  await writePolicy(root, policy);
+  console.log(
+    kleur.green(`wrote   `) + `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote})`,
+  );
+}
+
 export function registerInstall(program: Command): void {
   const install = program.command("install").description("Install gps agent integrations");
 
   addRootOption(
-    install
-      .command("claude")
-      .description("Install Claude Code CLI-first instructions, skill, and hooks")
-      .option("--force", "Overwrite existing gps-managed Claude files")
-      .option("--skip-claude-md", "Do not append gps instructions to CLAUDE.md")
-      .option("--use-global", "Generate hooks that call `gps` directly (requires global install)")
-      .option("--use-local", "Generate hooks that call this CLI by absolute path (for dogfood/dev)")
-      .option("--dry-run", "Show what would be written without touching disk"),
+    addPolicyOptions(
+      install
+        .command("claude")
+        .description("Install Claude Code CLI-first instructions, skill, and hooks")
+        .option("--force", "Overwrite existing gps-managed Claude files")
+        .option("--skip-claude-md", "Do not append gps instructions to CLAUDE.md")
+        .option("--use-global", "Generate hooks that call `gps` directly (requires global install)")
+        .option("--use-local", "Generate hooks that call this CLI by absolute path (for dogfood/dev)")
+        .option("--dry-run", "Show what would be written without touching disk"),
+    ),
   ).action(async (opts: InstallOpts) => {
     const root = resolveRoot(opts);
     DRY_RUN = !!opts.dryRun;
     try {
+      const policy = resolvePolicy(opts);
       const spec = resolveCmd(opts);
       await runInstallClaude(root, {
         force: !!opts.force,
         skipClaudeMd: !!opts.skipClaudeMd,
         spec,
       });
+      await persistPolicy(root, policy);
       console.log("");
       console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Claude Code CLI-first gps integration");
       console.log(kleur.dim(`Hooks call: ${spec.shell}`));
@@ -136,24 +219,28 @@ export function registerInstall(program: Command): void {
   });
 
   addRootOption(
-    install
-      .command("codex")
-      .description("Install Codex CLI integration: AGENTS.md, .codex/config.toml notify + MCP")
-      .option("--force", "Overwrite existing gps-managed Codex files")
-      .option("--skip-agents-md", "Do not append gps instructions to AGENTS.md")
-      .option("--use-global", "Configure Codex to call `gps` directly (requires global install)")
-      .option("--use-local", "Configure Codex to call this CLI by absolute path (for dogfood/dev)")
-      .option("--dry-run", "Show what would be written without touching disk"),
+    addPolicyOptions(
+      install
+        .command("codex")
+        .description("Install Codex CLI integration: AGENTS.md, .codex/config.toml notify + MCP")
+        .option("--force", "Overwrite existing gps-managed Codex files")
+        .option("--skip-agents-md", "Do not append gps instructions to AGENTS.md")
+        .option("--use-global", "Configure Codex to call `gps` directly (requires global install)")
+        .option("--use-local", "Configure Codex to call this CLI by absolute path (for dogfood/dev)")
+        .option("--dry-run", "Show what would be written without touching disk"),
+    ),
   ).action(async (opts: CodexInstallOpts) => {
     const root = resolveRoot(opts);
     DRY_RUN = !!opts.dryRun;
     try {
+      const policy = resolvePolicy(opts);
       const spec = resolveCmd(opts);
       await runInstallCodex(root, {
         force: !!opts.force,
         skipAgentsMd: !!opts.skipAgentsMd,
         spec,
       });
+      await persistPolicy(root, policy);
       console.log("");
       console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Codex CLI gps integration");
       console.log(kleur.dim(`Notify hook + MCP server use: ${spec.shell}`));
@@ -164,24 +251,28 @@ export function registerInstall(program: Command): void {
   });
 
   addRootOption(
-    install
-      .command("cursor")
-      .description("Install Cursor integration: .cursor/rules/gps.mdc + .cursor/mcp.json")
-      .option("--force", "Overwrite existing gps-managed Cursor files")
-      .option("--skip-mcp", "Do not write .cursor/mcp.json (rule file only)")
-      .option("--use-global", "Configure MCP to call `gps` directly (requires global install)")
-      .option("--use-local", "Configure MCP to call this CLI by absolute path (for dogfood/dev)")
-      .option("--dry-run", "Show what would be written without touching disk"),
+    addPolicyOptions(
+      install
+        .command("cursor")
+        .description("Install Cursor integration: .cursor/rules/gps.mdc + .cursor/mcp.json")
+        .option("--force", "Overwrite existing gps-managed Cursor files")
+        .option("--skip-mcp", "Do not write .cursor/mcp.json (rule file only)")
+        .option("--use-global", "Configure MCP to call `gps` directly (requires global install)")
+        .option("--use-local", "Configure MCP to call this CLI by absolute path (for dogfood/dev)")
+        .option("--dry-run", "Show what would be written without touching disk"),
+    ),
   ).action(async (opts: CursorInstallOpts) => {
     const root = resolveRoot(opts);
     DRY_RUN = !!opts.dryRun;
     try {
+      const policy = resolvePolicy(opts);
       const spec = resolveCmd(opts);
       await runInstallCursor(root, {
         force: !!opts.force,
         skipMcp: !!opts.skipMcp,
         spec,
       });
+      await persistPolicy(root, policy);
       console.log("");
       console.log((DRY_RUN ? kleur.yellow("dry-run") : kleur.green("installed")) + " Cursor gps integration");
       console.log(kleur.dim(`MCP server uses: ${spec.shell}`));

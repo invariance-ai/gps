@@ -1,5 +1,11 @@
 import type { Command } from "commander";
-import { extractDirectives, recordDirective, resolveActiveArea } from "@invariance/gps-core";
+import {
+  addToInbox,
+  extractDirectives,
+  loadPolicy,
+  recordDirective,
+  resolveActiveArea,
+} from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
@@ -64,6 +70,36 @@ export function registerCaptureDirective(program: Command): void {
             "<!-- /gps:captured-directive -->",
           ].join("\n"),
         );
+      }
+      return;
+    }
+
+    // capture=inbox → queue for review instead of persisting the area note.
+    const { capture } = await loadPolicy(root);
+    if (capture === "inbox") {
+      const queued = [];
+      for (const d of directives) {
+        const r = await addToInbox(root, {
+          kind: "directive",
+          text: d.text,
+          polarity: d.polarity,
+          area,
+        });
+        if (!r.deduped) queued.push(r.item);
+      }
+      if (opts.json) {
+        console.log(JSON.stringify({ queued }, null, 2));
+        return;
+      }
+      if (opts.emit && queued.length > 0) {
+        const lines = ["<!-- gps:captured-directive -->"];
+        lines.push(
+          `gps queued ${queued.length} directive${queued.length === 1 ? "" : "s"} for area \`${area}\` to the inbox:`,
+        );
+        for (const q of queued) lines.push(`- [${q.polarity}] ${q.text}`);
+        lines.push("Run `gps inbox` to review, then `gps inbox approve <id>`.");
+        lines.push("<!-- /gps:captured-directive -->");
+        console.log(lines.join("\n"));
       }
       return;
     }

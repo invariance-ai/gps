@@ -4,10 +4,11 @@ Everything gps writes lives under `.gps/` in your repo. Commit what you want to 
 
 ```
 .gps/
-├── config.yml              # languages, exclusions, depth, strands       ✅ commit
+├── config.yml              # languages, exclusions, depth, strands, policy ✅ commit
 ├── invariants.yml          # author-defined rules                        ✅ commit
 ├── index.json              # symbol graph (regenerated)                  ❌ gitignore
 ├── preferences.json        # captured user preferences                   ✅ commit
+├── inbox.yml               # captured memory awaiting review (capture=inbox) ✅ commit
 ├── observations.json       # per-symbol query counts (opt-in)            ❌ gitignore
 ├── features.json           # feature → symbols attribution               ✅ commit
 ├── notes/
@@ -29,9 +30,15 @@ strands:
   - tests
   - provenance
   - invariants
+capture: auto      # auto (persist live) | inbox (queue for review)
+promote: never     # never | safe | all — auto-graduation of note clusters
 ```
 
-JSON Schema: [`packages/schemas/json/config.schema.json`](../../packages/schemas/json/config.schema.json).
+`capture` and `promote` are written by `gps install --capture=… --promote=…`. See [Capture & promotion policy](../../README.md#capture--promotion-policy). JSON Schema: [`packages/schemas/json/config.schema.json`](../../packages/schemas/json/config.schema.json).
+
+## inbox.yml
+
+Present only when you installed with `--capture=inbox`. A flat review queue: each captured preference/directive lands here as `pending` instead of activating. Review with `gps inbox`, then `gps inbox approve <id>` (persists it to live memory), `gps inbox reject <id>`, or `gps inbox edit <id> --text "…"`. Items touching a risk topic (auth, payments, …) are flagged. Approved/rejected items stay in the file as an audit trail.
 
 ## invariants.yml
 

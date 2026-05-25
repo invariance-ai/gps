@@ -90,6 +90,29 @@ export async function appendNote(
   return { note, file: path.relative(root, file) };
 }
 
+/**
+ * Flip `promoted=true` on a symbol's notes whose lesson is in `lessons`. Matches
+ * by lesson text, so it also handles legacy notes that lack a stable `id` (which
+ * `updateNoteById` can't reach). Returns how many notes were flipped.
+ */
+export async function markSymbolNotesPromoted(
+  root: string,
+  symbol: string,
+  lessons: Set<string>,
+): Promise<number> {
+  const existing = await loadNotes(root, symbol);
+  let changed = 0;
+  const next = existing.map((n) => {
+    if (!n.promoted && lessons.has(n.lesson)) {
+      changed++;
+      return { ...n, promoted: true };
+    }
+    return n;
+  });
+  if (changed > 0) await writeFile(fileFor(root, symbol), stringifyYaml(next));
+  return changed;
+}
+
 const SEV_RANK: Record<NoteSeverity, number> = { high: 0, medium: 1, low: 2 };
 
 /**

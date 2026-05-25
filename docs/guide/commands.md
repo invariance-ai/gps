@@ -130,7 +130,7 @@ attach [options]
 
 **Options:**
 
-- `--transcript <path>` — Path to the conversation transcript file
+- `--transcript <path>` — Path to the conversation transcript file (use - for stdin)
 - `--hook-stdin` — Claude Code Stop-hook mode: read the hook JSON from stdin, resolve transcript_path, and auto-persist (never fails)
 - `--session <id>` — Logical session/PR/conversation ID to tag decisions with *(default: "transcript")*
 - `--symbol <name>` — Constrain extraction to these symbols; repeatable *(default: [])*
@@ -140,6 +140,7 @@ attach [options]
 - `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
 - `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
 - `--json` — Emit JSON
+- `--capture-prefs` — Also extract preferences and directives from user turns of the transcript
 - `--root <path>` — Repo root (default: cwd)
 
 ## `audit`
@@ -721,6 +722,66 @@ impact [options] [symbol]
 - `--base <ref>` — Diff base (default HEAD) *(default: "HEAD")*
 - `--root <path>` — Repo root (default: cwd)
 
+## `inbox`
+
+Review memory captured under --capture=inbox before it activates
+
+```
+inbox [options] [command]
+```
+
+### `inbox list`
+
+List inbox items (pending by default)
+
+```
+inbox list [options]
+```
+
+**Options:**
+
+- `--all` — Include approved and rejected items
+- `--risk <topic>` — Only items touching the given risk topic
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `inbox approve`
+
+Approve an item → persist it to live memory
+
+```
+inbox approve [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
+### `inbox reject`
+
+Reject an item (kept for the audit trail)
+
+```
+inbox reject [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
+### `inbox edit`
+
+Rewrite a pending item's text before approving
+
+```
+inbox edit [options] <id>
+```
+
+**Options:**
+
+- `--text <t>` — New text for the item
+- `--root <path>` — Repo root (default: cwd)
+
 ## `index`
 
 Scan repo, build symbol graph, write .gps/index/symbols.json
@@ -771,6 +832,8 @@ install claude [options]
 - `--use-global` — Generate hooks that call `gps` directly (requires global install)
 - `--use-local` — Generate hooks that call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
+- `--capture <mode>` — Capture mode: inbox | auto (default: auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install codex`
@@ -788,6 +851,8 @@ install codex [options]
 - `--use-global` — Configure Codex to call `gps` directly (requires global install)
 - `--use-local` — Configure Codex to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
+- `--capture <mode>` — Capture mode: inbox | auto (default: auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install cursor`
@@ -805,6 +870,8 @@ install cursor [options]
 - `--use-global` — Configure MCP to call `gps` directly (requires global install)
 - `--use-local` — Configure MCP to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
+- `--capture <mode>` — Capture mode: inbox | auto (default: auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
 - `--root <path>` — Repo root (default: cwd)
 
 ## `invariant`
@@ -1067,14 +1134,31 @@ prepare [options] [symbol]
 Find clusters of similar un-promoted notes that should become invariants
 
 ```
-promote [options] <symbol>
+promote [options] [symbol]
 ```
 
 **Options:**
 
+- `--auto` — Auto-promote per the configured policy (capture/promote in .gps/config.yml)
+- `--dry-run` — With --auto: show the promotion plan without writing
 - `--min <n>` — Minimum cluster size *(default: "3")*
 - `--threshold <f>` — Jaccard similarity threshold (0-1) *(default: "0.4")*
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `prune`
+
+Remove stale notes that have not been surfaced for --days days (default 90). Notes that are promoted, high-severity, or from trusted sources (human/doc/incident/pr) are never removed. Use --dry-run to preview without writing.
+
+```
+prune [options]
+```
+
+**Options:**
+
+- `--days <n>` — Staleness threshold in days (default: 90) *(default: "90")*
+- `--dry-run` — Preview removals without writing changes
+- `--json` — Emit JSON output
 - `--root <path>` — Repo root (default: cwd)
 
 ## `pulse`
@@ -1138,6 +1222,19 @@ record-failure [options]
 - `--kind <kind>` — test|typecheck|lint|bash|other *(default: "other")*
 - `--message <m>` — Short failure message (or pipe via stdin)
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `resume`
+
+"Where was I?" — surface TODOs, open questions, and recent decisions for files in the current git diff. Prints a concise markdown brief by default.
+
+```
+resume [options]
+```
+
+**Options:**
+
+- `--json` — Emit structured JSON instead of markdown
 - `--root <path>` — Repo root (default: cwd)
 
 ## `review-diff`

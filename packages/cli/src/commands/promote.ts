@@ -1,26 +1,39 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { findPromotionCandidates } from "@invariance/gps-core";
+import { autoPromote, findPromotionCandidates, loadPolicy } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   min?: string;
   threshold?: string;
   json?: boolean;
+  auto?: boolean;
+  dryRun?: boolean;
 }
 
 export function registerPromote(program: Command): void {
   addRootOption(
     program
-      .command("promote <symbol>")
+      .command("promote [symbol]")
       .description(
         "Find clusters of similar un-promoted notes that should become invariants",
       )
+      .option("--auto", "Auto-promote per the configured policy (capture/promote in .gps/config.yml)")
+      .option("--dry-run", "With --auto: show the promotion plan without writing")
       .option("--min <n>", "Minimum cluster size", "3")
       .option("--threshold <f>", "Jaccard similarity threshold (0-1)", "0.4")
       .option("--json", "Emit JSON"),
-  ).action(async (symbol: string, opts: Opts) => {
+  ).action(async (symbol: string | undefined, opts: Opts) => {
     const root = resolveRoot(opts);
+    if (opts.auto) {
+      await runAuto(root, symbol, opts);
+      return;
+    }
+    if (!symbol) {
+      console.error(kleur.red("error: missing required argument 'symbol' (or pass --auto)"));
+      process.exitCode = 1;
+      return;
+    }
     try {
       const min = Number.parseInt(opts.min ?? "3", 10);
       const threshold = Number.parseFloat(opts.threshold ?? "0.4");
@@ -58,4 +71,54 @@ export function registerPromote(program: Command): void {
       process.exitCode = 1;
     }
   });
+}
+
+async function runAuto(
+  root: string,
+  symbol: string | undefined,
+  opts: { json?: boolean; dryRun?: boolean },
+): Promise<void> {
+  try {
+    const { promote } = await loadPolicy(root);
+    if (promote === "never") {
+      if (opts.json) {
+        console.log(JSON.stringify({ policy: "never", promoted: [], skipped_risk: [] }, null, 2));
+        return;
+      }
+      console.log(
+        kleur.dim(
+          "auto-promotion is disabled (promote=never). Enable it with `gps install <agent> --capture=auto --promote=safe` (or =all).",
+        ),
+      );
+      return;
+    }
+    const res = await autoPromote(root, promote, {
+      symbols: symbol ? [symbol] : undefined,
+      dryRun: opts.dryRun,
+    });
+    if (opts.json) {
+      console.log(JSON.stringify(res, null, 2));
+      return;
+    }
+    const verb = opts.dryRun ? "would promote" : "promoted";
+    if (res.promoted.length === 0 && res.skipped_risk.length === 0) {
+      console.log(kleur.dim(`no promotion candidates (policy=${promote})`));
+      return;
+    }
+    for (const p of res.promoted) {
+      console.log(
+        kleur.green(`${verb}`) +
+          ` ${kleur.cyan(p.invariant.rule)} ${kleur.dim(`(${p.from_notes} notes → invariant "${p.invariant.name}", severity ${p.invariant.severity})`)}`,
+      );
+    }
+    for (const s of res.skipped_risk) {
+      console.log(
+        kleur.yellow(`skipped`) +
+          ` ${s.representative_lesson} ${kleur.dim(`— touches: ${s.topics.join(", ")} (needs human review)`)}`,
+      );
+    }
+  } catch (e) {
+    console.error(kleur.red(`error: ${(e as Error).message}`));
+    process.exitCode = 1;
+  }
 }
