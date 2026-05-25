@@ -45,7 +45,9 @@
             "incident",
             "transcript",
             "seed",
-            "pulse"
+            "pulse",
+            "auto-lesson",
+            "user-correction"
           ],
           "default": "agent"
         },
@@ -118,6 +120,9 @@
           "type": "string"
         },
         "expires_at": {
+          "type": "string"
+        },
+        "last_surfaced_at": {
           "type": "string"
         }
       },

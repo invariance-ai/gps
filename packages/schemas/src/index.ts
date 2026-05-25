@@ -112,6 +112,10 @@ export const NoteSource = z.enum([
   "transcript",
   "seed",
   "pulse",
+  // Distilled from a session transcript on Stop: a lesson the agent learned, or a
+  // correction/failure the user directed ("no, that's wrong", "that broke X").
+  "auto-lesson",
+  "user-correction",
 ]);
 export type NoteSource = z.infer<typeof NoteSource>;
 
@@ -161,6 +165,8 @@ export const Note = z.object({
   source_commit: z.string().optional(),
   /** ISO date after which this note auto-archives. */
   expires_at: z.string().optional(),
+  /** ISO timestamp this note was last surfaced to an agent (set on rank/prepare). Drives recency-based pruning. */
+  last_surfaced_at: z.string().optional(),
 });
 export type Note = z.infer<typeof Note>;
 
@@ -196,6 +202,8 @@ export const Decision = z.object({
   anchor_id: z.string().optional(),
   source_commit: z.string().optional(),
   expires_at: z.string().optional(),
+  /** ISO timestamp this decision was last surfaced to an agent. Drives recency-based pruning. */
+  last_surfaced_at: z.string().optional(),
 });
 export type Decision = z.infer<typeof Decision>;
 
