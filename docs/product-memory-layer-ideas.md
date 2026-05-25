@@ -13,6 +13,50 @@ Trust is not the billboard. The billboard is speed, fewer repeated mistakes, bet
 > - **Auto-promotion** — `--promote=safe` auto-graduates recurring note clusters into invariants but holds back any cluster touching a `require_approval_for` risk topic (the gate below); `--promote=all` promotes everything (bypasses the gate, prints a loud warning); `--promote=never` (default) keeps promotion manual. Run via `gps promote --auto`.
 > Not yet implemented: quarantine, influence auditing, demotion, and automatic Stop-hook promotion (auto-promotion is currently invoked explicitly).
 
+## MVP Launch Scope
+
+The MVP should prove one loop:
+
+```text
+agent asks GPS -> developer corrects agent -> GPS captures candidate -> human approves -> next session reuses it
+```
+
+Launch claim:
+
+> GPS is repo memory that keeps agents from rediscovering the same facts every session.
+
+Launch qualifier:
+
+> By default, new memories go to an inbox before they can affect future agent context.
+
+Required for MVP:
+
+- `gps install claude|codex|cursor` writes agent instructions that tell the agent to ask GPS before meaningful edits.
+- `gps prepare <symbol-or-path> --intent "<task>"` returns repo structure, relevant memories, warnings, tests, and recent decisions.
+- Captured preferences, corrections, TODOs, lessons, and directives can route to inbox.
+- `gps inbox` supports list, approve, reject, and edit.
+- Approved memory is eligible for retrieval; rejected inbox items do not steer agents.
+- `gps install --capture=<inbox|auto> --promote=<never|safe|all>` persists repo policy.
+- `--promote=never` is the default.
+- `--promote=safe` never promotes auth, billing, payments, security, compliance, migrations, or destructive-action memories.
+- `.gps/` artifacts remain readable enough for a developer to inspect or hand-edit.
+- `gps doctor` shows basic health: inbox count, active memory count, config policy, stale/conflict warnings if available.
+- README demo shows the correction-to-reuse loop, not only graph/token benchmarks.
+
+Explicitly not required for MVP:
+
+- Influence auditing.
+- Quarantine implementation.
+- Full CODEOWNERS enforcement.
+- Zep-style temporal snapshots.
+- Runtime/Sentry/Datadog evidence.
+- PR reasoning packs and reviewer hints.
+- Graphify-style HTML graph exports.
+- Branch-aware memory merge semantics.
+- Automatic Stop-hook promotion.
+
+MVP success means a solo developer can install GPS in a repo, correct an agent once, approve that lesson, and see a later agent session reuse it without manually pasting the same fact again.
+
 ## Core Thesis
 
 GPS should be conservative about trust and aggressive about capture.
