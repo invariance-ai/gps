@@ -15,8 +15,8 @@ import { testsForSymbol, testFilesIn, frameworkFor } from "./tests.js";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { logForFile, churn, isGitRepo } from "./git.js";
-import { loadNotes, rankNotes } from "./notes.js";
-import { loadDecisions, rankDecisions } from "./decisions.js";
+import { loadNotes, rankNotes, filterExpiredNotes, touchSurfacedNotes } from "./notes.js";
+import { loadDecisions, rankDecisions, filterExpiredDecisions, touchSurfacedDecisions } from "./decisions.js";
 import { loadQuestions, filterByStatus } from "./questions.js";
 import { packByBudget, type PackSection } from "./budget.js";
 import { parseSince, isAfter } from "./time.js";
@@ -253,17 +253,23 @@ export async function getContext(
   const notesAll = await loadNotes(ctx.root, sym.name);
   const decisionsAll = await loadDecisions(ctx.root, sym.name);
   const since = args.since ? parseSince(args.since) : undefined;
+  // Enforce expires_at: drop items whose expiry is in the past.
+  const notesActive = filterExpiredNotes(notesAll);
+  const decisionsActive = filterExpiredDecisions(decisionsAll);
   const notesFiltered = since
-    ? notesAll.filter((n) => isAfter(n.recorded_at, since))
-    : notesAll;
+    ? notesActive.filter((n) => isAfter(n.recorded_at, since))
+    : notesActive;
   let decisionsFiltered = since
-    ? decisionsAll.filter((d) => isAfter(d.recorded_at, since))
-    : decisionsAll;
+    ? decisionsActive.filter((d) => isAfter(d.recorded_at, since))
+    : decisionsActive;
   if (args.authored_by) {
     decisionsFiltered = decisionsFiltered.filter((d) => d.made_by === args.authored_by);
   }
   const notes = rankNotes(notesFiltered, caps.notes);
   const decisions = rankDecisions(decisionsFiltered, caps.decisions);
+  // Stamp last_surfaced_at on surfaced items (best-effort, never throws).
+  void touchSurfacedNotes(ctx.root, notes).catch(() => {});
+  void touchSurfacedDecisions(ctx.root, decisions).catch(() => {});
   const prefsAll = await loadPreferences(ctx.root);
   const preferences = rankPreferences(prefsAll, sym.name, sym.file, caps.preferences);
 
@@ -378,6 +384,7 @@ export async function prepareEdit(
   );
 
   const since = args.since ? parseSince(args.since) : undefined;
+  // c.notes/c.decisions are already expiry-filtered by getContext above.
   const filteredNotes: Note[] = since ? c.notes.filter((n) => isAfter(n.recorded_at, since)) : c.notes;
   const filteredDecisions: Decision[] = since
     ? c.decisions.filter((d) => isAfter(d.recorded_at, since))
