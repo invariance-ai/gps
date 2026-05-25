@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { Invariant } from "@invariance/gps-schemas";
 
 const REL = ".gps/invariants.yml";
@@ -14,6 +14,26 @@ export async function loadInvariants(root: string): Promise<Invariant[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Append invariants to `.gps/invariants.yml`, deduping by `name` (existing
+ * names win — re-runs are idempotent). Returns how many were newly added and
+ * the resulting total. Writes a flat YAML array.
+ */
+export async function appendInvariants(
+  root: string,
+  toAdd: Invariant[],
+): Promise<{ added: number; total: number }> {
+  const existing = await loadInvariants(root);
+  const names = new Set(existing.map((i) => i.name));
+  const fresh = toAdd.filter((i) => !names.has(i.name));
+  if (fresh.length === 0) return { added: 0, total: existing.length };
+  const merged = [...existing, ...fresh];
+  const file = path.join(root, REL);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, stringifyYaml(merged));
+  return { added: fresh.length, total: merged.length };
 }
 
 export function invariantsFor(symbol: string, all: Invariant[]): Invariant[] {

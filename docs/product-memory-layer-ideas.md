@@ -6,6 +6,11 @@ This note captures product ideas for GPS as a plug-in memory layer for coding ag
 
 The strongest wedge is not generic "agent memory." It is repo-scoped, reviewable, committed knowledge that every coding agent can use consistently.
 
+> **Implementation status (v0.5).** The capture/promotion governance described below is now partly shipped and configurable per repo via `gps install --capture=<inbox|auto> --promote=<never|safe|all>` (persisted to `.gps/config.yml`):
+> - **Inbox capture** — `--capture=inbox` routes captured preferences/directives into `.gps/inbox.yml` for review. Manage with `gps inbox` / `gps inbox approve|reject|edit <id>`. Approving runs the real persist. (`--capture=auto`, the default, persists live as before.)
+> - **Auto-promotion** — `--promote=safe` auto-graduates recurring note clusters into invariants but holds back any cluster touching a `require_approval_for` risk topic (the gate below); `--promote=all` promotes everything (bypasses the gate, prints a loud warning); `--promote=never` (default) keeps promotion manual. Run via `gps promote --auto`.
+> Not yet implemented: quarantine, influence auditing, demotion, and automatic Stop-hook promotion (auto-promotion is currently invoked explicitly).
+
 ## Core Thesis
 
 GPS should be conservative about trust and aggressive about capture.

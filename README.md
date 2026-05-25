@@ -59,6 +59,8 @@ Two independent axes:
 
 Defaults (`capture=auto`, `promote=never`) preserve current behavior, so existing setups are unaffected.
 
+Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`.
+
 ## The generated skill
 
 `gps install claude` writes `.claude/skills/gps/SKILL.md` — a Claude Code skill that auto-loads whenever you're editing code or starting a task. Paste it yourself if you prefer:
