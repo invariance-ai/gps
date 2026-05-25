@@ -1,28 +1,26 @@
-# gps
+# gps — plug-in memory layer for your coding agents
 
-> The repo that gets smarter every time you use it.
+> One install. Durable, automatic, symbol-anchored repo memory for Claude Code, Codex, and Cursor.
 
-`gps` gives coding agents — Claude Code, Codex, Cursor — the slice of repo context they'd otherwise miss: symbols, callers and callees, tests that protect each function, recent git history, declarative invariants you author once ("refunds over $1000 require finance approval"), and **lessons learned from previous edits** that agents and humans persist as they go. Anchored to symbols, recorded once, surfaced when relevant.
+`gps` gives Claude Code, Codex, and Cursor the memory they're missing: notes, decisions, preferences, and invariants anchored to symbols, captured automatically by lifecycle hooks, and surfaced only when the relevant code is touched.
 
-In a blinded judge run against vanilla Claude Code on a real internal repo (309 source files, 10 prompts, Sonnet judge, A/B-swapped), **gps answers won 13 of 19 valid comparisons (+11% overall quality)**:
+```bash
+cd your-repo
+npx -y @invariance/gps install claude      # or: install codex | install cursor
+npx -y @invariance/gps index
+```
 
-| dimension | baseline | gps |
-|---|---:|---:|
-| correctness | 4.15 | **4.20** |
-| specificity | 4.15 | **4.70** |
-| completeness | 3.80 | **4.50** |
-| **overall (1–5)** | **4.03** | **4.47** |
+That's it. The agent now has a memory layer. Every session starts with your standing preferences. Every edit on a non-trivial symbol is preceded by a brief — invariants, callers, tests, prior decisions, notes from past edits. Every session end distills what was learned back into the graph.
 
-Methodology and raw numbers: [`bench/dogfood/2026-05-12-invariance-platform.md`](bench/dogfood/2026-05-12-invariance-platform.md).
+## vs. native Claude Code memory
 
-**Tokens aren't the story.** `claude -p` explores via Glob/Read regardless of injected context; gps is additive there (+1.4% input tokens on the run above). The win is what the agent does *with* that exploration — gps answers cite real symbols and line numbers (`replayRun:14`, `applyMutations:58`) where baseline hand-waves at file-level.
-
-Three inputs compound on a single symbol graph:
-1. **Static structure** — calls, callers, tests, provenance (the spine)
-2. **Human intent** — notes, decisions, invariants (what's worth knowing)
-3. **Agent behavior** *(v0.3)* — what they asked, what they broke (the signal)
-
-Day one, gps is useful for context. Six months in, the notes-and-invariants layer is an asset every new engineer and every new agent depends on. Operational reality, encoded and made queryable. That's the thesis.
+| | Claude Code native | gps |
+|---|---|---|
+| **Todos** | Ephemeral — gone at session end | Persisted as notes, anchored to symbols |
+| **CLAUDE.md** | Manual — you write and maintain it | Auto-managed block; global lessons land here automatically |
+| **Memory feature** | Claude-only | Works identically on Claude Code, Codex, and Cursor |
+| **Scope** | File or conversation | Symbol-anchored — surfaces only when that code is touched |
+| **Capture** | Manual | Automatic via lifecycle hooks (Claude/Codex); explicit MCP calls (Cursor) |
 
 ## Quickstart
 
@@ -43,14 +41,27 @@ Prefer a global install? `npm install -g @invariance/gps`, then drop the `npx -y
 
 Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and [`docs/guide/agents/`](docs/guide/agents/) for per-IDE setup details.
 
-## What gps is not (yet)
+## The generated skill
 
-Honest, up-front:
+`gps install claude` writes `.claude/skills/gps/SKILL.md` — a Claude Code skill that auto-loads whenever you're editing code or starting a task. Paste it yourself if you prefer:
 
-- **Parser precision is ~90% on typical code**, lower on decorators-as-factories, dynamic dispatch, and heavy macros. The default backend is tree-sitter (WASM, zero native deps) for TS/JS/Python with body/`end_line` tracking; a regex backend (8 languages) is the fallback. Trade-off documented in [`packages/core/src/parser.ts:5`](packages/core/src/parser.ts). LSP-backed reference resolution is the next accuracy step.
-- **No semantic import resolution.** Re-exports and barrel files may miss call edges.
-- **No cross-repo / monorepo-aware symbol IDs** yet — each repo is its own graph.
-- **Proof base is n=1.** The +11% quality win above is one repo, 10 prompts. We're running this against more repos next; see [`docs/dogfood-runbook.md`](docs/dogfood-runbook.md) and contribute a result.
+```bash
+cat .claude/skills/gps/SKILL.md
+```
+
+The skill tells Claude to:
+1. Run `gps prepare <symbol>` (or call `mcp__gps__prepare_edit`) before non-trivial edits
+2. Run `gps lessons record "<one sentence>"` after edits that taught something
+3. Treat `gps preferences` output as standing constraints every session
+
+## How it works
+
+Three inputs compound on a single symbol graph:
+1. **Static structure** — calls, callers, tests, provenance (the spine)
+2. **Human intent** — notes, decisions, invariants (what's worth knowing)
+3. **Agent behavior** — what they asked, what they broke (the signal)
+
+Day one, gps is useful for context. Six months in, the notes-and-invariants layer is an asset every new engineer and every new agent depends on. Operational reality, encoded and made queryable. That's the thesis.
 
 ## CLI
 
@@ -62,7 +73,7 @@ The whole happy path is five commands:
 gps init                                              # 1. write .gps/config.yml + invariants.yml
 gps install claude                                    # 2. wire CLAUDE.md + .claude hooks (or: install codex)
 gps index                                             # 3. build the symbol graph
-gps prepare <symbol> --intent "<one-liner>"           # 4. ⭐ decision-ready brief before edits
+gps prepare <symbol> --intent "<one-liner>"           # 4. decision-ready brief before edits
 gps lessons record "<one sentence>"                   # 5. record what an edit taught you
 ```
 
@@ -72,7 +83,7 @@ Everything below is the full surface for power users and automation.
 
 ```bash
 # Reading
-gps prepare <symbol> --intent "what you'll change"   # ⭐ decision-ready brief
+gps prepare <symbol> --intent "what you'll change"   # decision-ready brief
 gps context <symbol>                                  # multi-strand context
 gps impact <symbol>                                   # blast radius
 gps tests <symbol>                                    # tests that protect it
@@ -91,7 +102,7 @@ gps decisions <symbol>                                # choices recorded, with r
 # Server
 gps index --watch                                     # rebuild on changes
 gps serve                                             # MCP stdio server
-gps serve --observe                                   # ⚡ opt-in: record per-symbol query counts (metadata only)
+gps serve --observe                                   # opt-in: record per-symbol query counts (metadata only)
 gps suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
 ```
 
@@ -115,13 +126,13 @@ For **Claude Code**, the installer wires five non-blocking hooks: `SessionStart`
 npx -y @invariance/gps install claude
 ```
 
-For **Codex CLI**, the installer writes `AGENTS.md` instructions, registers `gps serve` as an MCP server, and configures a `notify` hook that distills each turn:
+For **Codex CLI**, the installer writes `AGENTS.md` instructions, registers `gps serve` as an MCP server, and configures a `notify` hook that distills each turn — auto preference and directive capture happen via this hook:
 
 ```bash
 npx -y @invariance/gps install codex
 ```
 
-For **Cursor**, the installer writes a `.cursor/rules/gps.mdc` always-attached rule and registers `gps serve` in `.cursor/mcp.json`:
+For **Cursor**, the installer writes a `.cursor/rules/gps.mdc` always-attached rule and registers `gps serve` in `.cursor/mcp.json`. Because Cursor has no lifecycle hooks, the agent must call `record_preference` and `record_directive` MCP tools explicitly on durable and location-scoped instructions:
 
 ```bash
 npx -y @invariance/gps install cursor
@@ -260,6 +271,45 @@ v0.1.0 (alpha). Working CLI + MCP. Ships structural context plus tests, provenan
 Also shipping: passive metadata observer (`gps serve --observe` — symbol query frequencies only, never conversation content), `gps suggest` for the authoring queue (now also surfaces lessons near promotion), and LLM-assisted postmortem promotion.
 
 Next: native `gps attach --session <id>` lookup (the Stop hook already auto-distills via the transcript path), LSP-backed reference resolution, and cross-repo / monorepo symbol IDs.
+
+## What gps is not (yet)
+
+Honest, up-front:
+
+- **Parser precision is ~90% on typical code**, lower on decorators-as-factories, dynamic dispatch, and heavy macros. The default backend is tree-sitter (WASM, zero native deps) for TS/JS/Python with body/`end_line` tracking; a regex backend (8 languages) is the fallback. Trade-off documented in [`packages/core/src/parser.ts:5`](packages/core/src/parser.ts). LSP-backed reference resolution is the next accuracy step.
+- **No semantic import resolution.** Re-exports and barrel files may miss call edges.
+- **No cross-repo / monorepo-aware symbol IDs** yet — each repo is its own graph.
+- **Proof base is n=1.** The dogfood quality result above is one repo, 10 prompts. We're running this against more repos next; see [`docs/dogfood-runbook.md`](docs/dogfood-runbook.md) and contribute a result.
+
+## Benchmarks
+
+### Token efficiency (architectural result)
+
+On Django (8 symbols), a gps brief averages **819 tokens at 85% recall** vs ripgrep's **34,717 tokens at 56% recall** — roughly 98% fewer tokens, higher recall. This is an architectural consequence of graph lookup vs text dump: gps fetches exactly the strands relevant to a symbol, ripgrep dumps every matching line.
+
+| tool | tokens (mean) | tokens (p95) | recall | callers | callees | tests |
+|---|---|---|---|---|---|---|
+| **gps-brief** | **819** | 2,185 | **85%** | 54% | 100% | 100% |
+| gps-full | 2,487 | 8,851 | — | — | — | — |
+| rg | 34,717 | 129,351 | 56% | 27% | 60% | 80% |
+| codebase-memory-mcp | 450 | 1,265 | 47% | 40% | 60% | 40% |
+
+Source: [`bench/perf/results/compare-django-2026-05-16.md`](bench/perf/results/compare-django-2026-05-16.md). Recall is judged by a separate LLM extracting answers from each tool's output, scored against the gps structural oracle. The token/recall advantage is architectural (graph lookup vs text dump). **We do not claim end-to-end productivity gains from this measurement.**
+
+### End-to-end quality (dogfood, n=1 repo)
+
+In a blinded judge run against vanilla Claude Code on a real internal repo (309 source files, 10 prompts, Sonnet judge, A/B-swapped), **gps answers won 13 of 19 valid comparisons (+11% overall quality)**:
+
+| dimension | baseline | gps |
+|---|---:|---:|
+| correctness | 4.15 | **4.20** |
+| specificity | 4.15 | **4.70** |
+| completeness | 3.80 | **4.50** |
+| **overall (1–5)** | **4.03** | **4.47** |
+
+Methodology and raw numbers: [`bench/dogfood/2026-05-12-invariance-platform.md`](bench/dogfood/2026-05-12-invariance-platform.md).
+
+**Caveats:** Single repo (309 files, our own codebase), n=10 prompts, one LLM judge. These numbers reflect a real measured result but cannot be generalized to arbitrary repos or tasks. We're running this against more repos next. **Do not cite the +11% figure as a general productivity claim.**
 
 ## License
 

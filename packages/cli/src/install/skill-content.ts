@@ -66,15 +66,22 @@ ${SHARED_AGENT_BLOCK}
 /** Standalone Claude Code skill written to `.claude/skills/gps/SKILL.md`. */
 export const CLAUDE_SKILL = `---
 name: gps
-description: Use the gps CLI to fetch repo context, impact, tests, invariants, notes, and decisions before editing code.
+description: >
+  Use this skill when editing code, starting a task, reviewing a symbol, or recording what was learned.
+  gps is automatic repo memory: it surfaces symbol-anchored invariants, callers, tests, prior decisions,
+  and lessons from past edits — exactly when the relevant code is touched. Run \`gps prepare <symbol>\`
+  before any non-trivial edit and \`gps lessons record\` after. Prefer the MCP tool surface
+  (\`mcp__gps__prepare_edit\`) for a one-call decision-ready brief; fall back to CLI inside Bash.
 ---
 
-# gps
+# gps — plug-in memory layer
 
-Prefer the MCP tool surface in Claude Code: \`mcp__gps__prepare_edit\` returns
-a decision-ready brief in one structured call and is cheaper than fanning out
-to Glob/Read/Grep first. Fall back to the CLI when you're outside a tool
-context (e.g. inside a Bash command):
+gps gives you durable, automatic, symbol-anchored repo memory: notes, decisions, preferences, and
+invariants captured by lifecycle hooks and surfaced only when the relevant code is touched.
+
+## Before any non-trivial edit
+
+Prefer the MCP tool (one structured call, no fan-out to Glob/Read/Grep needed):
 
 \`\`\`text
 mcp__gps__prepare_edit { "symbol": "<symbol>", "intent": "<short intent>" }
@@ -86,13 +93,18 @@ CLI equivalent:
 gps prepare <symbol> --intent "<short intent>"
 \`\`\`
 
+The brief it returns — invariants, callers, tests, prior decisions, notes from past edits — is what
+gps exists for. Treat it like a code-search call you make *before* exploration, not after.
+
 Respect invariants marked \`block\`. Run tests listed by the prepare output or by:
 
 \`\`\`bash
 gps tests <symbol> --json
 \`\`\`
 
-Before declaring an edit done, run the brief — it catches blocking invariants and untested changes:
+## Before declaring an edit done
+
+Run the brief — it catches blocking invariants and untested changes:
 
 \`\`\`text
 mcp__gps__brief {}
@@ -104,28 +116,32 @@ CLI equivalent:
 gps brief
 \`\`\`
 
-Before creating a new helper, search for reusable code:
+## Before creating a new helper
+
+Search for reusable code first:
 
 \`\`\`bash
 gps find "<keyword>" --json
 \`\`\`
 
-When you understand what the user is working on, tag the session once so gps
-learns which symbols belong to that feature:
+## Tag the session early
+
+When you understand what the user is working on, tag once so gps learns which symbols belong to
+that feature:
 
 \`\`\`bash
 gps feature use <short-kebab-label>
 \`\`\`
 
-After a successful edit, persist durable lessons and decisions:
+## After a successful edit — record what you learned
 
 \`\`\`bash
 gps lessons record "<one sentence>"          # auto-classified: global → CLAUDE.md; scoped → notes
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
 
-\`gps learn <symbol> --lesson "<…>"\` still works but is legacy — always
-symbol-scoped. Prefer \`gps lessons record\`.
+\`gps learn <symbol> --lesson "<…>"\` still works but is legacy — always symbol-scoped. Prefer
+\`gps lessons record\`.
 `;
 
 /**
@@ -159,6 +175,28 @@ After a successful edit:
 gps lessons record "<one sentence>"              # persist what you learned
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
+
+## Capturing preferences and directives explicitly (Cursor-specific)
+
+Cursor has no lifecycle hooks, so preference and directive capture must happen via explicit MCP tool calls.
+
+**When the user gives a durable instruction** ("from now on…", "always…", "i prefer…", "don't ever…"):
+
+Call the MCP tool \`record_preference\` immediately:
+
+\`\`\`text
+record_preference { "text": "<the user's instruction verbatim or close paraphrase>" }
+\`\`\`
+
+**When the user gives a location-scoped instruction** ("don't do X here", "always Y in this folder", "in the home page, avoid Z"):
+
+Call the MCP tool \`record_directive\` immediately:
+
+\`\`\`text
+record_directive { "text": "<instruction>", "area": "<directory or alias>" }
+\`\`\`
+
+gps stores preferences in a managed CLAUDE.md / AGENTS.md block (global scope) and directives as area-scoped notes that resurface whenever you edit files in that directory. Because Cursor has no hooks to capture these automatically, calling \`record_preference\` and \`record_directive\` yourself is how the memory layer stays current.
 
 The MCP server registered in \`.cursor/mcp.json\` exposes the same surface as a set of tools — use whichever interface (CLI or MCP) fits the moment.
 `;

@@ -1,5 +1,7 @@
 # Codex CLI
 
+gps gives Codex durable, automatic, symbol-anchored repo memory. The `notify` hook captures preferences and directives from every turn — no manual calls needed.
+
 ```bash
 npx -y @invariance/gps install codex
 ```
@@ -8,8 +10,10 @@ Writes:
 
 - `AGENTS.md` — appends a `<!-- gps:start -->...<!-- gps:end -->` block. Codex reads this at session start.
 - `.codex/config.toml` — appends a `# gps:start ... # gps:end` managed block with two entries:
-  - `notify = ["npx", "-y", "@invariance/gps", "attach", "--transcript", "-"]` — turn-end hook that distills the transcript into Decisions
+  - `notify = ["npx", "-y", "@invariance/gps", "attach", "--transcript", "-"]` — turn-end hook that distills the transcript into Decisions **and** automatically captures preferences ("from now on…", "always…", "i prefer…") and location-scoped directives
   - `[mcp_servers.gps]` — registers `gps serve` as an MCP server
+
+The `notify` hook is how Codex gets automatic preference and directive capture — it fires after every turn, reads the transcript via stdin, and persists any durable instructions into the gps memory layer. You do not need to call `record_preference` or `record_directive` manually in Codex; the hook handles this automatically.
 
 The Codex CLI does not expose pre-tool-use hooks, so the index is refreshed lazily by `gps prepare` and `gps context` calls. Treat `gps` like `rg`: a local CLI Codex runs before non-trivial edits.
 
