@@ -97,15 +97,22 @@ export async function removePreference(root: string, id: string): Promise<boolea
  * manually); false positives spam the preferences file. Requires both a
  * directive cue and a meaningful predicate (>= 3 content words).
  */
+// Durability cues. A bare negation ("don't ...") is NOT enough — it must be
+// paired with a durability signal (from now on / always / never / i prefer /
+// going forward / as a rule). The bare `don't|do not` cue was removed because
+// it captured transient task instructions like "Do not write code yet".
 const DIRECTIVE_CUES: Array<{ re: RegExp; strip: RegExp }> = [
   { re: /\bfrom now on[,:\s]+/i, strip: /^from now on[,:\s]+/i },
+  { re: /\bgoing forward[,:\s]+/i, strip: /^going forward[,:\s]+/i },
+  { re: /\bas a rule[,:\s]+/i, strip: /^as a rule[,:\s]+/i },
   { re: /\b(?:please\s+)?always\b/i, strip: /^\s*(?:please\s+)?/i },
   { re: /\b(?:please\s+)?never\b/i, strip: /^\s*(?:please\s+)?/i },
-  { re: /\b(?:don'?t|do not)\b/i, strip: /^/ },
   { re: /\bi (?:prefer|want|like)\b/i, strip: /^/ },
-  { re: /\bmake sure (?:to|you)\b/i, strip: /^/ },
+  { re: /\bmake sure (?:to|you) always\b/i, strip: /^/ },
+  { re: /\b(?:don'?t|do not) (?:ever|always)\b/i, strip: /^/ },
   { re: /\bremember (?:to|that)\b/i, strip: /^remember (?:to|that)\s+/i },
-  { re: /\b(?:we|you) should (?:always|never)?\s?/i, strip: /^/ },
+  { re: /\b(?:we|you) should (?:always|never)\b/i, strip: /^/ },
+  { re: /\bwe (?:always|never)\b/i, strip: /^\s*/i },
 ];
 
 const STOP_PREFIXES = [
@@ -114,6 +121,19 @@ const STOP_PREFIXES = [
   /^could you\s+/i,
   /^now\s+/i,
 ];
+
+// Transient-phrasing guard. Even when a clause trips a cue, these markers mean
+// it's a one-shot task instruction, not a durable rule. Reject the whole clause.
+const TRANSIENT_GUARD: RegExp[] = [
+  /\b(?:yet|for now|right now|at the moment|just for this|this time|today|already)\b/i,
+  /\byou (?:do not|don'?t) need to\b/i,
+  /\b(?:don'?t|do not) (?:bother|write code|change code|edit|run|start|begin)\b/i,
+  /\b(?:hold off|wait|hang on|stop)\b/i,
+];
+
+// Session-talk guard: the imperative should be about the codebase / engineering
+// conventions, not the chat session itself.
+const SESSION_TALK = /\b(?:right now|for now|this session|this chat|this conversation|this turn|this task|this prompt)\b/i;
 
 export function rankPreferences(
   prefs: PreferenceT[],
@@ -160,12 +180,19 @@ export function extractPreferences(prompt: string): ExtractedPreference[] {
     .filter((c) => c.length > 0 && c.length < 240);
 
   for (const chunk of chunks) {
+    // Transient/session guards run on the RAW chunk before cue matching so a
+    // "from now on ... yet" style sentence is rejected wholesale.
+    if (TRANSIENT_GUARD.some((re) => re.test(chunk))) continue;
+    if (SESSION_TALK.test(chunk)) continue;
     const cue = DIRECTIVE_CUES.find((d) => d.re.test(chunk));
     if (!cue) continue;
     if (STOP_PREFIXES.some((re) => re.test(chunk))) continue;
     let text = chunk.replace(cue.strip, "").replace(/^[,:\s]+/, "").trim();
     text = text.replace(/[.!?]+$/, "").trim();
-    if (text.split(/\s+/).filter((w) => w.length > 2).length < 3) continue;
+    // Minimum substance: >= 3 content words AND at least one looks like it's
+    // about the codebase (a verb/noun, not just session chatter).
+    const contentWords = text.split(/\s+/).filter((w) => w.length > 2);
+    if (contentWords.length < 3) continue;
     if (text.length > 200) continue;
     const key = text.toLowerCase();
     if (seen.has(key)) continue;
