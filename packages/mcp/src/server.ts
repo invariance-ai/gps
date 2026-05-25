@@ -139,7 +139,17 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         lowConfidence = candidates.length === 1 && (candidates[0]!.score ?? 0) < LOW_CONFIDENCE_THRESHOLD;
       }
       if (!symbol) throw new Error("prepare_edit: symbol or intent required");
-      const result = await prepareEdit({ symbol, intent: a.intent, budget: a.budget, since: a.since, depth: a.depth }, root);
+      const result = await prepareEdit(
+        {
+          symbol,
+          intent: a.intent,
+          budget: a.budget,
+          since: a.since,
+          depth: a.depth,
+          ...(candidates && candidates.length > 0 ? { candidates } : {}),
+        },
+        root,
+      );
       const withCandidates = candidates && candidates.length > 1 ? { ...result, candidates } : result;
       return lowConfidence ? { ...withCandidates, low_confidence: true } : withCandidates;
     }

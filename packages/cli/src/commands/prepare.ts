@@ -109,7 +109,16 @@ export function registerPrepare(program: Command): void {
       }
 
       const r = await prepareEdit(
-        { symbol, intent: opts.intent, budget, since: opts.since, depth },
+        {
+          symbol,
+          intent: opts.intent,
+          budget,
+          since: opts.since,
+          depth,
+          // Pass inferred alternates so core can surface a "did you mean" hint
+          // when the resolved symbol is weak (zero callers / low confidence).
+          ...(candidates.length > 0 ? { candidates } : {}),
+        },
         root,
       );
       await recordPrepared(root, symbol).catch(() => {});

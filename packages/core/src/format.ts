@@ -35,6 +35,17 @@ export function formatContextMarkdown(r: ContextResult): string {
   L.push(`**Defined in:** \`${r.symbol.file}:${r.symbol.line}\` (${r.symbol.kind})`);
   L.push(`**Risk:** ${r.risk.toUpperCase()}`);
   L.push("");
+  // Resolution confidence (Fix 2): rendered even though caller/test sections are
+  // hidden when empty — a disconnected resolution is exactly what we must flag.
+  if (r.resolution_warnings && r.resolution_warnings.length) {
+    for (const wmsg of r.resolution_warnings) L.push(`> ⚠️ ${wmsg}`);
+    L.push("");
+  }
+  if (r.did_you_mean && r.did_you_mean.length) {
+    L.push("## You might mean");
+    for (const d of r.did_you_mean) L.push(`- \`${d.symbol}\` — ${d.reason}`);
+    L.push("");
+  }
   if (r.callers.length) {
     L.push("## Called by");
     for (const x of r.callers.slice(0, 10)) L.push(`- \`${x.name}\` — ${x.file}:${x.line}`);
@@ -115,6 +126,15 @@ export function formatContextPretty(r: ContextResult): string {
   L.push(`Defined in: ${r.symbol.file}:${r.symbol.line}`);
   L.push(`Risk:      ${riskColor[r.risk]!(r.risk.toUpperCase())}`);
   L.push("");
+  if (r.resolution_warnings && r.resolution_warnings.length) {
+    for (const wmsg of r.resolution_warnings) L.push(c.yellow(`! ${wmsg}`));
+    L.push("");
+  }
+  if (r.did_you_mean && r.did_you_mean.length) {
+    L.push(c.bold("You might mean:"));
+    for (const d of r.did_you_mean) L.push(`  - ${c.cyan(d.symbol)}  ${c.dim(d.reason)}`);
+    L.push("");
+  }
   if (r.callers.length) {
     L.push(c.bold("Called by:"));
     for (const x of r.callers.slice(0, 10)) L.push(`  - ${x.name}  ${c.dim(`${x.file}:${x.line}`)}`);
