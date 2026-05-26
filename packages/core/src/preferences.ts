@@ -168,6 +168,16 @@ const TRANSIENT_GUARD: RegExp[] = [
 // conventions, not the chat session itself.
 const SESSION_TALK = /\b(?:right now|for now|this session|this chat|this conversation|this turn|this task|this prompt)\b/i;
 
+// First-person commentary / state — "I always get confused by this", "I think
+// we should…", "I'm not sure" — is conversation, not a durable rule, but the
+// `always`/`should` cues otherwise trip on it. (Preference verbs like "I prefer
+// / want / like" are deliberately NOT here — those ARE durable.)
+const CHATTER_GUARD: RegExp[] = [
+  /\bi\s*['’]?m\b/i, // "I'm" / "Im" / "I am" (contraction or spaced)
+  /\bi (?:get|am|was|feel|think|guess|wonder|assume|believe|realiz|notic|see|know|find)\w*/i,
+  /\b(?:confused|not sure|no idea|wondering|curious)\b/i,
+];
+
 export function rankPreferences(
   prefs: PreferenceT[],
   symbolName: string,
@@ -217,6 +227,9 @@ export function extractPreferences(prompt: string): ExtractedPreference[] {
     // "from now on ... yet" style sentence is rejected wholesale.
     if (TRANSIENT_GUARD.some((re) => re.test(chunk))) continue;
     if (SESSION_TALK.test(chunk)) continue;
+    // Questions and first-person commentary are conversation, not rules.
+    if (chunk.trimEnd().endsWith("?")) continue;
+    if (CHATTER_GUARD.some((re) => re.test(chunk))) continue;
     const cue = DIRECTIVE_CUES.find((d) => d.re.test(chunk));
     if (!cue) continue;
     if (STOP_PREFIXES.some((re) => re.test(chunk))) continue;

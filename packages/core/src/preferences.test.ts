@@ -44,6 +44,10 @@ describe("extractPreferences — broadened cues keep precision (no transient lea
     "reading the same file again, stop",
     "let's look at this file",
     "now open the config",
+    // first-person commentary / questions — conversation, not durable rules
+    "I always get confused by this retry logic, can you explain it?",
+    "should we always validate inputs here?",
+    "I'm always noticing the tests are flaky",
   ])("still ignores transient phrasing: %s", (prompt) => {
     expect(extractPreferences(prompt)).toEqual([]);
   });
