@@ -25,6 +25,7 @@ import { classifyIntent, excludeForIntent } from "./intent.js";
 import { loadAssumptions } from "./assumptions.js";
 import { gapsForSymbol, type TestGap } from "./testgaps.js";
 import { loadPreferences, rankPreferences } from "./preferences.js";
+import { searchSymbols } from "./search.js";
 import { listTodos } from "./todos.js";
 import type { Assumption, Question, Decision, Note, TodoItem } from "@invariance/gps-schemas";
 import { PREPARE_EDIT_SCHEMA_VERSION } from "@invariance/gps-schemas";
@@ -194,6 +195,21 @@ function resolveByKey(key: string, L: IndexLookups): SymbolRef | undefined {
   return L.byId.get(key) ?? L.byQualified.get(key) ?? L.byName.get(key)?.[0];
 }
 
+/**
+ * `resolveSymbol` is exact-match only, so a near-miss a human would type
+ * (`calculateDelay` for `#calculateDelay`, a typo, the wrong casing) errors with
+ * no help. Use the fuzzy search to suggest what they probably meant.
+ */
+function symbolNotFound(query: string, ctx: QueryContext): Error {
+  const suggestions = searchSymbols(ctx.index, query, 3).map(
+    (m) => m.symbol.qualified_name ?? m.symbol.name,
+  );
+  const hint = suggestions.length
+    ? ` Did you mean: ${suggestions.join(", ")}?  (\`gps find "${query}"\` for more)`
+    : ` Run \`gps find "${query}"\` to search, or \`gps index\` if the graph may be stale.`;
+  return new Error(`symbol not found: ${query}.${hint}`);
+}
+
 export function callersOf(symbol: SymbolRef | string, ctx: QueryContext): SymbolRef[] {
   const L = lookups(ctx);
   const sym = typeof symbol === "string" ? resolveSymbol(symbol, ctx) : symbol;
@@ -331,7 +347,7 @@ export async function getContext(
 ): Promise<ContextResult> {
   const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
   const sym = resolveSymbol(args.symbol, ctx);
-  if (!sym) throw new Error(`symbol not found: ${args.symbol}`);
+  if (!sym) throw symbolNotFound(args.symbol, ctx);
 
   const mode = args.mode ?? "brief";
   const caps = mode === "full" ? FULL_CAPS : BRIEF_CAPS;
@@ -428,7 +444,7 @@ export async function impactOf(
 ): Promise<ImpactResult> {
   const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
   const sym = resolveSymbol(args.symbol, ctx);
-  if (!sym) throw new Error(`symbol not found: ${args.symbol}`);
+  if (!sym) throw symbolNotFound(args.symbol, ctx);
 
   const visited = new Set<string>();
   const frontier: SymbolRef[] = [sym];
