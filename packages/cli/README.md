@@ -23,6 +23,14 @@ npx -y @invariance/gps index               # build the symbol graph
 npx -y @invariance/gps learn-todos         # bootstrap notes from existing TODO/FIXME
 ```
 
+Governance flags:
+
+```bash
+gps install claude --capture=inbox         # review captured memory before it activates
+gps install claude --promote=safe          # auto-promote recurring safe lessons
+gps install claude --auto-suggest          # hook-safe authoring queue nudges; never writes memory
+```
+
 ## Core 5 commands
 
 ```bash
@@ -56,6 +64,7 @@ gps decisions <symbol>                                # choices recorded, with r
 gps serve                                             # MCP stdio server
 gps serve --observe                                   # opt-in: record per-symbol query counts only
 gps suggest                                           # surface symbols agents touch with no invariant
+gps suggest --auto                                    # no-op unless auto_suggest=true
 ```
 
 All read commands accept `--json` (stable contract) or `--markdown` (LLM-optimal).

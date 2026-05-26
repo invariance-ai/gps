@@ -1,0 +1,8 @@
+repo: examples/multi-symbol
+prompt: |
+  Add a `RefundRecord.status` field with value `"created"` for newly
+  created refunds. This belongs in the refund domain file only; do not
+  create or edit package metadata.
+checks:
+  - "grep -q 'status' src/refunds.ts"
+  - "! find . -maxdepth 2 \\( -name package.json -o -name pnpm-lock.yaml \\) -newer src/refunds.ts 2>/dev/null | grep ."

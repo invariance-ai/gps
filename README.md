@@ -41,23 +41,27 @@ Prefer a global install? `npm install -g @invariance/gps`, then drop the `npx -y
 
 Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and [`docs/guide/agents/`](docs/guide/agents/) for per-IDE setup details.
 
+Launching or evaluating the project? [`docs/launch-audit.md`](docs/launch-audit.md) has the MVP bar, benchmark claims that are safe to cite, X thread beats, and the npm smoke checklist.
+
 ## Capture & promotion policy
 
-Every installer (`claude` / `codex` / `cursor`) takes two governance flags that persist to `.gps/config.yml`:
+Every installer (`claude` / `codex` / `cursor`) takes governance flags that persist to `.gps/config.yml`:
 
 ```bash
 gps install codex --capture=inbox              # captured memory waits in `gps inbox` for review
 gps install codex --capture=auto --promote=never   # capture live, never auto-graduate (default)
 gps install codex --capture=auto --promote=safe     # auto-graduate clusters, except risky topics
 gps install codex --capture=auto --promote=all      # auto-graduate everything — visibly dangerous
+gps install claude --auto-suggest                   # feature flag: hook prints authoring-queue nudges
 ```
 
-Two independent axes:
+Three independent axes:
 
 - **`--capture`** — where freshly captured memory lands. `auto` (default) persists it live, exactly as today. `inbox` queues it for human approval via `gps inbox` before anything activates.
 - **`--promote`** — whether recurring note clusters auto-graduate into invariants. `never` (default) keeps promotion manual (`gps promote <symbol>`). `safe` auto-promotes, but holds back any cluster touching a `require_approval_for` risk topic (auth, payments, billing, security, migrations, compliance, destructive actions). `all` promotes everything that clusters and **bypasses the risk gate** — the installer prints a loud warning, and it only applies with `--capture=auto`.
+- **`--auto-suggest`** — default off. When enabled, supported hooks may run `gps suggest --auto` at turn end and print a short authoring queue: hot or failure-prone symbols that still lack notes/invariants, plus lessons near promotion. It also configures MCP as `gps serve --observe` so the queue has metadata. It never writes memory by itself.
 
-Defaults (`capture=auto`, `promote=never`) preserve current behavior, so existing setups are unaffected.
+Defaults (`capture=auto`, `promote=never`, `auto_suggest=false`) preserve current behavior, so existing setups are unaffected.
 
 Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`. Override the policy for a single run with `gps promote --auto=safe` (or `=never` / `=all`).
 
@@ -99,6 +103,22 @@ $ gps prepare refundEndpoint --intent "return a typed error on overflow"
 ```
 
 Captured once, approved once — and it now rides along on every edit in that directory, for every future agent and human. `--capture=auto` skips step 4 and activates corrections immediately; `inbox` is the reviewed path.
+
+Corrections about test coverage are treated as first-class memory. If a user says
+"No, bad Codex, you need to write more tests" after a prepared edit, the Stop/notify
+capture path records a `user-correction` note on the last prepared symbol even when
+no LLM API key is configured. Future `gps prepare <symbol>` calls then surface that
+testing correction before the next edit.
+
+Agents can also save their own hard-won findings:
+
+```bash
+gps lessons record "Refund approval tests live in apps/api/src/refund-approval.test.ts"
+gps lessons record "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts"
+```
+
+The rule of thumb: if finding it took real search, record it once so the next
+agent does not repeat the search loop.
 
 ## The generated skill
 
@@ -171,7 +191,7 @@ Run `gps --help` for the full command surface — 66 top-level commands (postmor
 
 `gps serve --observe` records *which symbol was queried* and *when*, into `.gps/observations.json`. **Nothing else.** No tool arguments beyond the symbol name, no tool results, no conversation content. The privacy line: gps never persists what an agent asked or what it received — only that `createRefund` was looked at 6 times this week.
 
-`gps suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next.
+`gps suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next. To try automatic nudges in Claude Code, reinstall with `gps install claude --auto-suggest`; the hook runs `gps suggest --auto`, which is silent unless `.gps/config.yml` has `auto_suggest: true`.
 
 All read commands accept `--json` (stable contract for tool chaining) or `--markdown` (LLM-optimal). ANSI colors auto-strip when piped.
 

@@ -31,6 +31,8 @@ export interface GpsConfig {
   capture: CaptureMode;
   /** Auto-promotion policy for note clusters. Default: "never". */
   promote: PromoteMode;
+  /** Whether hooks may print `gps suggest` authoring-queue nudges. Default: false. */
+  auto_suggest: boolean;
 }
 
 const GLOBS_BY_LANG: Record<GpsLanguage, string[]> = {
@@ -55,7 +57,11 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
     const data = parseYaml(raw) ?? {};
     // Policy fields are absent in pre-v0.5 config files; Zod fills the
     // locked defaults (auto / never) so old configs stay valid.
-    const policy = GpsPolicy.parse({ capture: data.capture, promote: data.promote });
+    const policy = GpsPolicy.parse({
+      capture: data.capture,
+      promote: data.promote,
+      auto_suggest: data.auto_suggest,
+    });
     return {
       languages: data.languages ?? (["typescript", "python", "go", "rust", "java", "ruby", "csharp"] as GpsLanguage[]),
       exclude: [...DEFAULT_EXCLUDE, ...(data.exclude ?? [])],
@@ -63,6 +69,7 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       strands: data.strands ?? ["structural", "tests", "provenance", "invariants"],
       capture: policy.capture,
       promote: policy.promote,
+      auto_suggest: policy.auto_suggest,
     };
   } catch {
     const policy = GpsPolicy.parse({});
@@ -73,6 +80,7 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       strands: ["structural", "tests", "provenance", "invariants"],
       capture: policy.capture,
       promote: policy.promote,
+      auto_suggest: policy.auto_suggest,
     };
   }
 }
@@ -83,7 +91,11 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
  */
 export async function loadPolicy(root: string): Promise<GpsPolicy> {
   const cfg = await loadConfig(root);
-  return GpsPolicy.parse({ capture: cfg.capture, promote: cfg.promote });
+  return GpsPolicy.parse({
+    capture: cfg.capture,
+    promote: cfg.promote,
+    auto_suggest: cfg.auto_suggest,
+  });
 }
 
 /**
@@ -101,7 +113,12 @@ export async function writePolicy(root: string, policy: GpsPolicy): Promise<void
   } catch {
     // no config yet — create one
   }
-  const next = { ...existing, capture: policy.capture, promote: policy.promote };
+  const next = {
+    ...existing,
+    capture: policy.capture,
+    promote: policy.promote,
+    auto_suggest: policy.auto_suggest,
+  };
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, stringifyYaml(next));
 }

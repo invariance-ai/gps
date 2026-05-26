@@ -144,6 +144,9 @@
                   },
                   "model": {
                     "type": "string"
+                  },
+                  "correction_kind": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -353,6 +356,31 @@
               "symbol",
               "score",
               "via"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "resolution_warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "did_you_mean": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "symbol": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "symbol",
+              "reason"
             ],
             "additionalProperties": false
           }

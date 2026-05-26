@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-26T19:51:53.756Z",
+  "model": "gpt-5.1-codex-mini",
+  "fixture_root": "/var/folders/92/htfjg8r95pv9pcyl32g8w8fm0000gn/T/gps-memory-loop-vHZK6r",
+  "gps_context": "## gps plan --json\n{\n  \"prompt\": \"Make a small change to createRefund's approval message\",\n  \"matches\": [\n    {\n      \"symbol\": {\n        \"name\": \"createRefund\",\n        \"qualified_name\": \"createRefund\",\n        \"file\": \"src/refunds.ts\",\n        \"line\": 12,\n        \"end_line\": 21,\n        \"kind\": \"function\",\n        \"id\": \"src/refunds.ts#createRefund@03afe429c6\",\n        \"tokens\": \"create refund req request threshold cents customer tier enterprise amount status needs approval message requires manager before processing approved\"\n      },\n      \"score\": 100,\n      \"via\": \"qualified\"\n    }\n  ]\n}\n\n## gps prepare createRefund\n# prepare_edit: createRefund\n\n**Intent:** Make a small wording-only change to createRefund's approval message.\n**Defined in:** `src/refunds.ts:12` (function)\n**Risk:** HIGH\n\n> ⚠️ No callers found — this symbol may be unexported, dynamically dispatched, or the index may be incomplete.\n## Invariants that apply\n- **Example — high-value refunds require approval** (block) — Refunds over 1000 require finance_approval_id.\n  - evidence: docs/refund-policy.md\n\n## Notes from previous edits\n- **[high]** When editing createRefund, add or strengthen tests before declaring the task done.\n  - evidence: No, bad Codex, you need to write more tests before calling this done.\n\n## Tests to run after editing\n- `src/refunds.test.ts` (jest)\n\n\n→ Run `gps brief` after editing to verify changed symbols, invariants, notes, and tests.\n\n## gps notes createRefund\ncreateRefund [high] When editing createRefund, add or strengthen tests before declaring the task done.\n  evidence: No, bad Codex, you need to write more tests before calling this done.  source: user-correction  recorded: 2026-05-26",
+  "results": [
+    {
+      "arm": "baseline",
+      "prompt": "Task: Make a small wording-only change to createRefund's approval message.\n\nRepo files:\n- src/refunds.ts contains createRefund.\n- src/refunds.test.ts contains createRefund tests.\nNo cross-session GPS memory is available. Plan the edit.",
+      "output": "{\"files_to_open\":[\"src/refunds.ts\"],\"first_actions\":[\"Open src/refunds.ts to inspect createRefund implementation and the approval message text for the required wording change.\"],\"will_add_or_run_tests\":\"no\",\"rationale\":\"Plan is to modify only the approval message text within createRefund, so inspect the function first to determine precise change without needing tests.\"}",
+      "score": {
+        "mentionsTests": true,
+        "mentionsGpsMemory": false,
+        "mentionsRightSymbol": true,
+        "mentionsRightFile": true,
+        "points": 4
+      }
+    },
+    {
+      "arm": "gps",
+      "prompt": "Task: Make a small wording-only change to createRefund's approval message.\n\nRepo files:\n- src/refunds.ts contains createRefund.\n- src/refunds.test.ts contains createRefund tests.\n\nGPS context is available below. Use it exactly like a pre-edit brief from `gps prepare`.\n\n## gps plan --json\n{\n  \"prompt\": \"Make a small change to createRefund's approval message\",\n  \"matches\": [\n    {\n      \"symbol\": {\n        \"name\": \"createRefund\",\n        \"qualified_name\": \"createRefund\",\n        \"file\": \"src/refunds.ts\",\n        \"line\": 12,\n        \"end_line\": 21,\n        \"kind\": \"function\",\n        \"id\": \"src/refunds.ts#createRefund@03afe429c6\",\n        \"tokens\": \"create refund req request threshold cents customer tier enterprise amount status needs approval message requires manager before processing approved\"\n      },\n      \"score\": 100,\n      \"via\": \"qualified\"\n    }\n  ]\n}\n\n## gps prepare createRefund\n# prepare_edit: createRefund\n\n**Intent:** Make a small wording-only change to createRefund's approval message.\n**Defined in:** `src/refunds.ts:12` (function)\n**Risk:** HIGH\n\n> ⚠️ No callers found — this symbol may be unexported, dynamically dispatched, or the index may be incomplete.\n## Invariants that apply\n- **Example — high-value refunds require approval** (block) — Refunds over 1000 require finance_approval_id.\n  - evidence: docs/refund-policy.md\n\n## Notes from previous edits\n- **[high]** When editing createRefund, add or strengthen tests before declaring the task done.\n  - evidence: No, bad Codex, you need to write more tests before calling this done.\n\n## Tests to run after editing\n- `src/refunds.test.ts` (jest)\n\n\n→ Run `gps brief` after editing to verify changed symbols, invariants, notes, and tests.\n\n## gps notes createRefund\ncreateRefund [high] When editing createRefund, add or strengthen tests before declaring the task done.\n  evidence: No, bad Codex, you need to write more tests before calling this done.  source: user-correction  recorded: 2026-05-26\n\nPlan the edit.",
+      "output": "{\"files_to_open\":[\"src/refunds.ts\",\"src/refunds.test.ts\"],\"first_actions\":[\"Open src/refunds.ts to inspect createRefund approval message wording.\",\"Review src/refunds.test.ts to understand current tests and find where approval message is verified.\"],\"will_add_or_run_tests\":\"Tests will need updates due to requirement to add or strengthen tests when editing createRefund; plan to update jest file accordingly.\",\"rationale\":\"Need to adjust approval message wording and ensure tests cover the new message per instruction to strengthen tests after modifying createRefund.\"}",
+      "score": {
+        "mentionsTests": true,
+        "mentionsGpsMemory": false,
+        "mentionsRightSymbol": true,
+        "mentionsRightFile": true,
+        "points": 4
+      }
+    }
+  ]
+}

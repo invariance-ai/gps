@@ -142,6 +142,7 @@ export const ClassifierMeta = z.object({
   confidence: z.number().min(0).max(1),
   used_llm: z.boolean().default(false),
   model: z.string().optional(),
+  correction_kind: z.string().optional(),
 });
 export type ClassifierMeta = z.infer<typeof ClassifierMeta>;
 
@@ -265,6 +266,13 @@ export type PromoteMode = z.infer<typeof PromoteMode>;
 export const GpsPolicy = z.object({
   capture: CaptureMode.default("auto"),
   promote: PromoteMode.default("never"),
+  /**
+   * Feature flag for hook-triggered authoring queue suggestions.
+   * false — `gps suggest` remains manual only.
+   * true  — supported hooks may run `gps suggest --auto` and print suggestions
+   *         when high-traffic/failure symbols need notes or invariants.
+   */
+  auto_suggest: z.boolean().default(false),
 });
 export type GpsPolicy = z.infer<typeof GpsPolicy>;
 

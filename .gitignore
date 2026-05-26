@@ -11,3 +11,4 @@ build/
 coverage/
 *.log
 .turbo/
+.claude/worktrees/

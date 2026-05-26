@@ -19,7 +19,7 @@ What just happened:
 - `install claude` wrote a `CLAUDE.md` block, a `.claude/skills/gps/SKILL.md` skill, five non-blocking hooks in `.claude/settings.json`, and a `gps` entry in `.mcp.json` (registers the gps MCP server).
 - `index` built the symbol graph at `.gps/index.json`. Re-runs are incremental.
 
-By default capture is **live** (`--capture=auto`) and nothing auto-graduates into invariants (`--promote=never`). To review captured memory before it activates, install with `--capture=inbox` and approve items via `gps inbox`. To let recurring lessons auto-graduate into invariants, add `--promote=safe` (holds back risky topics) or `--promote=all` (everything — bypasses the risk gate). Both persist to `.gps/config.yml`. See the [Capture & promotion policy](../../README.md#capture--promotion-policy) section in the README.
+By default capture is **live** (`--capture=auto`), nothing auto-graduates into invariants (`--promote=never`), and memory suggestions stay manual (`auto_suggest=false`). To review captured memory before it activates, install with `--capture=inbox` and approve items via `gps inbox`. To let recurring lessons auto-graduate into invariants, add `--promote=safe` (holds back risky topics) or `--promote=all` (everything — bypasses the risk gate). To let hooks print the authoring queue automatically, add `--auto-suggest`. These persist to `.gps/config.yml`. See the [Capture & promotion policy](../../README.md#capture--promotion-policy) section in the README.
 
 If you prefer a global install: `npm install -g @invariance/gps`, then add `--use-global` to the install commands so hooks call `gps` directly instead of `npx`.
 
@@ -80,7 +80,7 @@ gps serve --observe              # in a separate terminal, while an agent runs
 gps suggest                      # symbols queried often with no covering invariant
 ```
 
-`gps suggest` is your authoring queue — the symbols where the next invariant or note will have the most leverage.
+`gps suggest` is your authoring queue — the symbols where the next invariant or note will have the most leverage. It is manual by default; `gps install claude --auto-suggest` flips `.gps/config.yml` to `auto_suggest: true`, letting the Claude Stop hook run `gps suggest --auto` and print non-writing nudges at turn end.
 
 ## Next steps
 

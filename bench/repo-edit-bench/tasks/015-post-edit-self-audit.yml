@@ -1,0 +1,8 @@
+repo: examples/multi-symbol
+prompt: |
+  Add a `refundedAt` ISO timestamp to new refund records. Keep replayed
+  records deterministic by preserving their original timestamp.
+checks:
+  - "grep -q 'refundedAt' src/refunds.ts"
+  - "grep -A 25 'function createRefund' src/refunds.ts | grep -Eq 'new Date\\(\\)|toISOString'"
+  - "grep -A 20 'function replayRefund' src/refunds.ts | grep -q 'original'"

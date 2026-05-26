@@ -23,6 +23,8 @@ Writes:
 
 All hooks pipe to `>/dev/null 2>&1 || true`. A broken hook never breaks the agent.
 
+`gps install claude --auto-suggest` also lets the Stop hook run `gps suggest --auto`. That command is silent unless `.gps/config.yml` has `auto_suggest: true`, and it only prints suggestions; it does not approve, promote, or write memory.
+
 ## What Claude does with gps
 
 The injected `CLAUDE.md` block teaches Claude:

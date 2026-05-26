@@ -135,4 +135,27 @@ describe("prepareEdit surfaces approved path/area directives", () => {
     const result = await prepareEdit({ symbol: "createRefund", intent: "cap at 5000" }, ctx);
     expect(result.markdown).not.toContain("## Directives for this path");
   });
+
+  it("labels old notes as stale memory instead of presenting them as fresh fact", async () => {
+    const root = await fixtureRepo();
+    await mkdir(path.join(root, ".gps/notes"), { recursive: true });
+    await writeFile(
+      path.join(root, ".gps/notes/createRefund.yml"),
+      [
+        "- symbol: createRefund",
+        "  lesson: Old refund tests lived in a different path",
+        "  severity: medium",
+        "  promoted: false",
+        "  recorded_at: 2025-01-01T00:00:00.000Z",
+        "  source: agent",
+        "  id: old1",
+        "  scope: symbol",
+        "  applies_to: createRefund",
+      ].join("\n"),
+    );
+
+    const ctx = await open(root);
+    const result = await prepareEdit({ symbol: "createRefund", intent: "cap at 5000" }, ctx);
+    expect(result.markdown).toContain("[medium stale memory]");
+  });
 });

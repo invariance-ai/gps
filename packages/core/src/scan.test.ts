@@ -23,11 +23,12 @@ afterEach(async () => {
 });
 
 describe("loadConfig — policy defaults", () => {
-  it("defaults to capture=auto / promote=never when no config file exists", async () => {
+  it("defaults to capture=auto / promote=never / auto_suggest=false when no config file exists", async () => {
     const root = await tempRepo();
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
     expect(cfg.promote).toBe("never");
+    expect(cfg.auto_suggest).toBe(false);
   });
 
   it("defaults policy when config file omits the fields", async () => {
@@ -35,6 +36,7 @@ describe("loadConfig — policy defaults", () => {
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
     expect(cfg.promote).toBe("never");
+    expect(cfg.auto_suggest).toBe(false);
     // non-policy fields still parse
     expect(cfg.languages).toEqual(["typescript"]);
     expect(cfg.depth).toBe(5);
@@ -47,6 +49,7 @@ describe("loadConfig — policy defaults", () => {
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("inbox");
     expect(cfg.promote).toBe("safe");
+    expect(cfg.auto_suggest).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.exclude).toContain("tmp");
   });
@@ -54,7 +57,11 @@ describe("loadConfig — policy defaults", () => {
 
 describe("GpsPolicy schema", () => {
   it("yields locked defaults on empty input", () => {
-    expect(GpsPolicy.parse({})).toEqual({ capture: "auto", promote: "never" });
+    expect(GpsPolicy.parse({})).toEqual({
+      capture: "auto",
+      promote: "never",
+      auto_suggest: false,
+    });
   });
 
   it("rejects invalid enum values", () => {
@@ -65,8 +72,12 @@ describe("GpsPolicy schema", () => {
 
 describe("loadPolicy", () => {
   it("returns just the policy", async () => {
-    const root = await tempRepo("capture: inbox\npromote: all\n");
-    expect(await loadPolicy(root)).toEqual({ capture: "inbox", promote: "all" });
+    const root = await tempRepo("capture: inbox\npromote: all\nauto_suggest: true\n");
+    expect(await loadPolicy(root)).toEqual({
+      capture: "inbox",
+      promote: "all",
+      auto_suggest: true,
+    });
   });
 });
 
@@ -78,6 +89,7 @@ describe("writePolicy", () => {
     await writePolicy(root, GpsPolicy.parse({ capture: "inbox", promote: "never" }));
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("inbox");
+    expect(cfg.auto_suggest).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.depth).toBe(4);
     expect(cfg.exclude).toContain("tmp");
@@ -86,7 +98,14 @@ describe("writePolicy", () => {
 
   it("creates config.yml when none exists", async () => {
     const root = await tempRepo();
-    await writePolicy(root, GpsPolicy.parse({ capture: "auto", promote: "safe" }));
-    expect(await loadPolicy(root)).toEqual({ capture: "auto", promote: "safe" });
+    await writePolicy(
+      root,
+      GpsPolicy.parse({ capture: "auto", promote: "safe", auto_suggest: true }),
+    );
+    expect(await loadPolicy(root)).toEqual({
+      capture: "auto",
+      promote: "safe",
+      auto_suggest: true,
+    });
   });
 });

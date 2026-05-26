@@ -1,9 +1,28 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { claudeTranscriptToText, userTurnsFromTranscript } from "./attach.js";
-import { addPreference, loadPreferences } from "@invariance/gps-core";
+import {
+  claudeTranscriptToText,
+  extractHeuristicCorrections,
+  userTurnsFromTranscript,
+} from "./attach.js";
+import { addPreference, loadPreferences, recordPrepared } from "@invariance/gps-core";
+
+const roots: string[] = [];
+
+async function tempRepo(): Promise<string> {
+  const root = await mkdtemp(path.join(tmpdir(), "gps-attach-test-"));
+  roots.push(root);
+  return root;
+}
+
+afterEach(async () => {
+  while (roots.length) {
+    const root = roots.pop();
+    if (root) await rm(root, { recursive: true, force: true });
+  }
+});
 
 describe("claudeTranscriptToText", () => {
   it("flattens JSONL into role-tagged prose and drops tool blocks", () => {
@@ -104,7 +123,7 @@ describe("capturePrefsFromText (via addPreference)", () => {
   let root: string;
 
   beforeEach(async () => {
-    root = await mkdtemp(path.join(tmpdir(), "gps-attach-test-"));
+    root = await tempRepo();
   });
 
   it("writes a preference when a preference cue is detected", async () => {
@@ -152,5 +171,35 @@ describe("capturePrefsFromText (via addPreference)", () => {
       evidence: "cue:use",
     });
     expect(r.preference.text).not.toContain("sk-ant-api03");
+  });
+});
+
+describe("extractHeuristicCorrections", () => {
+  it("anchors a missing-tests correction to the last prepared symbol", async () => {
+    const root = await tempRepo();
+    await recordPrepared(root, "createRefund");
+    const transcript = [
+      "user: No, bad Codex, you need to write more tests before calling this done.",
+      "",
+      "assistant: I'll add coverage.",
+    ].join("\n");
+
+    const corrections = await extractHeuristicCorrections(root, transcript);
+
+    expect(corrections).toEqual([
+      expect.objectContaining({
+        symbol: "createRefund",
+        lesson: "When editing createRefund, add or strengthen tests before declaring the task done.",
+      }),
+    ]);
+    expect(corrections[0]?.evidence).toContain("write more tests");
+  });
+
+  it("ignores assistant-only apologies about tests", async () => {
+    const root = await tempRepo();
+    await recordPrepared(root, "createRefund");
+    const transcript = "assistant: Sorry, I should have written more tests.";
+
+    await expect(extractHeuristicCorrections(root, transcript)).resolves.toEqual([]);
   });
 });

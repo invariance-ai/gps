@@ -1,0 +1,8 @@
+repo: examples/multi-symbol
+prompt: |
+  Add a minimal vitest test for `replayRefund` and make sure the file can
+  be run directly by a targeted test command.
+checks:
+  - "test -f src/refunds.test.ts || test -f tests/refunds.test.ts"
+  - "grep -q 'replayRefund' src/refunds.test.ts tests/refunds.test.ts 2>/dev/null"
+  - "grep -Eq 'vitest|describe|it\\(' src/refunds.test.ts tests/refunds.test.ts 2>/dev/null"

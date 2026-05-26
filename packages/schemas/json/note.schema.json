@@ -89,6 +89,9 @@
             },
             "model": {
               "type": "string"
+            },
+            "correction_kind": {
+              "type": "string"
             }
           },
           "required": [

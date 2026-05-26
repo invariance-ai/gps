@@ -7,12 +7,13 @@ import {
   appendDecision,
   appendQuestion,
   appendNote,
-  addPreference,
   extractPreferences,
   extractDirectives,
   recordDirective,
   resolveActiveArea,
   redact,
+  recordPreference,
+  readObservations,
 } from "@invariance/gps-core";
 import { GpsLlm, extractDecisions } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
@@ -126,7 +127,7 @@ async function capturePrefsFromText(root: string, transcriptText: string): Promi
     const extracted = extractPreferences(userText);
     for (const e of extracted) {
       try {
-        await addPreference(root, {
+        await recordPreference(root, {
           text: redact(e.text).text,
           source: "auto",
           evidence: `cue:${e.cue}`,
@@ -155,6 +156,83 @@ async function capturePrefsFromText(root: string, transcriptText: string): Promi
   } catch {
     /* never throw from capture path */
   }
+}
+
+const TEST_CORRECTION_RE =
+  /\b(?:write|add|include|cover|need|needs|needed|missing|more|better|stronger|not enough|should have)\b[\s\S]{0,80}\b(?:test|tests|spec|coverage|assertion|assertions)\b/i;
+const REJECTION_RE =
+  /\b(?:no|bad|wrong|incorrect|not good|that'?s not|you missed|do not|don'?t)\b/i;
+
+export interface HeuristicCorrection {
+  symbol: string;
+  lesson: string;
+  evidence: string;
+}
+
+function trimEvidence(text: string): string {
+  return text.trim().replace(/\s+/g, " ").slice(0, 180);
+}
+
+/**
+ * Deterministic fallback for the highest-value correction class: the developer
+ * tells the agent it under-tested something. This works without an API key and
+ * anchors to the last prepared symbol when available.
+ */
+export async function extractHeuristicCorrections(
+  root: string,
+  transcriptText: string,
+  symbolsInScope: string[] = [],
+): Promise<HeuristicCorrection[]> {
+  const userText = userTurnsFromTranscript(transcriptText);
+  if (!userText.trim()) return [];
+
+  const observed = await readObservations(root).catch(() => undefined);
+  const symbol = symbolsInScope[0] ?? observed?.last_prepared_symbol ?? "general";
+  const corrections: HeuristicCorrection[] = [];
+  const seen = new Set<string>();
+  for (const turn of userText.split(/\n\n+/)) {
+    const text = trimEvidence(turn);
+    if (!text) continue;
+    const testCorrection = TEST_CORRECTION_RE.test(text);
+    if (!testCorrection) continue;
+    const lesson =
+      symbol === "general"
+        ? "When corrected for missing coverage, add or strengthen tests before declaring the task done."
+        : `When editing ${symbol}, add or strengthen tests before declaring the task done.`;
+    const key = `${symbol}\0${lesson}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    corrections.push({
+      symbol,
+      lesson,
+      evidence: text,
+    });
+  }
+  return corrections;
+}
+
+async function persistHeuristicCorrections(
+  root: string,
+  transcriptText: string,
+  symbolsInScope: string[] = [],
+): Promise<number> {
+  const corrections = await extractHeuristicCorrections(root, transcriptText, symbolsInScope);
+  let count = 0;
+  for (const c of corrections) {
+    try {
+      await appendNote(root, {
+        symbol: c.symbol,
+        lesson: redact(c.lesson).text,
+        source: "user-correction",
+        evidence: redact(c.evidence).text,
+        severity: "high",
+      });
+      count++;
+    } catch {
+      /* best-effort */
+    }
+  }
+  return count;
 }
 
 export function registerAttach(program: Command): void {
@@ -217,6 +295,7 @@ export function registerAttach(program: Command): void {
       // Capture preferences from user turns if requested.
       if (opts.capturePrefs) {
         await capturePrefsFromText(root, transcript);
+        await persistHeuristicCorrections(root, transcript, opts.symbol ?? []);
       }
 
       const llm = new GpsLlm({
@@ -369,6 +448,9 @@ async function runHookStdin(opts: Opts): Promise<void> {
     if (!transcript.trim()) return;
 
     const haveApiKey = !!(opts.apiKey ?? process.env.ANTHROPIC_API_KEY);
+    const heuristicCorrections = haveApiKey
+      ? 0
+      : await persistHeuristicCorrections(root, transcript, opts.symbol ?? []);
 
     // Degraded mode: no key configured. Stash the native-agent prompt so the
     // loop is recorded rather than dropped — the next session can process it.
@@ -440,13 +522,15 @@ async function runHookStdin(opts: Opts): Promise<void> {
       result.decisions.length ||
       result.questions.length ||
       result.auto_lessons.length ||
-      result.user_corrections.length
+      result.user_corrections.length ||
+      heuristicCorrections
     ) {
       // stderr keeps it visible in the transcript without altering the result.
       console.error(
         kleur.dim(
           `gps: distilled ${result.decisions.length} decision(s), ${result.questions.length} question(s), ` +
-          `${result.auto_lessons.length} auto-lesson(s), ${result.user_corrections.length} user-correction(s) from this session`,
+          `${result.auto_lessons.length} auto-lesson(s), ` +
+          `${result.user_corrections.length + heuristicCorrections} user-correction(s) from this session`,
         ),
       );
     }

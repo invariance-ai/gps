@@ -122,57 +122,87 @@ export async function annotateInboxDuplicates(
     return cached;
   }
 
+  // Earlier pending items, so a second phrasing of the same rule captured in the
+  // SAME session (e.g. "cap backoff at 17s" then "don't let backoff exceed 17s")
+  // is tagged against the first instead of both surfacing as fresh, actionable
+  // items. The first occurrence stays unmarked; later near/exact copies point at it.
+  const seenPending: Array<{
+    kind: InboxItemKind;
+    text: string;
+    norm: string;
+    tokens: Set<string>;
+    area?: string;
+  }> = [];
+  function pendingDuplicate(
+    kind: InboxItemKind,
+    norm: string,
+    tokens: Set<string>,
+    area: string | undefined,
+  ): { text: string; match: "exact" | "near" } | null {
+    let best: { text: string; score: number } | null = null;
+    for (const s of seenPending) {
+      if (s.kind !== kind) continue;
+      if (kind === "directive" && s.area !== area) continue;
+      if (s.norm === norm) return { text: s.text, match: "exact" };
+      const score = jaccard(tokens, s.tokens);
+      if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+        best = { text: s.text, score };
+      }
+    }
+    return best ? { text: best.text, match: "near" } : null;
+  }
+
   const out: AnnotatedInboxItem[] = [];
   for (const item of items) {
     if (item.status !== "pending") {
       out.push({ item });
       continue;
     }
+    const tokens = tokenize(item.text);
+    const norm = item.text.trim().toLowerCase();
+    let annotation: AnnotatedInboxItem = { item };
 
     if (item.kind === "preference") {
       // Exact: same normalized text → same sha1 as the stored preference.
       const exact = prefById.get(preferenceIdFor(item.text));
       if (exact) {
-        out.push({ item, duplicate_of: `preference "${exact.text}"`, match: "exact" });
-        continue;
-      }
-      const tokens = tokenize(item.text);
-      let best: { text: string; score: number } | null = null;
-      for (const { p, tokens: pt } of prefTokens) {
-        const score = jaccard(tokens, pt);
-        if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
-          best = { text: p.text, score };
+        annotation = { item, duplicate_of: `preference "${exact.text}"`, match: "exact" };
+      } else {
+        let best: { text: string; score: number } | null = null;
+        for (const { p, tokens: pt } of prefTokens) {
+          const score = jaccard(tokens, pt);
+          if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+            best = { text: p.text, score };
+          }
         }
+        if (best) annotation = { item, duplicate_of: `preference "${best.text}"`, match: "near" };
       }
-      out.push(
-        best ? { item, duplicate_of: `preference "${best.text}"`, match: "near" } : { item },
-      );
-      continue;
+    } else if (item.area) {
+      // directive → compare against the area notes of its resolved area.
+      const notes = await notesFor(item.area);
+      const exactNote = notes.find((n) => n.lesson.trim().toLowerCase() === norm);
+      if (exactNote) {
+        annotation = { item, duplicate_of: `area note "${exactNote.lesson}"`, match: "exact" };
+      } else {
+        let best: { lesson: string; score: number } | null = null;
+        for (const n of notes) {
+          const score = jaccard(tokens, n.tokens);
+          if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+            best = { lesson: n.lesson, score };
+          }
+        }
+        if (best) annotation = { item, duplicate_of: `area note "${best.lesson}"`, match: "near" };
+      }
     }
 
-    // directive → compare against the area notes of its resolved area.
-    if (!item.area) {
-      out.push({ item });
-      continue;
+    // Fall back to pending-vs-pending only when not already a dup of active memory.
+    if (!annotation.duplicate_of) {
+      const pd = pendingDuplicate(item.kind, norm, tokens, item.area);
+      if (pd) annotation = { item, duplicate_of: `pending "${pd.text}"`, match: pd.match };
     }
-    const notes = await notesFor(item.area);
-    const norm = item.text.trim().toLowerCase();
-    const exactNote = notes.find((n) => n.lesson.trim().toLowerCase() === norm);
-    if (exactNote) {
-      out.push({ item, duplicate_of: `area note "${exactNote.lesson}"`, match: "exact" });
-      continue;
-    }
-    const tokens = tokenize(item.text);
-    let best: { lesson: string; score: number } | null = null;
-    for (const n of notes) {
-      const score = jaccard(tokens, n.tokens);
-      if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
-        best = { lesson: n.lesson, score };
-      }
-    }
-    out.push(
-      best ? { item, duplicate_of: `area note "${best.lesson}"`, match: "near" } : { item },
-    );
+
+    out.push(annotation);
+    seenPending.push({ kind: item.kind, text: item.text, norm, tokens, area: item.area });
   }
   return out;
 }

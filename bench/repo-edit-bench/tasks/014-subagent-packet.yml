@@ -1,0 +1,9 @@
+repo: examples/multi-symbol
+prompt: |
+  Make `RefundRecord` carry the original customer tier. Apply the change
+  consistently to all refund creation paths without changing validation.
+checks:
+  - "grep -q 'customerTier' src/refunds.ts"
+  - "grep -A 20 'function createRefund' src/refunds.ts | grep -q 'customer.tier'"
+  - "grep -A 25 'function createPartialRefund' src/refunds.ts | grep -q 'customer.tier'"
+  - "grep -q 'requires approval' src/refunds.ts"

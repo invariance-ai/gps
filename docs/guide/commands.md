@@ -450,6 +450,20 @@ doctor [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `done`
+
+Post-edit self-audit: tests, invariants, durable memory, learned commands
+
+```
+done [options]
+```
+
+**Options:**
+
+- `--symbol <name>` — Symbol to include learned commands for
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `feature`
 
 Named bags of symbols, learned by observing what the agent touches
@@ -660,7 +674,7 @@ feature diff [options] <label>
 
 ## `find`
 
-Fuzzy search for symbols
+Fuzzy search for symbols (matches names and, on v2 indexes, body/doc tokens)
 
 ```
 find [options] <query>
@@ -834,6 +848,7 @@ install claude [options]
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install codex`
@@ -853,6 +868,7 @@ install codex [options]
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install cursor`
@@ -872,6 +888,7 @@ install cursor [options]
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ## `invariant`
@@ -1019,6 +1036,19 @@ notes [options] [symbol]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `packet`
+
+Emit a compact subagent-readable packet for a symbol
+
+```
+packet [options] <symbol>
+```
+
+**Options:**
+
+- `--json` — Emit JSON instead of markdown
+- `--root <path>` — Repo root (default: cwd)
+
 ## `plan`
 
 Rank candidate symbols for a prompt (used before `prepare`)
@@ -1139,7 +1169,7 @@ promote [options] [symbol]
 
 **Options:**
 
-- `--auto` — Auto-promote per the configured policy (capture/promote in .gps/config.yml)
+- `--auto [policy]` — Auto-promote per configured policy; override for this run with --auto=safe|never|all
 - `--dry-run` — With --auto: show the promotion plan without writing
 - `--min <n>` — Minimum cluster size *(default: "3")*
 - `--threshold <f>` — Jaccard similarity threshold (0-1) *(default: "0.4")*
@@ -1224,6 +1254,26 @@ record-failure [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `remember`
+
+Save a hard-won fact without choosing between lessons, notes, or scope
+
+```
+remember [options] <fact>
+```
+
+**Options:**
+
+- `--symbol <name>` — Attach to a symbol
+- `--file <path>` — Attach to a file
+- `--feature <label>` — Attach to a feature
+- `--area <dir>` — Attach to an area/directory
+- `--global` — Record as a repo-wide lesson
+- `--evidence <ref>` — PR/commit/doc backing this fact
+- `--severity <level>` — low | medium | high
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `resume`
 
 "Where was I?" — surface TODOs, open questions, and recent decisions for files in the current git diff. Prints a concise markdown brief by default.
@@ -1253,10 +1303,18 @@ review-diff [options]
 
 ## `review-memory`
 
-Maintainer queue: promotions, stale entries, open questions
+Maintainer queue: approve, reject, or promote captured memories
 
 ```
-review-memory [options]
+review-memory [options] [command]
+```
+
+### `review-memory list`
+
+List promotions, stale entries, and open questions
+
+```
+review-memory list [options]
 ```
 
 **Options:**
@@ -1264,6 +1322,45 @@ review-memory [options]
 - `--days <n>` — Staleness threshold in days *(default: 90)*
 - `--limit <n>` — Cap per section *(default: 25)*
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory approve`
+
+Mark a captured note as human-verified trusted context
+
+```
+review-memory approve [options] <id>
+```
+
+**Options:**
+
+- `--by <who>` — Reviewer identity
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory reject`
+
+Remove a captured note from memory
+
+```
+review-memory reject [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory promote`
+
+Move a note to a more durable scope
+
+```
+review-memory promote [options] <id>
+```
+
+**Options:**
+
+- `--to <scope>` — global | symbol | file | feature | area
+- `--target <target>` — Required for symbol|file|feature|area
 - `--root <path>` — Repo root (default: cwd)
 
 ## `runtime`
@@ -1416,6 +1513,7 @@ suggest [options]
 
 - `--min <n>` — Minimum query count to include *(default: 3)*
 - `--limit <n>` — Max suggestions *(default: 10)*
+- `--auto` — Hook-safe mode: no-op unless .gps/config.yml has auto_suggest: true
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 

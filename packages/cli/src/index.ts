@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { registerContext } from "./commands/context.js";
 import { registerImpact } from "./commands/impact.js";
@@ -65,12 +67,15 @@ import { registerVerify } from "./commands/verify.js";
 import { registerSync } from "./commands/sync.js";
 import { registerPrune } from "./commands/prune.js";
 import { registerResume } from "./commands/resume.js";
+import { registerRemember } from "./commands/remember.js";
+import { registerPacket } from "./commands/packet.js";
+import { registerDone } from "./commands/done.js";
 
 export function buildProgram(): Command {
   const program = new Command()
     .name("gps")
     .description("Codebase context for coding agents.")
-    .version("0.1.0");
+    .version("0.2.0");
 
   program.addHelpText(
     "beforeAll",
@@ -105,6 +110,7 @@ export function buildProgram(): Command {
     "invariants",
     "invariant",
     "learn",
+    "remember",
     "notes",
     "learn-todos",
     "decide",
@@ -115,6 +121,7 @@ export function buildProgram(): Command {
     "pulse",
     "seed",
     "verify",
+    "done",
     "sync",
   ]);
   for (const cmd of program.commands) {
@@ -143,6 +150,7 @@ registerIndex(program);
 registerPrepare(program);
 registerContext(program);
 registerLearn(program);
+registerRemember(program);
 registerNotes(program);
 registerLearnTodos(program);
 registerDecide(program);
@@ -190,6 +198,8 @@ registerReviewMemory(program);
   registerPulse(program);
   registerSeed(program);
   registerVerify(program);
+  registerPacket(program);
+  registerDone(program);
   registerSync(program);
   registerPrune(program);
   registerResume(program);
@@ -199,8 +209,9 @@ const isMain = (() => {
   try {
     const entry = process.argv[1];
     if (!entry) return false;
-    const url = new URL(`file://${entry}`).href;
-    return import.meta.url === url;
+    const entryUrl = pathToFileURL(realpathSync(entry)).href;
+    const moduleUrl = pathToFileURL(realpathSync(fileURLToPath(import.meta.url))).href;
+    return moduleUrl === entryUrl;
   } catch {
     return false;
   }

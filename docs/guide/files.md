@@ -32,9 +32,10 @@ strands:
   - invariants
 capture: auto      # auto (persist live) | inbox (queue for review)
 promote: never     # never | safe | all — auto-graduation of note clusters
+auto_suggest: false # feature flag for hook-triggered `gps suggest --auto`
 ```
 
-`capture` and `promote` are written by `gps install --capture=… --promote=…`. See [Capture & promotion policy](../../README.md#capture--promotion-policy). JSON Schema: [`packages/schemas/json/config.schema.json`](../../packages/schemas/json/config.schema.json).
+`capture`, `promote`, and `auto_suggest` are written by `gps install --capture=… --promote=… --auto-suggest`. See [Capture & promotion policy](../../README.md#capture--promotion-policy). JSON Schema: [`packages/schemas/json/config.schema.json`](../../packages/schemas/json/config.schema.json).
 
 ## inbox.yml
 

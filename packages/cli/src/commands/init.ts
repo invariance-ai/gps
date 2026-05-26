@@ -21,6 +21,9 @@ strands:
   - tests
   - provenance
   - invariants
+capture: auto
+promote: never
+auto_suggest: false
 `;
 
 const INVARIANTS = `# .gps/invariants.yml — declarative constraints for symbols in your repo.

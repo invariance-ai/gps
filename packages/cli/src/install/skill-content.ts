@@ -68,6 +68,17 @@ gps learn <symbol> --lesson "<…>"            # legacy: always symbol-scoped
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
 
+Save hard-won findings. If you spent real time locating code, tests, config, owners, fixtures,
+or a non-obvious workflow, record the answer before you finish:
+
+\`\`\`bash
+gps lessons record "Refund approval tests live in apps/api/src/refund-approval.test.ts"
+gps lessons record "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts"
+\`\`\`
+
+Do this for findings that would save a future agent another search loop. Do not record obvious facts
+from the file you are already editing.
+
 \`gps lessons record\` returns the chosen scope and signals; if the scope looks wrong (e.g. it picked \`symbol\` for something repo-wide), call \`gps lessons reclassify <id> --to global\` to fix it. Global lessons land in the \`<!-- gps:global-lessons -->\` block of CLAUDE.md and are always loaded; scoped lessons live in \`.gps/notes/{symbol,file,feature,area}/\` and are auto-pulled when the prompt mentions the matching target.
 
 **Tag the session early.** When you understand what the user is working on (e.g. "the homepage", "the auth flow"), call \`gps feature use <short-kebab-label>\` once. Use the exact label if the user names a known feature; otherwise pick a short kebab-case label. gps then learns which symbols belong to that feature and surfaces them automatically on future sessions that mention the same label.
@@ -172,6 +183,10 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 
 \`gps learn <symbol> --lesson "<…>"\` still works but is legacy — always symbol-scoped. Prefer
 \`gps lessons record\`.
+
+If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
+save that finding with \`gps lessons record\` before you finish. Future agents should not repeat
+the same search.
 `;
 
 /**

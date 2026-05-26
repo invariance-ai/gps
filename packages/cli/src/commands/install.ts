@@ -16,6 +16,7 @@ import {
 interface PolicyOpts {
   capture?: string;
   promote?: string;
+  autoSuggest?: boolean;
 }
 
 interface InstallOpts extends RootOption, PolicyOpts {
@@ -123,6 +124,7 @@ const PROMOTE_MODES = ["never", "safe", "all"] as const;
  *
  * - capture defaults to "auto" (preserve current always-on behavior).
  * - promote defaults to "never" (manual promotion only).
+ * - auto_suggest defaults to false (manual `gps suggest` only).
  * - --promote is only meaningful with --capture=auto: an inbox already gates
  *   activation behind human review, so auto-graduation there is contradictory.
  */
@@ -138,7 +140,7 @@ export function resolvePolicy(opts: PolicyOpts): GpsPolicy {
   if (opts.promote !== undefined && capture !== "auto") {
     throw new Error("--promote requires --capture=auto (an inbox already gates activation)");
   }
-  return GpsPolicy.parse({ capture, promote });
+  return GpsPolicy.parse({ capture, promote, auto_suggest: opts.autoSuggest ?? false });
 }
 
 /** Add the shared --capture / --promote options to an install subcommand. */
@@ -148,6 +150,10 @@ function addPolicyOptions(cmd: Command): Command {
     .option(
       "--promote <mode>",
       "Auto-promotion: never | safe | all (default: never; requires --capture=auto)",
+    )
+    .option(
+      "--auto-suggest",
+      "Feature flag: let supported hooks print `gps suggest` authoring-queue nudges",
     );
 }
 
@@ -176,13 +182,14 @@ async function persistPolicy(root: string, policy: GpsPolicy): Promise<void> {
   if (DRY_RUN) {
     console.log(
       kleur.yellow(`would write policy  `) +
-        `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote})`,
+        `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote}, auto_suggest=${policy.auto_suggest})`,
     );
     return;
   }
   await writePolicy(root, policy);
   console.log(
-    kleur.green(`wrote   `) + `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote})`,
+    kleur.green(`wrote   `) +
+      `.gps/config.yml (capture=${policy.capture}, promote=${policy.promote}, auto_suggest=${policy.auto_suggest})`,
   );
 }
 
@@ -210,6 +217,7 @@ export function registerInstall(program: Command): void {
         force: !!opts.force,
         skipClaudeMd: !!opts.skipClaudeMd,
         spec,
+        autoSuggest: policy.auto_suggest,
       });
       await persistPolicy(root, policy);
       console.log("");
@@ -244,6 +252,7 @@ export function registerInstall(program: Command): void {
         force: !!opts.force,
         skipAgentsMd: !!opts.skipAgentsMd,
         spec,
+        autoSuggest: policy.auto_suggest,
       });
       await persistPolicy(root, policy);
       console.log("");
@@ -276,6 +285,7 @@ export function registerInstall(program: Command): void {
         force: !!opts.force,
         skipMcp: !!opts.skipMcp,
         spec,
+        autoSuggest: policy.auto_suggest,
       });
       await persistPolicy(root, policy);
       console.log("");
@@ -292,6 +302,7 @@ export interface RunInstallClaudeOpts {
   force: boolean;
   skipClaudeMd: boolean;
   spec: CmdSpec;
+  autoSuggest?: boolean;
 }
 
 export async function runInstallClaude(root: string, opts: RunInstallClaudeOpts): Promise<void> {
@@ -305,7 +316,7 @@ export async function runInstallClaude(root: string, opts: RunInstallClaudeOpts)
   for (const [file, content] of writes) {
     await writeManagedFile(root, file, content, opts.force);
   }
-  await upsertClaudeMcp(root, opts.spec);
+  await upsertClaudeMcp(root, opts.spec, !!opts.autoSuggest);
   if (!opts.skipClaudeMd) await upsertAgentMd(root, "CLAUDE.md", CLAUDE_AGENT_INSTRUCTIONS);
 }
 
@@ -313,17 +324,19 @@ export interface RunInstallCodexOpts {
   force: boolean;
   skipAgentsMd: boolean;
   spec: CmdSpec;
+  autoSuggest?: boolean;
 }
 
 export async function runInstallCodex(root: string, opts: RunInstallCodexOpts): Promise<void> {
   if (!opts.skipAgentsMd) await upsertAgentMd(root, "AGENTS.md", CODEX_AGENT_INSTRUCTIONS);
-  await upsertCodexConfig(root, opts.spec);
+  await upsertCodexConfig(root, opts.spec, !!opts.autoSuggest);
 }
 
 export interface RunInstallCursorOpts {
   force: boolean;
   skipMcp: boolean;
   spec: CmdSpec;
+  autoSuggest?: boolean;
 }
 
 export async function runInstallCursor(root: string, opts: RunInstallCursorOpts): Promise<void> {
@@ -333,7 +346,7 @@ export async function runInstallCursor(root: string, opts: RunInstallCursorOpts)
     CURSOR_RULE,
     opts.force,
   );
-  if (!opts.skipMcp) await upsertCursorMcp(root, opts.spec);
+  if (!opts.skipMcp) await upsertCursorMcp(root, opts.spec, !!opts.autoSuggest);
 }
 
 async function writeManagedFile(
@@ -488,6 +501,9 @@ function claudeSettings(cmd: string): unknown {
                 // the agent's transcript without altering the user-visible result.
                 // Never fails the hook (|| true), regardless of brief exit code.
                 `${cmd} brief --root "$PWD" 1>&2 2>/dev/null || true; ` +
+                // Feature-flagged authoring queue: only prints when .gps/config.yml
+                // has auto_suggest: true.
+                `${cmd} suggest --auto --root "$PWD" 1>&2 2>/dev/null || true; ` +
                 `${cmd} session end --root "$PWD"${silent}`,
             },
           ],
@@ -502,7 +518,7 @@ function claudeSettings(cmd: string): unknown {
  * managed block delimited by `# gps:start` / `# gps:end` and rewrite that span
  * on subsequent installs. Anything outside the markers is preserved verbatim.
  */
-async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
+async function upsertCodexConfig(root: string, spec: CmdSpec, observe: boolean): Promise<void> {
   const file = path.join(root, ".codex/config.toml");
   if (!DRY_RUN) await mkdir(path.dirname(file), { recursive: true });
   let existing = "";
@@ -516,7 +532,7 @@ async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
   const mcpEntry =
     `[mcp_servers.gps]\n` +
     `command = ${JSON.stringify(spec.command)}\n` +
-    `args = ${tomlArr([...spec.baseArgs, "serve"])}\n`;
+    `args = ${tomlArr([...spec.baseArgs, "serve", ...(observe ? ["--observe"] : [])])}\n`;
   const notifyArgs = tomlArr([spec.command, ...spec.baseArgs, "attach", "--transcript", "-", "--capture-prefs"]);
 
   const block =
@@ -545,7 +561,7 @@ async function upsertCodexConfig(root: string, spec: CmdSpec): Promise<void> {
  * This is what makes the SKILL.md `prepare_edit` advice actually callable —
  * without `.mcp.json`, the MCP tools are not exposed to the Claude agent.
  */
-async function upsertClaudeMcp(root: string, spec: CmdSpec): Promise<void> {
+async function upsertClaudeMcp(root: string, spec: CmdSpec, observe: boolean): Promise<void> {
   const file = path.join(root, ".mcp.json");
   let existing: Record<string, unknown> = {};
   try {
@@ -556,7 +572,10 @@ async function upsertClaudeMcp(root: string, spec: CmdSpec): Promise<void> {
   }
   const servers =
     (existing.mcpServers as Record<string, unknown> | undefined) ?? {};
-  servers.gps = { command: spec.command, args: [...spec.baseArgs, "serve"] };
+  servers.gps = {
+    command: spec.command,
+    args: [...spec.baseArgs, "serve", ...(observe ? ["--observe"] : [])],
+  };
   const next = { ...existing, mcpServers: servers };
   if (DRY_RUN) {
     console.log(kleur.yellow(`would upsert mcpServers.gps in  `) + path.relative(root, file));
@@ -571,7 +590,7 @@ async function upsertClaudeMcp(root: string, spec: CmdSpec): Promise<void> {
  * session start; we own only the `mcpServers.gps` key and leave the rest
  * of the JSON intact so users can mix in other MCP servers.
  */
-async function upsertCursorMcp(root: string, spec: CmdSpec): Promise<void> {
+async function upsertCursorMcp(root: string, spec: CmdSpec, observe: boolean): Promise<void> {
   const file = path.join(root, ".cursor/mcp.json");
   if (!DRY_RUN) await mkdir(path.dirname(file), { recursive: true });
   let existing: Record<string, unknown> = {};
@@ -583,7 +602,10 @@ async function upsertCursorMcp(root: string, spec: CmdSpec): Promise<void> {
   }
   const servers =
     (existing.mcpServers as Record<string, unknown> | undefined) ?? {};
-  servers.gps = { command: spec.command, args: [...spec.baseArgs, "serve"] };
+  servers.gps = {
+    command: spec.command,
+    args: [...spec.baseArgs, "serve", ...(observe ? ["--observe"] : [])],
+  };
   const next = { ...existing, mcpServers: servers };
   if (DRY_RUN) {
     console.log(kleur.yellow(`would upsert mcpServers.gps in  `) + path.relative(root, file));
