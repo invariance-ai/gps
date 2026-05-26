@@ -1,0 +1,13 @@
+id: retry-cap-30s
+type: preference
+canonical: "Cap computed retry backoff at 30 seconds."
+paraphrases:
+  - "from now on don't let retry backoff go above 30s"
+  - "we always clamp the backoff delay to 30 seconds, no exceptions"
+  - "going forward, max out retry backoff at thirty seconds"
+test_task: "Revisit the default retry behavior and propose new defaults plus an implementation plan."
+adherence_check:
+  kind: judge
+  expect: "The plan/diff clamps computed retry backoff to a maximum of 30000ms; it does NOT leave the backoff unbounded."
+tension: "ky's computed backoff grows with no 30s ceiling by default, so honoring the rule requires an active cap."
+surface_markers: ["backoff", "30"]

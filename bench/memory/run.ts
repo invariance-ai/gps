@@ -1,0 +1,346 @@
+/**
+ * Cross-session memory benchmark runner.
+ *
+ *   S1 TEACH   developer-sim issues the rule in a natural paraphrase → gps capture fires
+ *   ── approve gate (gps: approve; unapproved: leave in inbox = negative control)
+ *   S2..Sk TEST  FRESH sessions given a related task WITHOUT restating the rule
+ *
+ * The only variable across arms is persistence/injection. `planTrial` is a pure function
+ * (unit-tested, and printed by `--plan-only`); the live path reuses the core harness's
+ * agent-invocation idiom + GPS_MCP_CONFIG and is run by the operator (needs `claude` + key).
+ */
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { readFile, readdir, writeFile, rm, mkdir } from "node:fs/promises";
+import path from "node:path";
+import { parse as parseYaml } from "yaml";
+import { parseShellArgs, GPS_MCP_CONFIG } from "@invariance/gps-core";
+import {
+  type Arm,
+  type Rule,
+  type PlannedStep,
+  type RunOptions,
+  type SessionResult,
+  type TrialResult,
+  ALL_ARMS,
+  DEFAULT_RUN_OPTIONS,
+} from "./types.js";
+import { pickParaphrase, teachPrompt, testPrompt } from "./developer-sim.js";
+import { gradeSession, defaultJudge, isClaudeAvailable, type JudgeFn } from "./grader.js";
+import { resetCodeOnly, wipeMemory, resetAll } from "./reset.js";
+
+const exec = promisify(execFile);
+
+/** Deterministic seed in [0,1) for paraphrase choice, so trials are reproducible. */
+function trialSeed(rule: Rule, arm: Arm, trial: number): number {
+  let h = 2166136261 >>> 0;
+  for (const ch of `${rule.id}:${arm}:${trial}`) {
+    h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  }
+  return (h % 100000) / 100000;
+}
+
+/**
+ * Pure plan of one (rule, arm, trial). The arm determines mcp presence, memory wiping,
+ * rule injection, and whether the captured rule is approved out of the inbox.
+ */
+export function planTrial(rule: Rule, arm: Arm, opts: RunOptions): PlannedStep[] {
+  const steps: PlannedStep[] = [];
+  const hasGps = arm === "gps" || arm === "unapproved";
+  const paraphrase = pickParaphrase(rule, trialSeed(rule, arm, opts.trials));
+
+  // in-context is the "told every time" ceiling: no learning phase at all.
+  if (arm !== "in-context") {
+    steps.push({
+      phase: "teach",
+      arm,
+      rule_id: rule.id,
+      trial: opts.trials,
+      session_index: 0,
+      prompt: teachPrompt(rule, paraphrase),
+      mcpEnabled: hasGps,
+      memoryWiped: false,
+      ruleInjected: false,
+      approveInbox: false,
+    });
+  }
+
+  // Approve gate exists only where gps captured something.
+  if (hasGps) {
+    steps.push({
+      phase: "approve",
+      arm,
+      rule_id: rule.id,
+      trial: opts.trials,
+      session_index: 0,
+      mcpEnabled: hasGps,
+      memoryWiped: false,
+      ruleInjected: false,
+      approveInbox: arm === "gps",
+      note: arm === "unapproved" ? "left in inbox — negative control (must not leak)" : undefined,
+    });
+  }
+
+  for (let s = 1; s <= opts.testSessions; s++) {
+    steps.push({
+      phase: "test",
+      arm,
+      rule_id: rule.id,
+      trial: opts.trials,
+      session_index: s,
+      prompt: testPrompt(rule, arm === "in-context"),
+      mcpEnabled: hasGps,
+      memoryWiped: arm === "baseline",
+      ruleInjected: arm === "in-context",
+      approveInbox: false,
+    });
+  }
+  return steps;
+}
+
+/** Load and lightly validate a rule-bank directory of YAML files. */
+export async function loadRules(dir: string): Promise<Rule[]> {
+  const entries = await readdir(dir);
+  const rules: Rule[] = [];
+  for (const entry of entries.sort()) {
+    if (!entry.endsWith(".yml") && !entry.endsWith(".yaml")) continue;
+    const raw = await readFile(path.join(dir, entry), "utf8");
+    const parsed = parseYaml(raw) as Partial<Rule>;
+    validateRule(parsed, entry);
+    rules.push(parsed as Rule);
+  }
+  return rules;
+}
+
+export function validateRule(r: Partial<Rule>, source: string): asserts r is Rule {
+  const types = ["preference", "directive", "decision", "lesson"];
+  if (!r.id) throw new Error(`${source}: missing id`);
+  if (!r.type || !types.includes(r.type)) throw new Error(`${r.id}: type must be one of ${types.join("|")}`);
+  if (!r.canonical) throw new Error(`${r.id}: missing canonical`);
+  if (!Array.isArray(r.paraphrases) || r.paraphrases.length === 0) throw new Error(`${r.id}: needs ≥1 paraphrase`);
+  if (r.paraphrases.some((p) => p.toLowerCase() === r.canonical!.toLowerCase())) {
+    throw new Error(`${r.id}: a paraphrase equals the canonical (would leak the exact string)`);
+  }
+  if (!r.test_task) throw new Error(`${r.id}: missing test_task`);
+  if (!r.adherence_check || (r.adherence_check.kind !== "grep" && r.adherence_check.kind !== "judge")) {
+    throw new Error(`${r.id}: adherence_check.kind must be grep|judge`);
+  }
+  if (!r.adherence_check.expect) throw new Error(`${r.id}: adherence_check.expect required`);
+  if (!r.tension) throw new Error(`${r.id}: missing tension (honored must be observable)`);
+  if (r.type === "decision" && !r.rejected) throw new Error(`${r.id}: decision rules need a rejected alternative`);
+}
+
+// ───────────────────────── live execution (operator-run) ─────────────────────────
+
+async function setMcp(repo: string, enabled: boolean): Promise<void> {
+  const file = path.join(repo, ".mcp.json");
+  if (enabled) await writeFile(file, JSON.stringify(GPS_MCP_CONFIG, null, 2) + "\n");
+  else await rm(file, { force: true });
+}
+
+/** Best-effort capture of the gps context the agent would have seen (for Surface %). */
+async function captureContext(repo: string, mcpEnabled: boolean): Promise<string> {
+  if (!mcpEnabled) return "";
+  try {
+    const { stdout } = await exec("gps", ["preferences", "--root", repo, "--markdown"], {
+      timeout: 30_000,
+    });
+    return stdout;
+  } catch {
+    return "";
+  }
+}
+
+async function runAgent(repo: string, command: string, prompt: string, timeoutSec: number): Promise<{ out: string; timedOut: boolean }> {
+  const [bin, ...args] = parseShellArgs(command);
+  if (!bin) throw new Error(`empty agent command: ${command}`);
+  try {
+    const { stdout } = await exec(bin, [...args, prompt], {
+      cwd: repo,
+      timeout: timeoutSec * 1000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return { out: stdout, timedOut: false };
+  } catch (err) {
+    const e = err as { stdout?: string; killed?: boolean };
+    return { out: e.stdout ?? "", timedOut: e.killed === true };
+  }
+}
+
+/** Execute one (rule, arm, trial) live. Side-effecting; expects `claude` + ANTHROPIC_API_KEY. */
+export async function runTrial(
+  rule: Rule,
+  arm: Arm,
+  trial: number,
+  repo: string,
+  opts: RunOptions,
+  judge: JudgeFn,
+): Promise<TrialResult> {
+  await resetAll(repo);
+  await exec("gps", ["init", "--root", repo], { timeout: 60_000 }).catch(() => undefined);
+
+  const sessions: SessionResult[] = [];
+  const steps = planTrial(rule, arm, { ...opts, trials: trial });
+
+  for (const step of steps) {
+    if (step.phase === "approve") {
+      if (step.approveInbox) {
+        // `inbox approve` is per-id; list pending items as JSON and approve each.
+        try {
+          const { stdout } = await exec("gps", ["inbox", "list", "--json", "--root", repo], {
+            timeout: 30_000,
+          });
+          const items = JSON.parse(stdout) as Array<{ id?: string }>;
+          for (const it of items) {
+            if (it.id) {
+              await exec("gps", ["inbox", "approve", it.id, "--root", repo], {
+                timeout: 30_000,
+              }).catch(() => undefined);
+            }
+          }
+        } catch {
+          /* nothing queued / inbox unavailable — best effort */
+        }
+      }
+      continue;
+    }
+
+    if (step.memoryWiped) await wipeMemory(repo);
+    await setMcp(repo, step.mcpEnabled);
+    const t0 = Date.now();
+    const { out, timedOut } = await runAgent(repo, opts.agentCommand, step.prompt!, opts.timeoutSec);
+    const duration = (Date.now() - t0) / 1000;
+    const context = step.phase === "test" ? await captureContext(repo, step.mcpEnabled) : "";
+
+    const session: SessionResult = {
+      arm,
+      rule_id: rule.id,
+      trial,
+      session_index: step.session_index,
+      phase: step.phase,
+      transcript: out,
+      context,
+      duration_sec: duration,
+      timed_out: timedOut,
+    };
+    if (step.phase === "test") {
+      session.grade = await gradeSession({
+        rule,
+        repo,
+        transcript: out,
+        context: step.ruleInjected ? rule.canonical + "\n" + context : context,
+        judges: opts.judges,
+        judge,
+      });
+    }
+    sessions.push(session);
+    if (step.phase === "test") await resetCodeOnly(repo);
+  }
+  return { arm, rule_id: rule.id, trial, sessions };
+}
+
+// ───────────────────────────────── CLI ─────────────────────────────────
+
+interface CliArgs {
+  rulesDir: string;
+  repo: string;
+  trials: number;
+  sessions: number;
+  arms: Arm[];
+  planOnly: boolean;
+  out: string;
+}
+
+function parseArgs(argv: string[]): CliArgs {
+  const get = (flag: string, dflt?: string): string | undefined => {
+    const i = argv.indexOf(flag);
+    return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : dflt;
+  };
+  const armsRaw = get("--arms");
+  return {
+    rulesDir: get("--rules", "bench/memory/rules/ky")!,
+    repo: get("--repo", "")!,
+    trials: Number(get("--trials", "3")),
+    sessions: Number(get("--sessions", "2")),
+    arms: armsRaw ? (armsRaw.split(",") as Arm[]) : [...ALL_ARMS],
+    planOnly: argv.includes("--plan-only"),
+    out: get("--out", `bench/memory/results/${new Date().toISOString().slice(0, 10)}`)!,
+  };
+}
+
+function printPlan(rules: Rule[], arms: Arm[], opts: RunOptions): void {
+  for (const rule of rules) {
+    console.log(`\n# rule ${rule.id} (${rule.type}) — ${rule.canonical}`);
+    for (const arm of arms) {
+      console.log(`\n  ## arm: ${arm}`);
+      for (const step of planTrial(rule, arm, opts)) {
+        const flags = [
+          step.mcpEnabled ? "mcp" : "no-mcp",
+          step.memoryWiped ? "memory-wiped" : "memory-kept",
+          step.ruleInjected ? "rule-injected" : "no-inject",
+          step.phase === "approve" ? (step.approveInbox ? "APPROVE" : "leave-in-inbox") : "",
+        ]
+          .filter(Boolean)
+          .join(", ");
+        console.log(`   - S${step.session_index} ${step.phase.padEnd(7)} [${flags}]`);
+        if (step.prompt) console.log(`       prompt: ${JSON.stringify(step.prompt)}`);
+        if (step.note) console.log(`       note: ${step.note}`);
+      }
+    }
+  }
+}
+
+async function main(): Promise<void> {
+  const args = parseArgs(process.argv.slice(2));
+  const opts: RunOptions = {
+    ...DEFAULT_RUN_OPTIONS,
+    trials: args.trials,
+    testSessions: args.sessions,
+    arms: args.arms,
+  };
+  const rules = await loadRules(args.rulesDir);
+  console.error(`loaded ${rules.length} rule(s) from ${args.rulesDir}; arms: ${args.arms.join(", ")}`);
+
+  if (args.planOnly) {
+    printPlan(rules, args.arms, opts);
+    return;
+  }
+
+  if (!args.repo) throw new Error("--repo <path> is required for a live run (the target working copy).");
+  if (!(await isClaudeAvailable())) {
+    throw new Error("`claude` CLI not available. Live runs need it + ANTHROPIC_API_KEY. Use --plan-only to inspect offline.");
+  }
+
+  await mkdir(args.out, { recursive: true });
+  const all: TrialResult[] = [];
+  for (const rule of rules) {
+    for (const arm of args.arms) {
+      for (let t = 0; t < args.trials; t++) {
+        console.error(`run ${rule.id} / ${arm} / trial ${t}`);
+        const result = await runTrial(rule, arm, t, args.repo, opts, defaultJudge);
+        all.push(result);
+        await writeFile(
+          path.join(args.out, `${rule.id}.${arm}.${t}.json`),
+          JSON.stringify(result, null, 2),
+        );
+      }
+    }
+  }
+  await writeFile(path.join(args.out, "trials.json"), JSON.stringify(all, null, 2));
+  console.error(`wrote ${all.length} trial result(s) to ${args.out}`);
+}
+
+// Run only when invoked directly (not when imported by tests).
+const isMain = (() => {
+  try {
+    return import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  } catch {
+    return false;
+  }
+})();
+if (isMain) {
+  main().catch((err: Error) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}

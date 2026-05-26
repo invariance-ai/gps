@@ -1,0 +1,21 @@
+{
+  "name": "@invariance/gps-bench-memory",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-session memory benchmark for gps (teach → approve → fresh-session reuse).",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "plan": "tsx run.ts --plan-only --rules rules/ky"
+  },
+  "dependencies": {
+    "@invariance/gps-core": "workspace:*",
+    "yaml": "^2.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  }
+}

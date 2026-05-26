@@ -1,0 +1,13 @@
+id: forward-abort-signal
+type: directive
+canonical: "Always forward the caller's AbortSignal through to the underlying fetch call."
+paraphrases:
+  - "make sure we pass the AbortSignal down to fetch"
+  - "the user's abort signal has to reach the actual fetch"
+  - "don't drop the AbortSignal — thread it through to fetch"
+test_task: "Describe how request cancellation should work and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "The design forwards the caller-provided AbortSignal to the underlying fetch so cancellation propagates."
+tension: "Requires explicitly threading the signal through rather than dropping it."
+surface_markers: ["abort", "signal"]
