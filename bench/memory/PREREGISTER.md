@@ -54,7 +54,16 @@ Judge noise → 3-judge blind panel + κ reported + deterministic checks dominat
 (validated), test task never restates. Prompt unfairness → identical prompts, only the arm setup
 differs. Token overclaim → report honestly, caveat any apparent win.
 
+## Discriminator principle (pilot finding, 2026-05-26 — see `results/`)
+A rule only measures memory if the taught choice is one the **model would not pick unprompted**.
+The pilot's `retry-cap-30s` failed this: the baseline *also* proposed a 30s cap, because 30s is
+the obvious default — zero attributable lift. Every rule in the bank now anchors on an
+**arbitrary** value (17s cap, 13s timeout, an `X-Ky-Trace` header) or a **contrarian** choice
+(retry POST; do *not* throw on 404). When the fresh `gps` session reproduces `17_000` and the
+baseline says `30000`, the difference can only be memory. Rules that merely restate a sensible
+default or ky's actual behavior are excluded.
+
 ## Caveat to resolve before the real run
-The ky `adherence_check`s currently use `kind: judge` with literal criteria. Pin each rule's
-`grep` check and `symbol` to ky's **actual** internals at a fixed SHA (so deterministic checks can
-dominate the headline) before publishing numbers.
+`adherence_check`s use `kind: judge` against the arbitrary/contrarian criterion above. Optionally
+tighten the numeric ones (17s, 13s, the header) into `kind: grep` over the agent's diff at a fixed
+ky SHA so deterministic checks dominate the headline; the judge handles the contrarian rules.

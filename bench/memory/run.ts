@@ -177,7 +177,20 @@ export async function runTrial(
   judge: JudgeFn,
 ): Promise<TrialResult> {
   await resetAll(repo);
-  await exec("gps", ["init", "--root", repo], { timeout: 60_000 }).catch(() => undefined);
+  // Faithful per-arm setup. Only the gps/unapproved arms get gps at all; baseline and
+  // in-context run vanilla (resetAll already cleared `.gps/`, `.mcp.json`, and any installed
+  // hooks). `install` wires the lifecycle hooks — incl. UserPromptSubmit → capture-preference /
+  // capture-directive, which is what actually records the taught rule. The pilot confirmed this
+  // is the path that fires headless; `gps init` alone captures nothing. `--capture inbox` routes
+  // captures through the governance gate so the approve step (and the unapproved control) mean
+  // something.
+  if (arm === "gps" || arm === "unapproved") {
+    await exec("gps", ["init", "--root", repo], { timeout: 60_000 }).catch(() => undefined);
+    await exec("gps", ["install", "claude", "--capture", "inbox", "--root", repo], {
+      timeout: 60_000,
+    }).catch(() => undefined);
+    await exec("gps", ["index", "--root", repo], { timeout: 120_000 }).catch(() => undefined);
+  }
 
   const sessions: SessionResult[] = [];
   const steps = planTrial(rule, arm, { ...opts, trials: trial });

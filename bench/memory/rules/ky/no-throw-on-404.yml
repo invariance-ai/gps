@@ -1,0 +1,14 @@
+id: no-throw-on-404
+type: lesson
+symbol: parseResponse
+canonical: "Do NOT throw on 404 responses; return the response so callers can branch on it."
+paraphrases:
+  - "we learned to stop throwing on 404 — hand the response back instead"
+  - "404s shouldn't raise here; let callers inspect the response themselves"
+  - "treat a 404 as a normal response to return, not an HTTPError"
+test_task: "Propose how ky should handle 404 Not Found responses and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "The proposal does NOT throw/raise on 404 and instead returns the response for the caller to handle. Throwing an HTTPError on 404 (ky's actual default) violates the rule."
+tension: "ky throws HTTPError on all non-2xx by default; suppressing the throw specifically for 404 is contrarian and only memory would justify it."
+surface_markers: ["404"]

@@ -31,8 +31,14 @@ async function assertGitRepo(repo: string): Promise<void> {
 export async function resetCodeOnly(repo: string): Promise<void> {
   await assertGitRepo(repo);
   await exec("git", ["-C", repo, "checkout", "--", "."]);
-  // `-e` keeps these untracked paths; everything else untracked is removed.
-  await exec("git", ["-C", repo, "clean", "-fd", "-e", ".gps", "-e", ".mcp.json"]);
+  // `-e` keeps these untracked paths; everything else untracked is removed. Beyond gps memory
+  // (`.gps`) and the MCP config, preserve the installed hooks — `.claude/`, `CLAUDE.md`,
+  // `AGENTS.md` — or S2 in the same trial would lose the capture/injection wiring that
+  // `runTrial` set up once, silently turning the "fresh session" into a no-gps session.
+  await exec("git", [
+    "-C", repo, "clean", "-fd",
+    "-e", ".gps", "-e", ".mcp.json", "-e", ".claude", "-e", "CLAUDE.md", "-e", "AGENTS.md",
+  ]);
 }
 
 /** Remove all persisted gps memory. Used by the baseline arm before every test session. */
