@@ -69,4 +69,23 @@ describe("searchSymbols", () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.symbol.name).toBe("calculateRetryDelay");
   });
+
+  it("ranks production code above an equal-tier test-file match", () => {
+    const idx = indexOf([
+      sym({ name: "customFetch", file: "test/retry.ts" }),
+      sym({ name: "customFetch", file: "source/core/Ky.ts" }),
+    ]);
+    const results = searchSymbols(idx, "customFetch");
+    expect(results[0]?.symbol.file).toBe("source/core/Ky.ts");
+  });
+
+  it("collapses duplicate name+kind+file hits (helper redefined per test)", () => {
+    const idx = indexOf([
+      sym({ name: "customFetch", file: "test/retry.ts", line: 10 }),
+      sym({ name: "customFetch", file: "test/retry.ts", line: 42 }),
+      sym({ name: "customFetch", file: "test/retry.ts", line: 88 }),
+    ]);
+    const results = searchSymbols(idx, "customFetch");
+    expect(results).toHaveLength(1);
+  });
 });
