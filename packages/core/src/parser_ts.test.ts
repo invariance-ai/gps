@@ -95,3 +95,34 @@ describe("parser_ts content-hash cache", () => {
     }
   });
 });
+
+describe("parser_ts call-site extraction", () => {
+  let dir: string;
+  beforeAll(async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), "gps-parser-calls-"));
+  });
+  beforeEach(() => _resetParseCache());
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("records `this.#private()` calls (regression: private methods showed 0 callers)", async () => {
+    const f = path.join(dir, "ky.ts");
+    await writeFile(
+      f,
+      `class Ky {
+  #calculateDelay(): number { return 1; }
+  foo() { return this.#calculateDelay(); }
+  bar() { return this.#calculateDelay() + this.publicM(); }
+  publicM() { return 2; }
+}
+`,
+    );
+    const pf = await parseFileTS(f);
+    const callees = pf.call_sites.map((c) => c.callee_name);
+    // private method is reachable from two sites, keyed by its qualified name
+    expect(callees.filter((c) => c === "Ky.#calculateDelay")).toHaveLength(2);
+    // the public `this.method()` path still works
+    expect(callees).toContain("Ky.publicM");
+  });
+});
