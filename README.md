@@ -12,6 +12,8 @@ npx -y @invariance/gps index
 
 That's it. The agent now has a memory layer. Every session starts with your standing preferences. Every edit on a non-trivial symbol is preceded by a brief — invariants, callers, tests, prior decisions, notes from past edits. Every session end distills what was learned back into the graph.
 
+> **Pairs with [tars](https://github.com/invariance-ai/tars).** gps gives your agent memory of *your code*; [tars](https://github.com/invariance-ai/tars) teaches it *how to work* — it learns the orchestration method from your cleanest sessions (explore before editing, test before done) and feeds it back on the next prompt. Knowledge + method.
+
 ## vs. native Claude Code memory
 
 | | Claude Code native | gps |
