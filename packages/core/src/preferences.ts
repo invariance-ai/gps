@@ -101,26 +101,55 @@ export async function removePreference(root: string, id: string): Promise<boolea
 // paired with a durability signal (from now on / always / never / i prefer /
 // going forward / as a rule). The bare `don't|do not` cue was removed because
 // it captured transient task instructions like "Do not write code yet".
+// Recall matters: an earlier pass kept only "from now on / always / never / i
+// prefer", which captured ~28% of how developers actually phrase durable rules
+// ("we clamp X", "in this repo we…", "by default…", "decision: …"). These cues
+// broaden recall across the common durability signals; the TRANSIENT_GUARD /
+// SESSION_TALK checks below stay the precision net, and capture=inbox gates any
+// over-capture for review rather than letting it steer.
 const DIRECTIVE_CUES: Array<{ re: RegExp; strip: RegExp }> = [
+  // temporal permanence
   { re: /\bfrom now on[,:\s]+/i, strip: /^from now on[,:\s]+/i },
   { re: /\bgoing forward[,:\s]+/i, strip: /^going forward[,:\s]+/i },
+  { re: /\bfrom here on(?: out)?[,:\s]+/i, strip: /^from here on(?: out)?[,:\s]+/i },
   { re: /\bas a rule[,:\s]+/i, strip: /^as a rule[,:\s]+/i },
   { re: /\b(?:please\s+)?always\b/i, strip: /^\s*(?:please\s+)?/i },
   { re: /\b(?:please\s+)?never\b/i, strip: /^\s*(?:please\s+)?/i },
-  { re: /\bi (?:prefer|want|like)\b/i, strip: /^/ },
+  // explicit preference verbs ("we", not just "i")
+  { re: /\b(?:i|we) (?:prefer|want|like|expect|require)\b/i, strip: /^/ },
   { re: /\bmake sure (?:to|you) always\b/i, strip: /^/ },
   { re: /\b(?:don'?t|do not) (?:ever|always)\b/i, strip: /^/ },
   { re: /\bremember (?:to|that)\b/i, strip: /^remember (?:to|that)\s+/i },
+  // habitual policy
   { re: /\b(?:we|you) should (?:always|never)\b/i, strip: /^/ },
-  { re: /\bwe (?:always|never)\b/i, strip: /^\s*/i },
+  { re: /\bwe (?:always|never|only ever|only)\b/i, strip: /^\s*/i },
+  // scope-to-repo: a statement bound to the repo/codebase is a convention, not
+  // a one-off ("this task/session/turn" is caught by SESSION_TALK below).
+  { re: /\bin this (?:repo|repository|codebase|project|module|package)\b/i, strip: /^/ },
+  // default / standard setting
+  { re: /\bby default\b/i, strip: /^/ },
+  { re: /\bdefaults? to\b/i, strip: /^/ },
+  { re: /\b(?:as|make it) the default\b/i, strip: /^/ },
+  { re: /\bout[- ]of[- ]the[- ]box\b/i, strip: /^/ },
+  // universal quantifier
+  { re: /\bno exceptions\b/i, strip: /^/ },
+  // convention-declaration prefix ("decision: …", "convention - …")
+  {
+    re: /^(?:decision|convention|rule|policy|standard|guideline)\s*[:\-]\s+/i,
+    strip: /^(?:decision|convention|rule|policy|standard|guideline)\s*[:\-]\s+/i,
+  },
+  // naming conventions ("should be called X", "is named Y")
+  { re: /\b(?:should be|is|are)\s+(?:named|called)\b/i, strip: /^/ },
+  // stated lessons (durable knowledge worth remembering)
+  { re: /\bwe learned\b/i, strip: /^we learned (?:to|that)\s*/i },
+  { re: /\blearned (?:that|the hard way)\b/i, strip: /^/ },
+  { re: /\bturns out\b/i, strip: /^turns out (?:that\s+)?/i },
 ];
 
-const STOP_PREFIXES = [
-  /^let'?s\s+/i,
-  /^can you\s+/i,
-  /^could you\s+/i,
-  /^now\s+/i,
-];
+// `let's` is intentionally NOT here: a clause only reaches this check after
+// matching a durability cue, so "let's always …" / "let's default to …" are
+// durable. Bare conversational openers without a cue never get this far.
+const STOP_PREFIXES = [/^can you\s+/i, /^could you\s+/i, /^now\s+/i];
 
 // Transient-phrasing guard. Even when a clause trips a cue, these markers mean
 // it's a one-shot task instruction, not a durable rule. Reject the whole clause.
@@ -128,12 +157,26 @@ const TRANSIENT_GUARD: RegExp[] = [
   /\b(?:yet|for now|right now|at the moment|just for this|this time|today|already)\b/i,
   /\byou (?:do not|don'?t) need to\b/i,
   /\b(?:don'?t|do not) (?:bother|write code|change code|edit|run|start|begin)\b/i,
-  /\b(?:hold off|wait|hang on|stop)\b/i,
+  /\b(?:hold off|wait|hang on)\b/i,
+  // "stop" only in its halt sense — bare/clause-final ("…, stop", "stop now")
+  // — not as a content verb ("stop throwing on 404", "stop swallowing errors"),
+  // which is part of a durable rule.
+  /\bstop\s*(?:it|now|everything|right now)?\s*[.!?]*$/i,
 ];
 
 // Session-talk guard: the imperative should be about the codebase / engineering
 // conventions, not the chat session itself.
 const SESSION_TALK = /\b(?:right now|for now|this session|this chat|this conversation|this turn|this task|this prompt)\b/i;
+
+// First-person commentary / state — "I always get confused by this", "I think
+// we should…", "I'm not sure" — is conversation, not a durable rule, but the
+// `always`/`should` cues otherwise trip on it. (Preference verbs like "I prefer
+// / want / like" are deliberately NOT here — those ARE durable.)
+const CHATTER_GUARD: RegExp[] = [
+  /\bi\s*['’]?m\b/i, // "I'm" / "Im" / "I am" (contraction or spaced)
+  /\bi (?:get|am|was|feel|think|guess|wonder|assume|believe|realiz|notic|see|know|find)\w*/i,
+  /\b(?:confused|not sure|no idea|wondering|curious)\b/i,
+];
 
 export function rankPreferences(
   prefs: PreferenceT[],
@@ -184,6 +227,9 @@ export function extractPreferences(prompt: string): ExtractedPreference[] {
     // "from now on ... yet" style sentence is rejected wholesale.
     if (TRANSIENT_GUARD.some((re) => re.test(chunk))) continue;
     if (SESSION_TALK.test(chunk)) continue;
+    // Questions and first-person commentary are conversation, not rules.
+    if (chunk.trimEnd().endsWith("?")) continue;
+    if (CHATTER_GUARD.some((re) => re.test(chunk))) continue;
     const cue = DIRECTIVE_CUES.find((d) => d.re.test(chunk));
     if (!cue) continue;
     if (STOP_PREFIXES.some((re) => re.test(chunk))) continue;
