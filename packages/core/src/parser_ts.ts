@@ -69,6 +69,14 @@ interface CachedParse {
 const IN_MEM_MAX = 500;
 const PERSIST_MAX = 5000;
 
+// Bump whenever a change alters what `walkJsTs`/`walkPython` extract (symbols,
+// call_sites, imports). The cache is content-keyed, so without this an existing
+// repo keeps serving parses from the OLD parser logic after a gps upgrade —
+// e.g. the private-method (`this.#foo()`) caller fix would never reach anyone
+// who had already indexed. Folded into both the entry key and the on-disk
+// version so a mismatch discards the stale cache instead of silently using it.
+const PARSE_CACHE_VERSION = 2;
+
 // In-memory LRU (Map preserves insertion order — re-insert on access).
 const parseCache = new Map<string, CachedParse>();
 // Persistent layer (loaded from disk on demand, written on flush).
@@ -85,7 +93,7 @@ function sha256(s: string): string {
 }
 
 function cacheKey(lang: ParsedLanguage, content: string): string {
-  return `${lang}:${sha256(content)}`;
+  return `${PARSE_CACHE_VERSION}:${lang}:${sha256(content)}`;
 }
 
 function lruGet(key: string): CachedParse | undefined {
@@ -134,7 +142,10 @@ export async function loadParseCache(root: string): Promise<void> {
   persistRoot = root;
   try {
     const raw = await readFile(cacheFile(root), "utf8");
-    const data = JSON.parse(raw) as { entries: Array<[string, CachedParse]> };
+    const data = JSON.parse(raw) as { version?: number; entries: Array<[string, CachedParse]> };
+    // Discard a cache written by a different parser version rather than serving
+    // its stale (possibly buggy) parses.
+    if (data.version !== PARSE_CACHE_VERSION) return;
     for (const [k, v] of data.entries) persistCache.set(k, v);
   } catch {
     // missing or corrupt — start empty
@@ -153,7 +164,7 @@ export async function saveParseCache(root: string): Promise<void> {
     const entries = Array.from(persistCache.entries());
     await writeFile(
       cacheFile(target),
-      JSON.stringify({ version: 1, entries }),
+      JSON.stringify({ version: PARSE_CACHE_VERSION, entries }),
       "utf8",
     );
     persistDirty = false;
@@ -491,7 +502,16 @@ function walkJsTs(
         const obj = fn.childForFieldName("object");
         const prop = fn.childForFieldName("property");
         const isThis = obj && (obj.type === "this" || obj.type === "this_expression");
-        if (isThis && prop && prop.type === "property_identifier") {
+        // `this.foo()` (property_identifier) and `this.#foo()` (private —
+        // private_property_identifier, text incl. the leading `#` to match the
+        // symbol's qualified name `Class.#foo`). Without the private case,
+        // private-method calls form no edge and `impact`/`prepare` report
+        // "0 callers" on heavily-used private helpers.
+        if (
+          isThis &&
+          prop &&
+          (prop.type === "property_identifier" || prop.type === "private_property_identifier")
+        ) {
           const container = classStack[classStack.length - 1];
           if (container) {
             const callee = `${container}.${prop.text}`;
