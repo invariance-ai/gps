@@ -57,18 +57,35 @@ describe("resolveCmd", () => {
 });
 
 describe("resolvePolicy", () => {
-  it("defaults to capture=auto / promote=never with no flags", () => {
-    expect(resolvePolicy({})).toEqual({ capture: "auto", promote: "never" });
+  it("defaults to capture=auto / promote=safe with no flags", () => {
+    expect(resolvePolicy({})).toEqual({
+      capture: "auto",
+      promote: "safe",
+      auto_suggest: false,
+    });
   });
 
-  it("accepts --capture=inbox", () => {
-    expect(resolvePolicy({ capture: "inbox" })).toEqual({ capture: "inbox", promote: "never" });
+  it("defaults --capture=inbox to promote=never", () => {
+    expect(resolvePolicy({ capture: "inbox" })).toEqual({
+      capture: "inbox",
+      promote: "never",
+      auto_suggest: false,
+    });
   });
 
   it("accepts --capture=auto --promote=all", () => {
     expect(resolvePolicy({ capture: "auto", promote: "all" })).toEqual({
       capture: "auto",
       promote: "all",
+      auto_suggest: false,
+    });
+  });
+
+  it("accepts --auto-suggest as an explicit feature flag", () => {
+    expect(resolvePolicy({ autoSuggest: true })).toEqual({
+      capture: "auto",
+      promote: "safe",
+      auto_suggest: true,
     });
   });
 
@@ -99,6 +116,21 @@ describe("install codex: notifyArgs contains --capture-prefs", () => {
   });
 });
 
+describe("install codex: auto suggestions enable observation", () => {
+  it("Codex MCP server args include --observe when auto suggestions are enabled", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "gps-install-codex-observe-test-"));
+    const spec = resolveCmd({ useGlobal: true });
+    await runInstallCodex(root, {
+      force: true,
+      skipAgentsMd: true,
+      spec,
+      autoSuggest: true,
+    });
+    const config = await readFile(path.join(root, ".codex/config.toml"), "utf8");
+    expect(config).toContain('"serve", "--observe"');
+  });
+});
+
 describe("install claude: Stop hook does NOT contain --capture-prefs", () => {
   it("Claude .claude/settings.json Stop hook does not include --capture-prefs", async () => {
     const root = await mkdtemp(path.join(tmpdir(), "gps-install-claude-test-"));
@@ -114,5 +146,15 @@ describe("install claude: Stop hook does NOT contain --capture-prefs", () => {
         }
       }
     }
+  });
+});
+
+describe("install claude: Stop hook contains feature-flagged suggestions", () => {
+  it("Claude .claude/settings.json Stop hook runs `gps suggest --auto`", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "gps-install-claude-suggest-test-"));
+    const spec = resolveCmd({ useGlobal: true });
+    await runInstallClaude(root, { force: true, skipClaudeMd: true, spec });
+    const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+    expect(settings).toContain("suggest --auto");
   });
 });

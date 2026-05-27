@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
 import { registerContext } from "./commands/context.js";
 import { registerImpact } from "./commands/impact.js";
@@ -65,25 +67,107 @@ import { registerVerify } from "./commands/verify.js";
 import { registerSync } from "./commands/sync.js";
 import { registerPrune } from "./commands/prune.js";
 import { registerResume } from "./commands/resume.js";
+import { registerRemember } from "./commands/remember.js";
+import { registerPacket } from "./commands/packet.js";
+import { registerDone } from "./commands/done.js";
+
+type CommandRegistrar = (program: Command) => void;
+
+interface CommandRegistration {
+  name: string;
+  register: CommandRegistrar;
+  primary?: boolean;
+}
+
+const COMMANDS: CommandRegistration[] = [
+  { name: "init", register: registerInit, primary: true },
+  { name: "setup", register: registerWizard, primary: true },
+  { name: "install", register: registerInstall, primary: true },
+  { name: "prefer", register: registerPrefer },
+  { name: "preferences", register: registerPreferences },
+  { name: "capture-preference", register: registerCapturePreference },
+  { name: "capture-directive", register: registerCaptureDirective },
+  { name: "inbox", register: registerInbox },
+  { name: "context-from-path", register: registerContextFromPath },
+  { name: "directive", register: registerDirective },
+  { name: "feature", register: registerFeature },
+  { name: "index", register: registerIndex, primary: true },
+  { name: "prepare", register: registerPrepare, primary: true },
+  { name: "context", register: registerContext, primary: true },
+  { name: "learn", register: registerLearn, primary: true },
+  { name: "remember", register: registerRemember, primary: true },
+  { name: "notes", register: registerNotes, primary: true },
+  { name: "learn-todos", register: registerLearnTodos, primary: true },
+  { name: "decide", register: registerDecide, primary: true },
+  { name: "decisions", register: registerDecisions, primary: true },
+  { name: "suggest", register: registerSuggest, primary: true },
+  { name: "postmortem", register: registerPostmortem },
+  { name: "promote", register: registerPromote },
+  { name: "attach", register: registerAttach },
+  { name: "pr-intent", register: registerPrIntent },
+  { name: "impact", register: registerImpact, primary: true },
+  { name: "tests", register: registerTests, primary: true },
+  { name: "invariants", register: registerInvariants, primary: true },
+  { name: "invariant", register: registerInvariant, primary: true },
+  { name: "find", register: registerFind, primary: true },
+  { name: "trace", register: registerTrace, primary: true },
+  { name: "serve", register: registerServe, primary: true },
+  { name: "bench", register: registerBench },
+  { name: "context-from-prompt", register: registerContextFromPrompt },
+  { name: "record-failure", register: registerRecordFailure },
+  { name: "validate", register: registerValidate },
+  { name: "ask", register: registerAsk },
+  { name: "questions", register: registerQuestions },
+  { name: "session", register: registerSession },
+  { name: "why", register: registerWhy },
+  { name: "stale", register: registerStale },
+  { name: "contributors", register: registerContributors },
+  { name: "conflicts", register: registerConflicts },
+  { name: "assume", register: registerAssume },
+  { name: "health", register: registerHealth },
+  { name: "lessons", register: registerLessons },
+  { name: "gate", register: registerGate },
+  { name: "waive", register: registerWaive },
+  { name: "plan", register: registerPlan },
+  { name: "test-record", register: registerTestRecord },
+  { name: "runtime", register: registerRuntime },
+  { name: "audit", register: registerAudit },
+  { name: "review-memory", register: registerReviewMemory },
+  { name: "verify-contract", register: registerVerifyContract },
+  { name: "check-proposal", register: registerCheckProposal },
+  { name: "doctor", register: registerDoctor, primary: true },
+  { name: "verify-index", register: registerVerifyIndex },
+  { name: "review-diff", register: registerReviewDiff },
+  { name: "brief", register: registerBrief },
+  { name: "validate-knowledge", register: registerValidateKnowledge },
+  { name: "pulse", register: registerPulse, primary: true },
+  { name: "seed", register: registerSeed, primary: true },
+  { name: "verify", register: registerVerify, primary: true },
+  { name: "packet", register: registerPacket },
+  { name: "done", register: registerDone, primary: true },
+  { name: "sync", register: registerSync, primary: true },
+  { name: "prune", register: registerPrune },
+  { name: "resume", register: registerResume },
+];
 
 export function buildProgram(): Command {
   const program = new Command()
     .name("gps")
     .description("Codebase context for coding agents.")
-    .version("0.1.0");
+    .version("0.2.0");
 
   program.addHelpText(
     "beforeAll",
     [
-      "Core 5 (the happy path):",
-      "  gps init                              write .gps/config.yml + invariants.yml",
-      "  gps install <claude|codex|cursor>     wire agent hooks + CLAUDE.md / AGENTS.md / .cursor/",
-      "  gps index                             build the symbol graph",
+      "Happy path:",
+      "  gps setup --yes --with-claude         init .gps, index, lift TODOs, wire Claude Code",
+      "  gps setup --yes --with-codex          init .gps, index, lift TODOs, wire Codex CLI",
       "  gps prepare <symbol> --intent <...>   decision-ready brief before edits",
-      "  gps learn <symbol> --lesson <...>     record what an edit taught you",
+      "  gps remember <fact>                   save a hard-won repo fact",
+      "  gps done                              post-edit self-audit",
       "",
       "Other essentials: gps doctor (health check), gps find, gps context, gps impact, gps tests.",
-      "Full surface (40+ commands) is available — see https://github.com/invariance-ai/gps#cli.",
+      "Full surface is available — see https://github.com/invariance-ai/gps#cli.",
       "",
     ].join("\n"),
   );
@@ -92,31 +176,7 @@ export function buildProgram(): Command {
 
   // Curate `gps --help`: only README-documented commands are visible by default.
   // The full surface still runs and is reachable via `gps <name> --help`.
-  const PRIMARY = new Set([
-    "init",
-    "install",
-    "index",
-    "prepare",
-    "context",
-    "find",
-    "trace",
-    "impact",
-    "tests",
-    "invariants",
-    "invariant",
-    "learn",
-    "notes",
-    "learn-todos",
-    "decide",
-    "decisions",
-    "serve",
-    "suggest",
-    "doctor",
-    "pulse",
-    "seed",
-    "verify",
-    "sync",
-  ]);
+  const PRIMARY = new Set(COMMANDS.filter((c) => c.primary).map((c) => c.name));
   for (const cmd of program.commands) {
     if (!PRIMARY.has(cmd.name())) {
       (cmd as unknown as { _hidden: boolean })._hidden = true;
@@ -128,79 +188,18 @@ export function buildProgram(): Command {
 }
 
 function registerAll(program: Command): void {
-  registerInit(program);
-registerWizard(program);
-registerInstall(program);
-registerPrefer(program);
-registerPreferences(program);
-registerCapturePreference(program);
-registerCaptureDirective(program);
-registerInbox(program);
-registerContextFromPath(program);
-registerDirective(program);
-registerFeature(program);
-registerIndex(program);
-registerPrepare(program);
-registerContext(program);
-registerLearn(program);
-registerNotes(program);
-registerLearnTodos(program);
-registerDecide(program);
-registerDecisions(program);
-registerSuggest(program);
-registerPostmortem(program);
-registerPromote(program);
-registerAttach(program);
-registerPrIntent(program);
-registerImpact(program);
-registerTests(program);
-registerInvariants(program);
-registerInvariant(program);
-registerFind(program);
-registerTrace(program);
-registerServe(program);
-registerBench(program);
-registerContextFromPrompt(program);
-registerRecordFailure(program);
-registerValidate(program);
-registerAsk(program);
-registerQuestions(program);
-registerSession(program);
-registerWhy(program);
-registerStale(program);
-registerContributors(program);
-registerConflicts(program);
-registerAssume(program);
-registerHealth(program);
-registerLessons(program);
-registerGate(program);
-registerWaive(program);
-registerPlan(program);
-registerTestRecord(program);
-registerRuntime(program);
-registerAudit(program);
-registerReviewMemory(program);
-  registerVerifyContract(program);
-  registerCheckProposal(program);
-  registerDoctor(program);
-  registerVerifyIndex(program);
-  registerReviewDiff(program);
-  registerBrief(program);
-  registerValidateKnowledge(program);
-  registerPulse(program);
-  registerSeed(program);
-  registerVerify(program);
-  registerSync(program);
-  registerPrune(program);
-  registerResume(program);
+  for (const command of COMMANDS) {
+    command.register(program);
+  }
 }
 
 const isMain = (() => {
   try {
     const entry = process.argv[1];
     if (!entry) return false;
-    const url = new URL(`file://${entry}`).href;
-    return import.meta.url === url;
+    const entryUrl = pathToFileURL(realpathSync(entry)).href;
+    const moduleUrl = pathToFileURL(realpathSync(fileURLToPath(import.meta.url))).href;
+    return moduleUrl === entryUrl;
   } catch {
     return false;
   }
@@ -218,8 +217,8 @@ if (isMain) {
         const isConfig = /config\.yml/.test(msg);
         console.error(
           isConfig
-            ? "gps is not initialized in this directory. Run `gps init` first."
-            : "No symbol index found. Run `gps index` first (or `gps init` if this is a new repo).",
+            ? "gps is not initialized in this directory. Run `gps setup --yes --with-claude` (or --with-codex) first."
+            : "No symbol index found. Run `gps index` first (or `gps setup --yes --with-claude` if this is a new repo).",
         );
         console.error("Run `gps doctor` to see what else is missing.");
         process.exit(1);

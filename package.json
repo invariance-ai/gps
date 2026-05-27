@@ -15,6 +15,7 @@
     "test": "pnpm -r test",
     "dev": "pnpm -r --parallel dev",
     "bench:perf": "tsx bench/perf/run.ts",
+    "bench:memory:openai": "tsx bench/memory-loop/run-openai.ts",
     "perf:check": "tsx bench/perf/compare-thresholds.ts --baseline bench/baselines/perf-self.json --current bench/perf/results/current.json",
     "verify:check": "tsx bench/perf/compare-verify.ts --baseline bench/baselines/verify-index-self.json --current bench/perf/results/verify-current.json",
     "bench:compare": "tsx bench/perf/compare-all.ts",
@@ -24,6 +25,7 @@
     "gen:docs": "tsx scripts/gen-commands-doc.ts",
     "gen:schemas": "tsx scripts/gen-json-schemas.ts",
     "gen:check": "pnpm gen:docs && pnpm gen:schemas && git diff --exit-code docs/guide/commands.md packages/schemas/json",
+    "smoke:pack": "tsx scripts/smoke-packed-install.ts",
     "release": "tsx scripts/release.ts",
     "release:check": "tsx scripts/release.ts --check",
     "release:dry": "bash scripts/publish.sh --dry-run"

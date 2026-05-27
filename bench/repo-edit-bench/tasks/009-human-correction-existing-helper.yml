@@ -1,0 +1,8 @@
+repo: examples/multi-symbol
+prompt: |
+  A previous agent added duplicate id formatting logic. Fix it by using
+  the existing `mkId` helper everywhere. Do not add another id helper.
+checks:
+  - "grep -q 'function mkId' src/refunds.ts"
+  - "! grep -Eq 'function .*Id|const .*Id' src/refunds.ts || test $(grep -Ec 'function .*Id|const .*Id' src/refunds.ts) -le 1"
+  - "grep -q 'mkId(\"rf\"' src/refunds.ts"

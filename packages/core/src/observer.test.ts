@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { recordObservation, readObservations, suggest } from "./observer.js";
+import { recordObservation, recordPrepared, readObservations, suggest } from "./observer.js";
 
 const roots: string[] = [];
 
@@ -53,5 +53,19 @@ describe("observer", () => {
     await recordObservation(root, "tests_for", "createRefund");
 
     await expect(suggest(root, { min_count: 3 })).resolves.toEqual([]);
+  });
+
+  it("counts CLI prepare calls as query traffic for suggestions", async () => {
+    const root = await tempRepo();
+    await recordPrepared(root, "createRefund");
+    await recordPrepared(root, "createRefund");
+
+    const store = await readObservations(root);
+    expect(store.symbols.createRefund?.count).toBe(2);
+    expect(store.symbols.createRefund?.tools.prepare_edit).toBe(2);
+
+    await expect(suggest(root, { min_count: 2 })).resolves.toEqual([
+      expect.objectContaining({ symbol: "createRefund", count: 2 }),
+    ]);
   });
 });

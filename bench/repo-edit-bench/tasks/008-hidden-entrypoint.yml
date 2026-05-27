@@ -1,0 +1,9 @@
+repo: examples/multi-symbol
+prompt: |
+  Add a new exported entry point `refundPreview(req)` that returns the
+  would-be refund amount and currency without allocating an id. It must
+  live beside the other refund entry points in `src/refunds.ts`.
+checks:
+  - "grep -q 'export function refundPreview' src/refunds.ts"
+  - "grep -A 30 'function refundPreview' src/refunds.ts | grep -q 'currency'"
+  - "! grep -A 30 'function refundPreview' src/refunds.ts | grep -q 'mkId'"

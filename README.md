@@ -1,16 +1,15 @@
-# gps — plug-in memory layer for your coding agents
+# gps — repo memory for coding agents
 
-> One install. Durable, automatic, symbol-anchored repo memory for Claude Code, Codex, and Cursor.
+> Teach your coding agent how your repo works once. GPS brings that memory back when the relevant code is touched.
 
-`gps` gives Claude Code, Codex, and Cursor the memory they're missing: notes, decisions, preferences, and invariants anchored to symbols, captured automatically by lifecycle hooks, and surfaced only when the relevant code is touched.
+`gps` is a memory layer for Claude Code, Codex, Cursor, and shell-based coding agents. It stores the things humans usually have to repeat: repo conventions, best practices, user preferences, invariants, decisions, TODOs, test commands, and hard-won lessons from past edits. Then it retrieves the relevant slice before the agent edits.
 
 ```bash
 cd your-repo
-npx -y @invariance/gps install claude      # or: install codex | install cursor
-npx -y @invariance/gps index
+npx -y @invariance/gps setup --yes --with-claude   # or --with-codex
 ```
 
-That's it. The agent now has a memory layer. Every session starts with your standing preferences. Every edit on a non-trivial symbol is preceded by a brief — invariants, callers, tests, prior decisions, notes from past edits. Every session end distills what was learned back into the graph.
+That's it. `setup` initializes `.gps/`, builds the first symbol graph, lifts existing TODO/FIXME comments into notes, and wires your agent. Every non-trivial edit can start with a GPS brief: callers, likely tests, relevant invariants, prior decisions, notes from past edits, and preferences you have taught the agent. At turn end, supported integrations can capture durable lessons back into the memory layer.
 
 ## vs. native Claude Code memory
 
@@ -24,40 +23,102 @@ That's it. The agent now has a memory layer. Every session starts with your stan
 
 ## Quickstart
 
-No install required — `npx` runs the latest published version each time:
+One command from the repo root. Pick the agent you use:
 
 ```bash
 cd your-repo
-npx -y @invariance/gps init                # writes .gps/config.yml + .gps/invariants.yml
-npx -y @invariance/gps install claude      # writes CLAUDE.md + .claude skill/hooks + .mcp.json
-npx -y @invariance/gps install codex       # writes AGENTS.md + .codex/config.toml (notify + MCP)
-npx -y @invariance/gps install cursor      # writes .cursor/rules/gps.mdc + .cursor/mcp.json
-npx -y @invariance/gps index               # builds the symbol graph
-npx -y @invariance/gps learn-todos         # bootstrap notes from existing TODO/FIXME
-npx -y @invariance/gps invariant init --stack stripe   # optional: drop in a starter pack
+npx -y @invariance/gps setup --yes --with-claude   # Claude Code
+npx -y @invariance/gps setup --yes --with-codex    # Codex CLI
 ```
 
-Prefer a global install? `npm install -g @invariance/gps`, then drop the `npx -y` prefix and pass `--use-global` to the installers so generated hooks/MCP entries call `gps` directly instead of `npx`.
+Or install multiple integrations at once:
 
-Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and [`docs/guide/agents/`](docs/guide/agents/) for per-IDE setup details.
+```bash
+npx -y @invariance/gps setup --yes --with-cursor
+npx -y @invariance/gps setup --yes --with-claude --with-codex --with-cursor
+```
+
+`setup` does the full first-run path: writes `.gps/config.yml` and `.gps/invariants.yml`, builds `.gps/index/symbols.json`, lifts `TODO(symbol):` and `FIXME(symbol):` comments into notes, and installs the selected agent integration.
+
+## What gets installed
+
+GPS is CLI-first because coding agents already know how to run shell commands. The installer also writes the native files each agent reads at startup.
+
+| Agent | Install command | What GPS writes | How the agent learns |
+|---|---|---|---|
+| **Claude Code** | `npx -y @invariance/gps setup --yes --with-claude` | `CLAUDE.md`, `.claude/skills/gps/SKILL.md`, `.claude/settings.json`, `.mcp.json` | The skill and `CLAUDE.md` teach the workflow. Hooks inject context, refresh the index, and capture lessons. MCP exposes `mcp__gps__prepare_edit`. |
+| **Codex CLI** | `npx -y @invariance/gps setup --yes --with-codex` | `AGENTS.md`, `.codex/config.toml` | `AGENTS.md` teaches Codex to run `gps prepare` / `gps brief`. MCP exposes structured GPS tools. `notify` captures durable preferences after each turn. |
+| **Cursor** | `npx -y @invariance/gps setup --yes --with-cursor` | `.cursor/rules/gps.mdc`, `.cursor/mcp.json` | The always-attached rule teaches the workflow. MCP tools are available for context and explicit memory capture. |
+
+The core loop is the same everywhere:
+
+```bash
+gps prepare --intent "what I am about to change"   # get the repo-specific brief
+gps remember "hard-won fact worth reusing"         # save a durable lesson
+gps remember "still need to update the fixture" --reminder --symbol createRefund
+gps brief                                          # check changed symbols, tests, and invariants before done
+```
+
+For Claude Code and Codex, GPS can also capture instructions like "always run this test twice" or "in this package, use the errors module" from the session transcript according to your capture policy.
+
+## Copy-paste prompt for Claude Code
+
+If you want Claude Code to install GPS for you, paste this into a Claude Code session at the root of your repo:
+
+```text
+Install GPS for this repository and verify it is wired for Claude Code.
+
+GPS npm package: https://www.npmjs.com/package/@invariance/gps
+GPS GitHub repo: https://github.com/invariance-ai/gps
+
+Run:
+  npx -y @invariance/gps setup --yes --with-claude
+
+Then verify:
+  gps validate --root "$PWD"
+  test -f CLAUDE.md
+  test -f .claude/skills/gps/SKILL.md
+  test -f .claude/settings.json
+  test -f .mcp.json
+
+After setup, briefly explain what changed and show me the first GPS command I should use before a non-trivial edit.
+```
+
+Prefer a global install? Use one shell line:
+
+```bash
+npm install -g @invariance/gps && gps setup --yes --with-claude
+```
+
+Optional starter packs are still explicit because they depend on your stack:
+
+```bash
+gps invariant init --stack stripe
+```
+
+Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-started.md) for the 10-minute walkthrough, [`docs/guide/commands.md`](docs/guide/commands.md) for the full CLI reference, and the install guides for [`Claude Code`](docs/guide/agents/claude.md), [`Codex CLI`](docs/guide/agents/codex.md), and [`Cursor`](docs/guide/agents/cursor.md).
+
+Launching or evaluating the project? [`docs/launch-audit.md`](docs/launch-audit.md) has the MVP bar, benchmark claims that are safe to cite, X thread beats, and the npm smoke checklist. [`docs/product-hunt.md`](docs/product-hunt.md) has launch copy.
 
 ## Capture & promotion policy
 
-Every installer (`claude` / `codex` / `cursor`) takes two governance flags that persist to `.gps/config.yml`:
+Every installer (`claude` / `codex` / `cursor`) takes governance flags that persist to `.gps/config.yml`:
 
 ```bash
 gps install codex --capture=inbox              # captured memory waits in `gps inbox` for review
-gps install codex --capture=auto --promote=never   # capture live, never auto-graduate (default)
-gps install codex --capture=auto --promote=safe     # auto-graduate clusters, except risky topics
+gps install codex --capture=auto --promote=safe     # capture live, auto-promote safe clusters (default)
+gps install codex --capture=auto --promote=never    # capture live, keep promotion manual
 gps install codex --capture=auto --promote=all      # auto-graduate everything — visibly dangerous
+gps install claude --auto-suggest                   # feature flag: hook prints authoring-queue nudges
 ```
 
-Two independent axes:
+Three independent axes:
 
 - **`--capture`** — where freshly captured memory lands. `auto` (default) persists it live, exactly as today. `inbox` queues it for human approval via `gps inbox` before anything activates.
-- **`--promote`** — whether recurring note clusters auto-graduate into invariants. `never` (default) keeps promotion manual (`gps promote <symbol>`). `safe` auto-promotes, but holds back any cluster touching a `require_approval_for` risk topic (auth, payments, billing, security, migrations, compliance, destructive actions). `all` promotes everything that clusters and **bypasses the risk gate** — the installer prints a loud warning, and it only applies with `--capture=auto`.
+- **`--promote`** — whether recurring note clusters auto-graduate into invariants. `safe` (default with `capture=auto`) auto-promotes, but holds back any cluster touching a `require_approval_for` risk topic (auth, payments, billing, security, migrations, compliance, destructive actions). `never` keeps promotion manual (`gps promote <symbol>`). `all` promotes everything that clusters and **bypasses the risk gate** — the installer prints a loud warning, and it only applies with `--capture=auto`.
+- **`--auto-suggest`** — default off. When enabled, supported hooks may run `gps suggest --auto` at turn end and print a short authoring queue: hot or failure-prone symbols that still lack notes/invariants, plus lessons near promotion. It also configures MCP as `gps serve --observe` so the queue has metadata. It never writes memory by itself.
 
-Defaults (`capture=auto`, `promote=never`) preserve current behavior, so existing setups are unaffected.
+Defaults (`capture=auto`, `promote=safe`, `auto_suggest=false`) make memory useful immediately while still gating risky topics. If you choose `capture=inbox`, promotion defaults to manual because humans are already reviewing memory before activation.
 
 Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`. Override the policy for a single run with `gps promote --auto=safe` (or `=never` / `=all`).
 
@@ -67,9 +128,7 @@ The full loop — an agent gets context, a developer's correction is captured fo
 
 ```console
 # 1. Install with capture=inbox so corrections queue for review (nothing activates silently).
-$ npx -y @invariance/gps init
-$ npx -y @invariance/gps install claude --capture=inbox
-$ npx -y @invariance/gps index
+$ npx -y @invariance/gps setup --yes --with-claude --capture=inbox
 
 # 2. The agent prepares an edit and gets structure, tests, invariants, and risk.
 $ gps prepare createRefund --intent "add $5000 cap for non-enterprise"
@@ -100,18 +159,52 @@ $ gps prepare refundEndpoint --intent "return a typed error on overflow"
 
 Captured once, approved once — and it now rides along on every edit in that directory, for every future agent and human. `--capture=auto` skips step 4 and activates corrections immediately; `inbox` is the reviewed path.
 
-## The generated skill
+Corrections about test coverage are treated as first-class memory. If a user says
+"No, bad Codex, you need to write more tests" after a prepared edit, the Stop/notify
+capture path records a `user-correction` note on the last prepared symbol even when
+no LLM API key is configured. Future `gps prepare <symbol>` calls then surface that
+testing correction before the next edit.
 
-`gps install claude` writes `.claude/skills/gps/SKILL.md` — a Claude Code skill that auto-loads whenever you're editing code or starting a task. Paste it yourself if you prefer:
+Agents can also save their own hard-won findings:
 
 ```bash
+gps lessons record "Refund approval tests live in apps/api/src/refund-approval.test.ts"
+gps lessons record "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts"
+```
+
+The rule of thumb: if finding it took real search, record it once so the next
+agent does not repeat the search loop.
+
+## How Claude Code knows to use gps
+
+`gps setup --yes --with-claude` installs three Claude Code integration points:
+
+- `CLAUDE.md` — a managed gps block with always-loaded repo instructions and global lessons.
+- `.claude/skills/gps/SKILL.md` — a Claude Code skill that auto-loads when you're editing code or starting a task.
+- `.claude/settings.json` and `.mcp.json` — non-blocking hooks plus the gps MCP server.
+
+So yes: Claude Code learns the workflow through `CLAUDE.md`, and the skill/hooks make it active. The hooks inject context on session start and prompts, refresh the index around edits, record failed shell commands against the active symbol, and distill useful session learnings at the end. The MCP entry exposes the same context as tools, with `mcp__gps__prepare_edit` as the preferred structured entry point.
+
+If you only want the portable Claude Code skill, the important file is:
+
+```text
+.claude/skills/gps/SKILL.md
+```
+
+That skill is enough to teach Claude the loop: prepare before edits, remember hard-won facts, and run the pre-finalize brief. The one-command setup writes the skill for you and also adds hooks/MCP so the behavior is automatic instead of purely instructional.
+
+To inspect what Claude sees:
+
+```bash
+cat CLAUDE.md
 cat .claude/skills/gps/SKILL.md
 ```
 
 The skill tells Claude to:
 1. Run `gps prepare <symbol>` (or call `mcp__gps__prepare_edit`) before non-trivial edits
-2. Run `gps lessons record "<one sentence>"` after edits that taught something
-3. Treat `gps preferences` output as standing constraints every session
+2. Save hard-won repo facts with `gps remember "<fact>"`
+3. Run `gps done` before handing work back
+4. Treat `gps preferences` output as standing constraints every session
 
 ## How it works
 
@@ -124,16 +217,16 @@ Day one, gps is useful for context. Six months in, the notes-and-invariants laye
 
 ## CLI
 
-### Start here — the Core 5
+### Start here
 
-The whole happy path is five commands:
+The whole happy path is one setup command, then normal agent usage:
 
 ```bash
-gps init                                              # 1. write .gps/config.yml + invariants.yml
-gps install claude                                    # 2. wire CLAUDE.md + .claude hooks (or: install codex)
-gps index                                             # 3. build the symbol graph
-gps prepare <symbol> --intent "<one-liner>"           # 4. decision-ready brief before edits
-gps lessons record "<one sentence>"                   # 5. record what an edit taught you
+gps setup --yes --with-claude                         # init + index + TODO lift + Claude wiring
+gps prepare <symbol> --intent "<one-liner>"           # decision-ready brief before edits
+gps remember "<one sentence>"                         # save hard-won repo facts
+gps remember "still need to update the fixture" --reminder --symbol <symbol>
+gps done                                              # post-edit self-audit
 ```
 
 Everything below is the full surface for power users and automation.
@@ -153,6 +246,7 @@ gps trace <symbol>                                    # git provenance
 # Writing — anchored memory
 gps lessons record "..."                              # record a lesson; auto-classified global/scoped
 gps learn <symbol> --lesson "..." [--severity low|medium|high] [--evidence <ref>]   # legacy: always symbol-scoped
+gps remember "still need to update the fixture" --reminder --symbol createRefund     # agent/human reminder
 gps notes <symbol>                                    # what previous edits left behind
 gps learn-todos                                       # one-shot: lift TODO/FIXME into notes
 gps decide <symbol> --decision "..." [--rejected "..."] [--rationale "..."]
@@ -165,13 +259,13 @@ gps serve --observe                                   # opt-in: record per-symbo
 gps suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
 ```
 
-Run `gps --help` for the full command surface — 66 top-level commands (postmortem, promote, gate, runtime, audit, …). Full reference: [`docs/guide/commands.md`](docs/guide/commands.md).
+Run `gps --help` for the curated surface, or `gps <command> --help` for any advanced command. Full reference: [`docs/guide/commands.md`](docs/guide/commands.md).
 
 ### Passive observer — opt-in, metadata only
 
 `gps serve --observe` records *which symbol was queried* and *when*, into `.gps/observations.json`. **Nothing else.** No tool arguments beyond the symbol name, no tool results, no conversation content. The privacy line: gps never persists what an agent asked or what it received — only that `createRefund` was looked at 6 times this week.
 
-`gps suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next.
+`gps suggest` reads those counts and surfaces the symbols agents touch a lot that have no covering invariant. The agent's repeated confusion becomes the **authoring queue** — what's worth writing an invariant or note for next. To try automatic nudges in Claude Code, reinstall with `gps install claude --auto-suggest`; the hook runs `gps suggest --auto`, which is silent unless `.gps/config.yml` has `auto_suggest: true`.
 
 All read commands accept `--json` (stable contract for tool chaining) or `--markdown` (LLM-optimal). ANSI colors auto-strip when piped.
 
@@ -182,19 +276,23 @@ Coding agents already have Bash. Treat `gps` like `rg`: a local command the agen
 For **Claude Code**, the installer wires five non-blocking hooks: `SessionStart` (rebuilds the index, prints standing preferences), `UserPromptSubmit` (auto-loads context for symbols named in your prompt), `PreToolUse` Edit/Write (refreshes the index), `PostToolUse` Bash (records failures against the last-prepared symbol), and `Stop` (distills the session into Decisions):
 
 ```bash
-npx -y @invariance/gps install claude
+npx -y @invariance/gps setup --yes --with-claude
 ```
+
+Claude learns from `.claude/skills/gps/SKILL.md` and `CLAUDE.md`; hooks and MCP make the same behavior automatic.
 
 For **Codex CLI**, the installer writes `AGENTS.md` instructions, registers `gps serve` as an MCP server, and configures a `notify` hook that distills each turn — auto preference and directive capture happen via this hook:
 
 ```bash
-npx -y @invariance/gps install codex
+npx -y @invariance/gps setup --yes --with-codex
 ```
+
+Codex learns from the `AGENTS.md` block. The `notify` hook captures durable instructions after each turn, and the MCP server exposes the same context tools.
 
 For **Cursor**, the installer writes a `.cursor/rules/gps.mdc` always-attached rule and registers `gps serve` in `.cursor/mcp.json`. Because Cursor has no lifecycle hooks, the agent must call `record_preference` and `record_directive` MCP tools explicitly on durable and location-scoped instructions:
 
 ```bash
-npx -y @invariance/gps install cursor
+npx -y @invariance/gps setup --yes --with-cursor
 ```
 
 For any other shell-based agent, add this to the repo instructions:

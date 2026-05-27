@@ -1,0 +1,9 @@
+repo: examples/multi-symbol
+prompt: |
+  Update refund validation based on current code, not stale memory: keep
+  the existing high-value approval rule and add a separate rejection for
+  negative refund amounts.
+checks:
+  - "grep -Eq '< ?0|<= ?-1|negative' src/refunds.ts"
+  - "grep -q 'requires approval' src/refunds.ts"
+  - "grep -Eq 'HIGH_VALUE_USD|1000' src/refunds.ts"

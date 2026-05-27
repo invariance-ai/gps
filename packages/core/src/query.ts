@@ -135,6 +135,15 @@ function ancestorDirs(file: string): string[] {
   return out;
 }
 
+function memoryAgeLabel(recordedAt: string, now = Date.now()): string {
+  const recorded = Date.parse(recordedAt);
+  if (Number.isNaN(recorded)) return "";
+  const ageDays = Math.floor((now - recorded) / 86_400_000);
+  if (ageDays >= 180) return " stale memory";
+  if (ageDays >= 90) return " aging memory";
+  return "";
+}
+
 function buildLookups(index: GpsIndex): IndexLookups {
   const byId = new Map<string, SymbolRef>();
   const byQualified = new Map<string, SymbolRef>();
@@ -673,7 +682,8 @@ function formatPrepareEdit(
       items: directiveNotes.map((n) => {
         const loc = n.applies_to ?? n.symbol;
         const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
-        return `- **[${n.scope}: \`${loc}\`]** ${n.lesson}${ev}`;
+        const age = memoryAgeLabel(n.recorded_at);
+        return `- **[${n.scope}: \`${loc}\`${age}]** ${n.lesson}${ev}`;
       }),
     });
   }
@@ -682,7 +692,8 @@ function formatPrepareEdit(
     heading: "## Notes from previous edits",
     items: symbolNotes.map((n) => {
       const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
-      return `- **[${n.severity}]** ${n.lesson}${ev}`;
+      const age = memoryAgeLabel(n.recorded_at);
+      return `- **[${n.severity}${age}]** ${n.lesson}${ev}`;
     }),
   });
 

@@ -143,6 +143,32 @@ describe("annotateInboxDuplicates", () => {
     expect(ann?.duplicate_of).toBeUndefined();
   });
 
+  it("tags a later pending item that reworps an EARLIER pending item (same session, neither approved)", async () => {
+    const root = await tempRepo();
+    // First phrasing — stays actionable.
+    const { item: first } = await addToInbox(root, {
+      kind: "preference",
+      text: "always add retry logic with exponential backoff to outbound network calls",
+    });
+    // Reworded copy of the same rule, also still pending (nothing approved).
+    const { item: second } = await addToInbox(root, {
+      kind: "preference",
+      text: "add retry logic with exponential backoff to outbound network calls always",
+    });
+    // Genuinely different rule — must stay separate.
+    const { item: distinct } = await addToInbox(root, {
+      kind: "preference",
+      text: "prefer four space indentation in python files",
+    });
+
+    const annotated = await annotateInboxDuplicates(root, await loadInbox(root));
+    const byId = new Map(annotated.map((a) => [a.item.id, a]));
+
+    expect(byId.get(first.id)?.duplicate_of).toBeUndefined(); // first occurrence stays clean
+    expect(byId.get(second.id)?.duplicate_of).toMatch(/^pending /);
+    expect(byId.get(distinct.id)?.duplicate_of).toBeUndefined();
+  });
+
   it("tags a pending directive duplicating an active area note", async () => {
     const root = await tempRepo();
     // active area note recorded directly (e.g. via record_lesson path)

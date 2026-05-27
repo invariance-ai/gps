@@ -1,0 +1,9 @@
+repo: examples/multi-symbol
+prompt: |
+  Add focused tests for `createPartialRefund`. Put them in the existing
+  hidden test convention for this repo: `tests/unit/refunds.test.ts`.
+  Cover rounding and the high-value approval failure.
+checks:
+  - "test -f tests/unit/refunds.test.ts"
+  - "grep -q 'createPartialRefund' tests/unit/refunds.test.ts"
+  - "grep -Eq 'Math.round|round|0\\.5|approval|High-value' tests/unit/refunds.test.ts"

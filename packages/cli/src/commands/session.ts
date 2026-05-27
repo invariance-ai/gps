@@ -37,8 +37,11 @@ export function registerSession(program: Command): void {
     const root = resolveRoot(opts);
     const id = opts.id ?? randomUUID();
     const file = path.join(root, SESSION_ID_REL);
+    const sessionsDir = path.join(root, SESSIONS_DIR);
     await mkdir(path.dirname(file), { recursive: true });
+    await mkdir(sessionsDir, { recursive: true });
     await writeFile(path.join(path.dirname(file), ".gitignore"), "*\n");
+    await writeFile(path.join(sessionsDir, ".gitignore"), "*\n");
     await writeFile(file, id);
     if (opts.json) console.log(JSON.stringify({ id }));
     else console.log(id);
@@ -119,6 +122,10 @@ export function registerSession(program: Command): void {
 
 function summarize(e: Record<string, unknown>): string {
   switch (e.type) {
+    case "tool": {
+      const target = String(e.file ?? e.path ?? "");
+      return `${e.tool ?? "?"}${target ? ` ${kleur.dim(target)}` : ""}`;
+    }
     case "query":
       return `${e.symbol ?? "?"} ${kleur.dim(`(${e.tool ?? "?"})`)}`;
     case "prepare":

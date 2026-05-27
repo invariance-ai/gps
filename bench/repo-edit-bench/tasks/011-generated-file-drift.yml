@@ -1,0 +1,7 @@
+repo: examples/multi-symbol
+prompt: |
+  Add a comment documenting why `HIGH_VALUE_USD` is 1000. Do not edit any
+  generated files or create files under `src/generated`.
+checks:
+  - "grep -B 3 -A 3 'HIGH_VALUE_USD' src/refunds.ts | grep -Eq 'why|policy|approval|threshold'"
+  - "! test -d src/generated"

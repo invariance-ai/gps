@@ -21,6 +21,9 @@ strands:
   - tests
   - provenance
   - invariants
+capture: auto
+promote: safe
+auto_suggest: false
 `;
 
 const INVARIANTS = `# .gps/invariants.yml — declarative constraints for symbols in your repo.
@@ -161,6 +164,6 @@ export function registerInit(program: Command): void {
       console.log(kleur.dim(`Next: open ${r.path} to review, then run \`gps seed --apply\` to promote into .gps/notes and .gps/decisions.`));
     }
     console.log("");
-    console.log(`Next: ${kleur.bold("gps wizard")} to wire agents, or ${kleur.bold("gps index")} to build the symbol graph.`);
+    console.log(`Next: ${kleur.bold("gps setup")} to wire agents and build the graph, or ${kleur.bold("gps index")} to build only the symbol graph.`);
   });
 }

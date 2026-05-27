@@ -36,7 +36,9 @@ export interface ObservationStore {
   last_prepared_symbol?: string;
 }
 
-const EMPTY: ObservationStore = { version: 1, symbols: {} };
+function emptyStore(): ObservationStore {
+  return { version: 1, symbols: {} };
+}
 
 export function observationsPath(root: string): string {
   return path.join(root, REL);
@@ -47,9 +49,9 @@ async function readStore(root: string): Promise<ObservationStore> {
     const raw = await readFile(observationsPath(root), "utf8");
     const data = JSON.parse(raw) as ObservationStore;
     if (data?.version === 1 && data.symbols) return data;
-    return { ...EMPTY };
+    return emptyStore();
   } catch {
-    return { ...EMPTY };
+    return emptyStore();
   }
 }
 
@@ -117,6 +119,9 @@ export async function recordPrepared(root: string, symbol: string): Promise<void
     last_queried: new Date(0).toISOString(),
     tools: {},
   };
+  entry.count++;
+  entry.last_queried = now;
+  entry.tools.prepare_edit = (entry.tools.prepare_edit ?? 0) + 1;
   entry.last_prepared = now;
   store.symbols[symbol] = entry;
   store.last_prepared_symbol = symbol;
