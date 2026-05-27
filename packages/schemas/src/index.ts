@@ -1239,6 +1239,15 @@ export const PruneInput = z.object({
   days: z.number().int().min(1).default(90).describe(
     "Notes unsurfaced (or never surfaced) for this many days are candidates for pruning.",
   ),
+  min_confidence: z.number().min(0).max(1).default(0.8).describe(
+    "Keep memories at or above this confidence threshold.",
+  ),
+  auto: z.boolean().default(false).describe(
+    "Background mode: skip the prune if the interval has not elapsed.",
+  ),
+  interval_days: z.number().int().min(1).default(7).describe(
+    "Minimum days between background prune runs.",
+  ),
   dry_run: z.boolean().default(false).describe("Print what would be removed without writing."),
 });
 export type PruneInput = z.infer<typeof PruneInput>;
@@ -1247,9 +1256,11 @@ export const PruneResult = z.object({
   removed: z.number().int().nonnegative(),
   dry_run: z.boolean(),
   details: z.array(z.object({
+    kind: z.enum(["note", "decision"]),
     symbol: z.string(),
-    lesson: z.string(),
+    text: z.string(),
     reason: z.string(),
+    file: z.string(),
   })),
 });
 export type PruneResult = z.infer<typeof PruneResult>;

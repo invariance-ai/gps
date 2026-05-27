@@ -428,6 +428,9 @@ function claudeSettings(cmd: string): unknown {
                 // Continuously sync TODO(symbol): comments into notes and drop
                 // any whose comment was removed — prepare surfaces the live set.
                 `${cmd} learn-todos --root "$PWD" --prune --quiet${silent}; ` +
+                // Periodic memory GC: removes only stale low-confidence agent
+                // memories. Throttled by .gps/maintenance/prune.json.
+                `${cmd} prune --root "$PWD" --auto --quiet${silent}; ` +
                 `${cmd} feature clear-active --root "$PWD"${silent}; ` +
                 `${cmd} session start --root "$PWD"${silent}; ` +
                 // Persist standing preferences as a managed CLAUDE.md block so

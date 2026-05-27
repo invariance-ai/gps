@@ -506,8 +506,14 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       return { tier, proposals, scanned: r.scanned };
     }
     case "prune": {
-      const a = args as { days?: number; dry_run?: boolean };
-      return pruneNotes(root, { days: a.days, dryRun: a.dry_run });
+      const a = args as { days?: number; min_confidence?: number; auto?: boolean; interval_days?: number; dry_run?: boolean };
+      return pruneNotes(root, {
+        days: a.days,
+        minConfidence: a.min_confidence,
+        auto: a.auto,
+        intervalDays: a.interval_days,
+        dryRun: a.dry_run,
+      } as Parameters<typeof pruneNotes>[1]);
     }
     case "resume": {
       return resume(root);

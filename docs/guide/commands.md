@@ -1178,7 +1178,7 @@ promote [options] [symbol]
 
 ## `prune`
 
-Remove stale notes that have not been surfaced for --days days (default 90). Notes that are promoted, high-severity, or from trusted sources (human/doc/incident/pr) are never removed. Use --dry-run to preview without writing.
+Remove stale notes that have not been surfaced for --days days (default 90). Promoted, verified, high-severity, trusted-source, and high-confidence memories are never removed. Use --dry-run to preview without writing.
 
 ```
 prune [options]
@@ -1187,7 +1187,11 @@ prune [options]
 **Options:**
 
 - `--days <n>` — Staleness threshold in days (default: 90) *(default: "90")*
+- `--min-confidence <n>` — Keep memories at or above this confidence (default: 0.8) *(default: "0.8")*
+- `--auto` — Background mode: no-op unless the interval has elapsed
+- `--interval-days <n>` — Background run cadence in days (default: 7) *(default: "7")*
 - `--dry-run` — Preview removals without writing changes
+- `--quiet` — Suppress stdout when nothing is removed
 - `--json` — Emit JSON output
 - `--root <path>` — Repo root (default: cwd)
 

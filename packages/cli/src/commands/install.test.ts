@@ -158,3 +158,14 @@ describe("install claude: Stop hook contains feature-flagged suggestions", () =>
     expect(settings).toContain("suggest --auto");
   });
 });
+
+describe("install claude: SessionStart runs periodic prune", () => {
+  it("Claude .claude/settings.json SessionStart hook runs `gps prune --auto`", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "gps-install-claude-prune-test-"));
+    const spec = resolveCmd({ useGlobal: true });
+    await runInstallClaude(root, { force: true, skipClaudeMd: true, spec });
+    const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+    expect(settings).toContain("prune --root");
+    expect(settings).toContain("--auto --quiet");
+  });
+});
