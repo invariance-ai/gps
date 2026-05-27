@@ -79,6 +79,15 @@ gps lessons record "The Stripe webhook entrypoint is stripeWebhook in apps/api/s
 Do this for findings that would save a future agent another search loop. Do not record obvious facts
 from the file you are already editing.
 
+If you know something is still left to do, record a reminder instead of relying on chat history:
+
+\`\`\`bash
+gps remember "still need to update the payer denial fixture" --reminder --symbol routeToPayer
+gps remember "confirm rollback plan before merge" --reminder --for both --symbol runMigration
+\`\`\`
+
+Use reminders for unfinished work, follow-up checks, or anything the next agent/human must not miss.
+
 \`gps lessons record\` returns the chosen scope and signals; if the scope looks wrong (e.g. it picked \`symbol\` for something repo-wide), call \`gps lessons reclassify <id> --to global\` to fix it. Global lessons land in the \`<!-- gps:global-lessons -->\` block of CLAUDE.md and are always loaded; scoped lessons live in \`.gps/notes/{symbol,file,feature,area}/\` and are auto-pulled when the prompt mentions the matching target.
 
 **Tag the session early.** When you understand what the user is working on (e.g. "the homepage", "the auth flow"), call \`gps feature use <short-kebab-label>\` once. Use the exact label if the user names a known feature; otherwise pick a short kebab-case label. gps then learns which symbols belong to that feature and surfaces them automatically on future sessions that mention the same label.
@@ -111,7 +120,7 @@ description: >
   Use this skill when editing code, starting a task, reviewing a symbol, or recording what was learned.
   gps is automatic repo memory: it surfaces symbol-anchored invariants, callers, tests, prior decisions,
   and lessons from past edits — exactly when the relevant code is touched. Run \`gps prepare <symbol>\`
-  before any non-trivial edit and \`gps lessons record\` after. Prefer the MCP tool surface
+  before any non-trivial edit and \`gps remember\` for hard-won repo facts. Prefer the MCP tool surface
   (\`mcp__gps__prepare_edit\`) for a one-call decision-ready brief; fall back to CLI inside Bash.
 ---
 
@@ -177,6 +186,8 @@ gps feature use <short-kebab-label>
 ## After a successful edit — record what you learned
 
 \`\`\`bash
+gps remember "<hard-won repo fact>"            # simplest path: save durable context
+gps remember "<unfinished follow-up>" --reminder --symbol <symbol>
 gps lessons record "<one sentence>"          # auto-classified: global → CLAUDE.md; scoped → notes
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
@@ -185,7 +196,7 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`gps lessons record\`.
 
 If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
-save that finding with \`gps lessons record\` before you finish. Future agents should not repeat
+save that finding with \`gps remember\` before you finish. Future agents should not repeat
 the same search.
 `;
 

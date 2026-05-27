@@ -8,20 +8,18 @@ A 10-minute walkthrough: install gps in a real repo, see it surface memory to an
 
 ```bash
 cd your-repo
-npx -y @invariance/gps init
-npx -y @invariance/gps install claude      # or `codex`, or `cursor`
-npx -y @invariance/gps index
+npx -y @invariance/gps setup --yes --with-claude      # or --with-codex / --with-cursor
 ```
 
 What just happened:
 
-- `init` wrote `.gps/config.yml` (what to index) and `.gps/invariants.yml` (an example invariant you can delete).
-- `install claude` wrote a `CLAUDE.md` block, a `.claude/skills/gps/SKILL.md` skill, five non-blocking hooks in `.claude/settings.json`, and a `gps` entry in `.mcp.json` (registers the gps MCP server).
-- `index` built the symbol graph at `.gps/index.json`. Re-runs are incremental.
+- `setup` wrote `.gps/config.yml` (what to index) and `.gps/invariants.yml` (an example invariant you can delete).
+- It built the symbol graph at `.gps/index/symbols.json`. Re-runs are incremental.
+- With `--with-claude`, it wrote a `CLAUDE.md` block, a `.claude/skills/gps/SKILL.md` skill, five non-blocking hooks in `.claude/settings.json`, and a `gps` entry in `.mcp.json` (registers the gps MCP server).
 
-By default capture is **live** (`--capture=auto`), nothing auto-graduates into invariants (`--promote=never`), and memory suggestions stay manual (`auto_suggest=false`). To review captured memory before it activates, install with `--capture=inbox` and approve items via `gps inbox`. To let recurring lessons auto-graduate into invariants, add `--promote=safe` (holds back risky topics) or `--promote=all` (everything — bypasses the risk gate). To let hooks print the authoring queue automatically, add `--auto-suggest`. These persist to `.gps/config.yml`. See the [Capture & promotion policy](../../README.md#capture--promotion-policy) section in the README.
+By default capture is **live** (`--capture=auto`), recurring safe lessons can auto-graduate into invariants (`--promote=safe`), and memory suggestions stay manual (`auto_suggest=false`). Risky topics still require human review. To review captured memory before it activates, install with `--capture=inbox` and approve items via `gps inbox`. To keep promotion fully manual, add `--promote=never`; to promote everything, add `--promote=all` (bypasses the risk gate). To let hooks print the authoring queue automatically, add `--auto-suggest`. These persist to `.gps/config.yml`. See the [Capture & promotion policy](../../README.md#capture--promotion-policy) section in the README.
 
-If you prefer a global install: `npm install -g @invariance/gps`, then add `--use-global` to the install commands so hooks call `gps` directly instead of `npx`.
+If you prefer a global install: `npm install -g @invariance/gps`, then run `gps setup --yes --with-claude` from the repo root.
 
 If you're running gps from a local checkout (pre-publish, dogfood, or contributor dev), use `--use-local` so hooks point at the absolute path of your built CLI (`node /abs/path/to/packages/cli/dist/index.js`). The installer auto-detects this and switches to local mode when it sees it's running from a workspace checkout — set `CI=1` to force npx instead.
 

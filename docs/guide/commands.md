@@ -847,7 +847,7 @@ install claude [options]
 - `--use-local` — Generate hooks that call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
 - `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
@@ -867,7 +867,7 @@ install codex [options]
 - `--use-local` — Configure Codex to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
 - `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
@@ -887,7 +887,7 @@ install cursor [options]
 - `--use-local` — Configure MCP to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
 - `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1269,6 +1269,8 @@ remember [options] <fact>
 - `--feature <label>` — Attach to a feature
 - `--area <dir>` — Attach to an area/directory
 - `--global` — Record as a repo-wide lesson
+- `--reminder` — Record a pending reminder / still-to-do item for the next agent or human
+- `--for <audience>` — Reminder audience: agent | human | both (default: agent)
 - `--evidence <ref>` — PR/commit/doc backing this fact
 - `--severity <level>` — low | medium | high
 - `--json` — Emit JSON
@@ -1485,6 +1487,27 @@ session replay [options] <id>
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `setup`
+
+Interactive setup: init + agent hooks + first index + preferences seed
+
+```
+setup [options]
+```
+
+**Options:**
+
+- `--yes` — Non-interactive; accept defaults (detect Claude/Codex, do everything)
+- `--with-claude` — Install Claude Code hooks
+- `--with-codex` — Install Codex MCP + AGENTS.md block
+- `--with-cursor` — Install Cursor rules + MCP
+- `--capture <mode>` — Capture mode: inbox | auto (default: auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
+- `--auto-suggest` — Let supported hooks print `gps suggest` authoring-queue nudges
+- `--skip-index` — Skip building the initial symbol graph
+- `--skip-todos` — Skip lifting TODOs into notes
+- `--root <path>` — Repo root (default: cwd)
+
 ## `stale`
 
 List notes/decisions/open questions older than --days whose file has since changed
@@ -1693,21 +1716,4 @@ why [options] <symbol>
 **Options:**
 
 - `--json` — Emit JSON
-- `--root <path>` — Repo root (default: cwd)
-
-## `wizard`
-
-Interactive setup: init + agent hooks + first index + preferences seed
-
-```
-wizard [options]
-```
-
-**Options:**
-
-- `--yes` — Non-interactive; accept defaults (detect Claude/Codex, do everything)
-- `--with-claude` — Install Claude Code hooks
-- `--with-codex` — Install Codex MCP + AGENTS.md block
-- `--skip-index` — Skip building the initial symbol graph
-- `--skip-todos` — Skip lifting TODOs into notes
 - `--root <path>` — Repo root (default: cwd)

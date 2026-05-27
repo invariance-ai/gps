@@ -35,6 +35,8 @@ jobs:
 
       - run: pnpm -r test
 
+      - run: pnpm smoke:pack
+
   smoke:
     runs-on: ubuntu-latest
     needs: build

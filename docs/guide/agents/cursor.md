@@ -3,7 +3,7 @@
 gps gives Cursor durable, symbol-anchored repo memory. Because Cursor has no lifecycle hooks, the agent must call `record_preference` and `record_directive` MCP tools explicitly — the installed rule instructs the agent to do this automatically.
 
 ```bash
-npx -y @invariance/gps install cursor
+npx -y @invariance/gps setup --yes --with-cursor
 ```
 
 Writes:
@@ -42,7 +42,7 @@ record_preference { "text": "<the user's instruction>" }
 record_directive { "text": "<instruction>", "area": "<directory or alias>" }
 ```
 
-gps stores preferences in a managed block (global scope) and directives as area-scoped notes that resurface whenever you edit files in that directory. The installed `.cursor/rules/gps.mdc` reminds the agent to make these calls — no manual setup is needed beyond running `gps install cursor`.
+gps stores preferences in a managed block (global scope) and directives as area-scoped notes that resurface whenever you edit files in that directory. The installed `.cursor/rules/gps.mdc` reminds the agent to make these calls — no manual setup is needed beyond running `gps setup --yes --with-cursor`.
 
 ## Verifying it's working
 

@@ -23,11 +23,11 @@ afterEach(async () => {
 });
 
 describe("loadConfig — policy defaults", () => {
-  it("defaults to capture=auto / promote=never / auto_suggest=false when no config file exists", async () => {
+  it("defaults to capture=auto / promote=safe / auto_suggest=false when no config file exists", async () => {
     const root = await tempRepo();
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
-    expect(cfg.promote).toBe("never");
+    expect(cfg.promote).toBe("safe");
     expect(cfg.auto_suggest).toBe(false);
   });
 
@@ -35,7 +35,7 @@ describe("loadConfig — policy defaults", () => {
     const root = await tempRepo("languages: [typescript]\ndepth: 5\n");
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
-    expect(cfg.promote).toBe("never");
+    expect(cfg.promote).toBe("safe");
     expect(cfg.auto_suggest).toBe(false);
     // non-policy fields still parse
     expect(cfg.languages).toEqual(["typescript"]);
@@ -59,7 +59,7 @@ describe("GpsPolicy schema", () => {
   it("yields locked defaults on empty input", () => {
     expect(GpsPolicy.parse({})).toEqual({
       capture: "auto",
-      promote: "never",
+      promote: "safe",
       auto_suggest: false,
     });
   });

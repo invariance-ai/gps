@@ -114,14 +114,18 @@ export function detectHardSearch(events: SessionEvent[], threshold = 8): HardSea
   const searchTools = new Set(["rg", "grep", "find", "cat", "sed", "ls", "query", "find_symbol"]);
   const recent = events.filter((e) => e.tool && searchTools.has(e.tool));
   if (recent.length < threshold) return [];
-  const last = [...events].reverse().find((e) => e.symbol || e.file || e.path);
-  const file = last?.file ?? last?.path;
-  const target = last?.symbol ?? file;
+  const lastLocated = [...events].reverse().find((e) => e.file || e.path);
+  const lastSymbol = [...events].reverse().find((e) => e.symbol);
+  const file = lastLocated?.file ?? lastLocated?.path;
+  const symbol = lastLocated?.symbol ?? lastSymbol?.symbol;
+  const target = symbol ?? file;
   return [{
-    symbol: last?.symbol,
+    symbol,
     file,
     command_count: recent.length,
-    suggestion: target
+    suggestion: symbol && file
+      ? `You spent a while finding ${file} while working on ${symbol}. Save it with gps remember "... ${file}" --symbol ${symbol}?`
+      : target
       ? `You spent a while finding this. Save "${target} lives in ${file ?? target}" with gps remember?`
       : "You spent a while searching. Save the path you found with gps remember?",
   }];

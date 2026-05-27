@@ -123,14 +123,16 @@ const PROMOTE_MODES = ["never", "safe", "all"] as const;
  * Pure + exported so it can be unit-tested without Commander.
  *
  * - capture defaults to "auto" (preserve current always-on behavior).
- * - promote defaults to "never" (manual promotion only).
+ * - promote defaults to "safe" with capture=auto (useful by default, still risk-gated).
+ * - promote defaults to "never" with capture=inbox unless explicitly set, because
+ *   an inbox already means humans review memory before activation.
  * - auto_suggest defaults to false (manual `gps suggest` only).
  * - --promote is only meaningful with --capture=auto: an inbox already gates
  *   activation behind human review, so auto-graduation there is contradictory.
  */
 export function resolvePolicy(opts: PolicyOpts): GpsPolicy {
   const capture = opts.capture ?? "auto";
-  const promote = opts.promote ?? "never";
+  const promote = opts.promote ?? (capture === "auto" ? "safe" : "never");
   if (!CAPTURE_MODES.includes(capture as (typeof CAPTURE_MODES)[number])) {
     throw new Error(`invalid --capture "${capture}" (expected: ${CAPTURE_MODES.join(" | ")})`);
   }
@@ -149,7 +151,7 @@ function addPolicyOptions(cmd: Command): Command {
     .option("--capture <mode>", "Capture mode: inbox | auto (default: auto)")
     .option(
       "--promote <mode>",
-      "Auto-promotion: never | safe | all (default: never; requires --capture=auto)",
+      "Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)",
     )
     .option(
       "--auto-suggest",

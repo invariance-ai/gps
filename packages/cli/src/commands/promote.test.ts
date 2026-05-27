@@ -31,10 +31,10 @@ async function runPromote(root: string, args: string[]): Promise<{ out: string; 
 }
 
 describe("gps promote --auto[=policy]", () => {
-  it("bare --auto uses the config default (never) on a fresh repo", async () => {
+  it("bare --auto uses the config default (safe) on a fresh repo", async () => {
     const root = await tempRepo();
     const { out } = await runPromote(root, ["--auto", "--json"]);
-    expect(JSON.parse(out)).toMatchObject({ policy: "never" });
+    expect(JSON.parse(out)).toMatchObject({ policy: "safe" });
   });
 
   it("--auto=safe overrides config (never) for this run", async () => {

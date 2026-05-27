@@ -2,6 +2,7 @@ import { readFile, mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 import type { Command } from "commander";
 import {
+  appendSessionEventIfActive,
   areaForPath,
   loadAreaNotes,
   loadFeatureNotes,
@@ -15,6 +16,11 @@ interface Opts extends RootOption {
 }
 
 const SURFACED_REL = ".gps/session/area-surfaced";
+const TOOL_NAME_TO_SEARCH_TOOL: Record<string, string> = {
+  Grep: "rg",
+  Glob: "find",
+  Read: "cat",
+};
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return "";
@@ -29,20 +35,27 @@ async function readStdin(): Promise<string> {
  * Pull the path/pattern a Grep/Glob/Read tool call is about to touch out of
  * the PreToolUse hook JSON. Lenient — field names vary by tool.
  */
-function extractPathFromHookJson(stdin: string): string | undefined {
+function extractPathFromHookJson(stdin: string): { target?: string; tool?: string } {
   const trimmed = stdin.trim();
-  if (!trimmed || !trimmed.startsWith("{")) return trimmed || undefined;
+  if (!trimmed) return {};
+  if (!trimmed.startsWith("{")) return { target: trimmed, tool: "query" };
   try {
     const obj = JSON.parse(trimmed) as Record<string, unknown>;
     const input = (obj.tool_input ?? obj.input ?? obj) as Record<string, unknown>;
+    const rawTool = typeof obj.tool_name === "string" ? obj.tool_name : undefined;
     for (const key of ["path", "file_path", "glob", "pattern"]) {
       const v = input[key];
-      if (typeof v === "string" && v.length > 0) return v;
+      if (typeof v === "string" && v.length > 0) {
+        return {
+          target: v,
+          tool: rawTool ? (TOOL_NAME_TO_SEARCH_TOOL[rawTool] ?? rawTool) : "query",
+        };
+      }
     }
   } catch {
     /* not JSON */
   }
-  return undefined;
+  return {};
 }
 
 async function alreadySurfaced(root: string, area: string): Promise<boolean> {
@@ -74,8 +87,20 @@ export function registerContextFromPath(program: Command): void {
   ).action(async (opts: Opts) => {
     const root = resolveRoot(opts);
     const raw = opts.text ?? (await readStdin());
-    const target = opts.text ?? extractPathFromHookJson(raw);
+    const extracted = opts.text
+      ? { target: opts.text, tool: "query" }
+      : extractPathFromHookJson(raw);
+    const target = extracted.target;
     if (!target) return;
+
+    // TARS-style structured capture: keep a compact local trace of the agent's
+    // search/read path so gps can later suggest durable memory for hard-won finds.
+    await appendSessionEventIfActive(root, {
+      type: "tool",
+      ts: new Date().toISOString(),
+      tool: extracted.tool ?? "query",
+      path: target,
+    }).catch(() => {});
 
     let area: string | undefined;
     try {

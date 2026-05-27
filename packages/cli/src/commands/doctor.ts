@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { access, stat, readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import {
@@ -15,6 +15,7 @@ import {
   loadAllAreaNotes,
   loadAllDecisions,
   findStale,
+  loadConfig,
 } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
@@ -38,6 +39,18 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
+async function readText(p: string): Promise<string | null> {
+  try {
+    return await readFile(p, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function mentionsGps(text: string | null): boolean {
+  return !!text && /gps\s+(prepare|context|brief|serve)|mcp__gps__prepare_edit|prepare_edit/.test(text);
+}
+
 export async function runChecks(root: string): Promise<Check[]> {
   const checks: Check[] = [];
 
@@ -47,7 +60,7 @@ export async function runChecks(root: string): Promise<Check[]> {
     name: ".gps/ directory",
     ok: hasGpsDir,
     detail: hasGpsDir ? gpsDir : "missing",
-    hint: hasGpsDir ? undefined : "run `gps init`",
+    hint: hasGpsDir ? undefined : "run `gps setup --yes --with-claude` (or --with-codex)",
   });
 
   const cfg = path.join(root, ".gps/config.yml");
@@ -56,7 +69,7 @@ export async function runChecks(root: string): Promise<Check[]> {
     name: "config (.gps/config.yml)",
     ok: hasCfg,
     detail: hasCfg ? "present" : "missing",
-    hint: hasCfg ? undefined : "run `gps init`",
+    hint: hasCfg ? undefined : "run `gps setup --yes --with-claude` (or --with-codex)",
   });
 
   const inv = path.join(root, ".gps/invariants.yml");
@@ -65,8 +78,26 @@ export async function runChecks(root: string): Promise<Check[]> {
     name: "invariants (.gps/invariants.yml)",
     ok: hasInv,
     detail: hasInv ? "present" : "missing",
-    hint: hasInv ? undefined : "run `gps init`",
+    hint: hasInv ? undefined : "run `gps setup --yes --with-claude` (or --with-codex)",
   });
+
+  try {
+    const cfg = await loadConfig(root);
+    const risky = cfg.promote === "all";
+    checks.push({
+      name: "capture policy",
+      ok: !risky,
+      detail: `capture=${cfg.capture}, promote=${cfg.promote}, auto_suggest=${cfg.auto_suggest}`,
+      hint: risky ? "use `gps install <agent> --promote=safe` unless you intentionally bypass review gates" : undefined,
+    });
+  } catch (err) {
+    checks.push({
+      name: "capture policy",
+      ok: false,
+      detail: `unreadable: ${(err as Error).message}`,
+      hint: "run `gps install <agent>` to rewrite policy fields",
+    });
+  }
 
   const idx = indexPath(root);
   const hasIdx = await exists(idx);
@@ -128,30 +159,100 @@ export async function runChecks(root: string): Promise<Check[]> {
 
   const claudeMd = path.join(root, "CLAUDE.md");
   const agentsMd = path.join(root, "AGENTS.md");
+  const claudeSkill = path.join(root, ".claude/skills/gps/SKILL.md");
+  const claudeSettings = path.join(root, ".claude/settings.json");
+  const mcpJson = path.join(root, ".mcp.json");
+  const codexConfig = path.join(root, ".codex/config.toml");
+  const cursorRule = path.join(root, ".cursor/rules/gps.mdc");
+  const cursorMcp = path.join(root, ".cursor/mcp.json");
   const hasClaude = await exists(claudeMd);
   const hasAgents = await exists(agentsMd);
-  const installed = hasClaude || hasAgents;
+  const hasClaudeSkill = await exists(claudeSkill);
+  const hasClaudeSettings = await exists(claudeSettings);
+  const hasMcpJson = await exists(mcpJson);
+  const hasCodexConfig = await exists(codexConfig);
+  const hasCursorRule = await exists(cursorRule);
+  const hasCursorMcp = await exists(cursorMcp);
+  const installed = hasClaude || hasAgents || hasCursorRule;
   checks.push({
-    name: "agent install (CLAUDE.md / AGENTS.md)",
+    name: "agent install",
     ok: installed,
-    detail: [hasClaude && "CLAUDE.md", hasAgents && "AGENTS.md"].filter(Boolean).join(", ") || "none",
-    hint: installed ? undefined : "run `gps install claude` or `gps install codex`",
+    detail:
+      [hasClaude && "Claude", hasAgents && "Codex", hasCursorRule && "Cursor"]
+        .filter(Boolean)
+        .join(", ") || "none",
+    hint: installed ? undefined : "run `gps setup --yes --with-claude` (or --with-codex / --with-cursor)",
   });
 
   if (hasClaude) {
-    try {
-      const text = await readFile(claudeMd, "utf8");
-      const wired = /gps\s+prepare|gps\s+context/.test(text);
-      checks.push({
-        name: "CLAUDE.md mentions gps",
-        ok: wired,
-        detail: wired ? "yes" : "no gps usage instructions found",
-        hint: wired ? undefined : "re-run `gps install claude`",
-      });
-    } catch {
-      // ignore
-    }
+    const claudeText = await readText(claudeMd);
+    const skillText = await readText(claudeSkill);
+    const settingsText = await readText(claudeSettings);
+    const mcpText = await readText(mcpJson);
+    const wired =
+      mentionsGps(claudeText) &&
+      mentionsGps(skillText) &&
+      !!settingsText &&
+      /SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|Stop/.test(settingsText) &&
+      !!mcpText &&
+      /"gps"/.test(mcpText);
+    checks.push({
+      name: "Claude wiring",
+      ok: wired,
+      detail: [
+        mentionsGps(claudeText) && "CLAUDE.md",
+        mentionsGps(skillText) && "skill",
+        hasClaudeSettings && "hooks",
+        hasMcpJson && "MCP",
+      ].filter(Boolean).join(", ") || "incomplete",
+      hint: wired ? undefined : "run `gps setup --yes --with-claude`",
+    });
   }
+
+  if (hasAgents || hasCodexConfig) {
+    const agentsText = await readText(agentsMd);
+    const codexText = await readText(codexConfig);
+    const wired =
+      mentionsGps(agentsText) &&
+      !!codexText &&
+      /notify\s*=/.test(codexText) &&
+      /\[mcp_servers\.gps\]/.test(codexText);
+    checks.push({
+      name: "Codex wiring",
+      ok: wired,
+      detail: [
+        mentionsGps(agentsText) && "AGENTS.md",
+        codexText && /notify\s*=/.test(codexText) && "notify",
+        codexText && /\[mcp_servers\.gps\]/.test(codexText) && "MCP",
+      ].filter(Boolean).join(", ") || "incomplete",
+      hint: wired ? undefined : "run `gps setup --yes --with-codex`",
+    });
+  }
+
+  if (hasCursorRule || hasCursorMcp) {
+    const ruleText = await readText(cursorRule);
+    const mcpText = await readText(cursorMcp);
+    const wired = mentionsGps(ruleText) && !!mcpText && /"gps"/.test(mcpText);
+    checks.push({
+      name: "Cursor wiring",
+      ok: wired,
+      detail: [mentionsGps(ruleText) && "rule", hasCursorMcp && "MCP"].filter(Boolean).join(", ") || "incomplete",
+      hint: wired ? undefined : "run `gps setup --yes --with-cursor`",
+    });
+  }
+
+  const gitignore = await readText(path.join(root, ".gitignore"));
+  const ignoresIndex = !!gitignore && (/^\.gps\/index\//m.test(gitignore) || /^\.gps\/index\.json$/m.test(gitignore));
+  const ignoresObservations = !!gitignore && /^\.gps\/observations\.json$/m.test(gitignore);
+  checks.push({
+    name: "local artifact ignores",
+    ok: ignoresIndex && ignoresObservations,
+    detail: [
+      ignoresIndex ? ".gps/index" : "missing .gps/index",
+      ignoresObservations ? ".gps/observations.json" : "missing .gps/observations.json",
+    ].join(", "),
+    hint: ignoresIndex && ignoresObservations ? undefined : "add `.gps/index/` and `.gps/observations.json` to .gitignore",
+  });
 
   // Informational checks below — they report counts, never fail the run.
 
@@ -211,6 +312,14 @@ export async function runChecks(root: string): Promise<Check[]> {
   return checks;
 }
 
+function nextAction(checks: Check[]): string {
+  const firstFailed = checks.find((c) => !c.ok);
+  if (firstFailed?.hint) return firstFailed.hint;
+  const index = checks.find((c) => c.name === "symbol index");
+  if (index?.ok) return 'run `gps prepare <symbol> --intent "what you are changing"` before a non-trivial edit';
+  return "run `gps index`";
+}
+
 export function registerDoctor(program: Command): void {
   addRootOption(
     program
@@ -223,9 +332,7 @@ export function registerDoctor(program: Command): void {
     const failed = checks.filter((c) => !c.ok);
 
     if (opts.json) {
-      console.log(
-        JSON.stringify({ root, ok: failed.length === 0, checks }, null, 2),
-      );
+      console.log(JSON.stringify({ root, ok: failed.length === 0, checks, next_action: nextAction(checks) }, null, 2));
       process.exitCode = failed.length === 0 ? 0 : 1;
       return;
     }
@@ -244,5 +351,6 @@ export function registerDoctor(program: Command): void {
       console.log(kleur.red(`${failed.length} check(s) failed.`));
       process.exitCode = 1;
     }
+    console.log(kleur.bold("Next: ") + nextAction(checks));
   });
 }

@@ -57,15 +57,15 @@ describe("resolveCmd", () => {
 });
 
 describe("resolvePolicy", () => {
-  it("defaults to capture=auto / promote=never with no flags", () => {
+  it("defaults to capture=auto / promote=safe with no flags", () => {
     expect(resolvePolicy({})).toEqual({
       capture: "auto",
-      promote: "never",
+      promote: "safe",
       auto_suggest: false,
     });
   });
 
-  it("accepts --capture=inbox", () => {
+  it("defaults --capture=inbox to promote=never", () => {
     expect(resolvePolicy({ capture: "inbox" })).toEqual({
       capture: "inbox",
       promote: "never",
@@ -84,7 +84,7 @@ describe("resolvePolicy", () => {
   it("accepts --auto-suggest as an explicit feature flag", () => {
     expect(resolvePolicy({ autoSuggest: true })).toEqual({
       capture: "auto",
-      promote: "never",
+      promote: "safe",
       auto_suggest: true,
     });
   });

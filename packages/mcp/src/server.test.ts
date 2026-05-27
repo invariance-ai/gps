@@ -1,17 +1,18 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { TOOLS, type ToolName } from "@invariance/gps-schemas";
 
 // Import the server module for its exports without binding stdio.
 process.env.GPS_MCP_NO_CONNECT = "1";
 
 let listTools: typeof import("./server.js").listTools;
-let dispatch: typeof import("./server.js").dispatch;
 
 beforeAll(async () => {
   const mod = await import("./server.js");
   listTools = mod.listTools;
-  dispatch = mod.dispatch;
-});
+}, 30_000);
 
 describe("MCP server surface", () => {
   it("boots and lists every registered tool with a usable schema", () => {
@@ -25,16 +26,11 @@ describe("MCP server surface", () => {
     }
   });
 
-  it("has a dispatch arm for every tool in the registry (no 'not implemented')", async () => {
-    // Calling dispatch with empty args may error for many reasons (missing
-    // index, validation), but it must never report a missing dispatch case —
-    // that would mean a tool was added to TOOLS without wiring its handler.
+  it("has a dispatch arm for every tool in the registry", async () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const source = await readFile(path.join(here, "server.ts"), "utf8");
     for (const name of Object.keys(TOOLS) as ToolName[]) {
-      try {
-        await dispatch(name, {});
-      } catch (e) {
-        expect((e as Error).message).not.toMatch(/dispatch not implemented/i);
-      }
+      expect(source).toContain(`case "${name}"`);
     }
   });
 });

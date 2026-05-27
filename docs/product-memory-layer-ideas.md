@@ -10,7 +10,7 @@ Trust is not the billboard. The billboard is speed, fewer repeated mistakes, bet
 
 > **Implementation status (v0.5).** The capture/promotion governance described below is now partly shipped and configurable per repo via `gps install --capture=<inbox|auto> --promote=<never|safe|all>` (persisted to `.gps/config.yml`):
 > - **Inbox capture** — `--capture=inbox` routes captured preferences/directives into `.gps/inbox.yml` for review. Manage with `gps inbox` / `gps inbox approve|reject|edit <id>`. Approving runs the real persist. (`--capture=auto`, the default, persists live as before.)
-> - **Auto-promotion** — `--promote=safe` auto-graduates recurring note clusters into invariants but holds back any cluster touching a `require_approval_for` risk topic (the gate below); `--promote=all` promotes everything (bypasses the gate, prints a loud warning); `--promote=never` (default) keeps promotion manual. Run via `gps promote --auto`.
+> - **Auto-promotion** — `--promote=safe` (default with `capture=auto`) auto-graduates recurring note clusters into invariants but holds back any cluster touching a `require_approval_for` risk topic (the gate below); `--promote=all` promotes everything (bypasses the gate, prints a loud warning); `--promote=never` keeps promotion manual. Run via `gps promote --auto`.
 > Not yet implemented: quarantine, influence auditing, demotion, and automatic Stop-hook promotion (auto-promotion is currently invoked explicitly).
 
 ## MVP Launch Scope
@@ -37,7 +37,7 @@ Required for MVP:
 - `gps inbox` supports list, approve, reject, and edit.
 - Approved memory is eligible for retrieval; rejected inbox items do not steer agents.
 - `gps install --capture=<inbox|auto> --promote=<never|safe|all>` persists repo policy.
-- `--promote=never` is the default.
+- `--promote=safe` is the default with `capture=auto`.
 - `--promote=safe` never promotes auth, billing, payments, security, compliance, migrations, or destructive-action memories.
 - `.gps/` artifacts remain readable enough for a developer to inspect or hand-edit.
 - `gps doctor` shows basic health: inbox count, active memory count, config policy, stale/conflict warnings if available.

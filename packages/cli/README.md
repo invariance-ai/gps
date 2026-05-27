@@ -6,21 +6,18 @@
 
 ```bash
 cd your-repo
-npx -y @invariance/gps install claude      # or: install codex | install cursor
-npx -y @invariance/gps index
+npx -y @invariance/gps setup --yes --with-claude      # or --with-codex / --with-cursor
 ```
 
-That's it. Start a new agent session — the memory layer is active.
+That's it. `setup` initializes `.gps/`, builds the first symbol graph, lifts TODO/FIXME comments into notes, and wires the selected agent.
 
 Full install with all options:
 
 ```bash
-npx -y @invariance/gps init                # write .gps/config.yml + .gps/invariants.yml
-npx -y @invariance/gps install claude      # wire CLAUDE.md + .claude skill/hooks + .mcp.json
-npx -y @invariance/gps install codex       # wire AGENTS.md + .codex/config.toml (notify + MCP)
-npx -y @invariance/gps install cursor      # write .cursor/rules/gps.mdc + .cursor/mcp.json
-npx -y @invariance/gps index               # build the symbol graph
-npx -y @invariance/gps learn-todos         # bootstrap notes from existing TODO/FIXME
+npx -y @invariance/gps setup --yes --with-claude
+npx -y @invariance/gps setup --yes --with-codex
+npx -y @invariance/gps setup --yes --with-cursor
+npx -y @invariance/gps setup --yes --with-claude --with-codex --with-cursor
 ```
 
 Governance flags:
@@ -31,14 +28,13 @@ gps install claude --promote=safe          # auto-promote recurring safe lessons
 gps install claude --auto-suggest          # hook-safe authoring queue nudges; never writes memory
 ```
 
-## Core 5 commands
+## Happy path
 
 ```bash
-gps init                                              # 1. write config files
-gps install claude                                    # 2. wire agent integration (or: codex | cursor)
-gps index                                             # 3. build the symbol graph
-gps prepare <symbol> --intent "<one-liner>"           # 4. decision-ready brief before edits
-gps lessons record "<one sentence>"                   # 5. record what an edit taught you
+gps setup --yes --with-claude                         # init + index + TODO lift + Claude wiring
+gps prepare <symbol> --intent "<one-liner>"           # decision-ready brief before edits
+gps remember "<one sentence>"                         # save hard-won repo facts
+gps done                                              # post-edit self-audit
 ```
 
 ## Full reference

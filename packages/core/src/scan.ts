@@ -55,8 +55,8 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
   try {
     const raw = await readFile(path.join(root, ".gps/config.yml"), "utf8");
     const data = parseYaml(raw) ?? {};
-    // Policy fields are absent in pre-v0.5 config files; Zod fills the
-    // locked defaults (auto / never) so old configs stay valid.
+    // Policy fields may be absent in old config files; Zod fills the current
+    // locked defaults (auto / safe) so missing keys remain valid.
     const policy = GpsPolicy.parse({
       capture: data.capture,
       promote: data.promote,

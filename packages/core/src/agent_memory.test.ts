@@ -73,4 +73,15 @@ describe("agent memory helpers", () => {
     expect(suggestions[0]!.suggestion).toContain("gps remember");
     expect(suggestions[0]!.file).toBe("src/refunds.ts");
   });
+
+  it("anchors hard-search suggestions to the prepared symbol", () => {
+    const events = [
+      { type: "prepare", symbol: "createRefund" },
+      ...Array.from({ length: 8 }, () => ({ type: "tool", tool: "rg", path: "src/refunds.ts" })),
+    ];
+    const suggestions = detectHardSearch(events);
+    expect(suggestions[0]!.symbol).toBe("createRefund");
+    expect(suggestions[0]!.file).toBe("src/refunds.ts");
+    expect(suggestions[0]!.suggestion).toContain("--symbol createRefund");
+  });
 });

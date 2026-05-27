@@ -261,11 +261,11 @@ export type PromoteMode = z.infer<typeof PromoteMode>;
 /**
  * The governance policy persisted to `.gps/config.yml` by `gps install`.
  * Defaults are baked in here so this schema is the single source of truth:
- * `GpsPolicy.parse({})` yields the locked defaults (auto / never).
+ * `GpsPolicy.parse({})` yields the locked defaults (auto / safe).
  */
 export const GpsPolicy = z.object({
   capture: CaptureMode.default("auto"),
-  promote: PromoteMode.default("never"),
+  promote: PromoteMode.default("safe"),
   /**
    * Feature flag for hook-triggered authoring queue suggestions.
    * false — `gps suggest` remains manual only.

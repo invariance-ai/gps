@@ -15,9 +15,7 @@ This is the MVP bar for a launch that is genuinely useful rather than just a dem
 The default loop should stay boring:
 
 ```bash
-npx -y @invariance/gps init
-npx -y @invariance/gps install claude    # or codex | cursor
-npx -y @invariance/gps index
+npx -y @invariance/gps setup --yes --with-claude    # or --with-codex / --with-cursor
 gps prepare --intent "what I am about to change"
 gps brief
 ```
@@ -30,7 +28,7 @@ gps brief
 | Claude Code | Skill, hooks, MCP server, CLAUDE.md block | `install claude --dry-run`, `install claude`, then verify `.claude/settings.json`, `.mcp.json`, and `CLAUDE.md` |
 | Codex CLI | AGENTS.md, notify hook, MCP server | Verify `.codex/config.toml` has top-level `notify` and `mcp_servers.gps` |
 | Cursor | Always-attached rule plus MCP server | Verify `.cursor/rules/gps.mdc` and `.cursor/mcp.json` |
-| Memory governance | `capture=auto|inbox`, `promote=never|safe|all` | Default remains non-breaking; recommend `--capture=inbox` for teams |
+| Memory governance | `capture=auto|inbox`, `promote=never|safe|all` | Default is useful-but-gated (`promote=safe`); recommend `--capture=inbox` for teams that need review |
 | Auto suggestions | Feature flag: `auto_suggest=false` by default, enabled by `--auto-suggest` | Hook-safe `gps suggest --auto` must never write memory and must no-op unless enabled |
 | Benchmarks | Measured perf and dogfood docs exist | Market claims must cite the exact benchmark file and caveats |
 | Package hygiene | Build excludes compiled tests from dist | Keep `npm pack --dry-run` clean before publishing |
@@ -82,20 +80,14 @@ pnpm gen:schemas
 pnpm -r build
 pnpm -r typecheck
 pnpm -r test
+pnpm smoke:pack
 pnpm release:check
-(cd packages/cli && npm pack --dry-run)
 ```
 
 Then test from a clean directory:
 
 ```bash
-(cd packages/cli && npm pack)
-npm install -g ./packages/cli/invariance-gps-0.1.0.tgz
-mkdir /tmp/gps-smoke && cd /tmp/gps-smoke
-git init
-gps init
-gps install claude --dry-run
-gps --help
+pnpm smoke:pack
 ```
 
 For the real release, use `scripts/release.ts` so all workspace packages stay lockstep.
