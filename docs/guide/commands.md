@@ -771,6 +771,31 @@ inbox approve [options] <id>
 
 - `--root <path>` — Repo root (default: cwd)
 
+### `inbox review`
+
+Summarize pending memory, duplicates, merge suggestions, risk, and scope warnings
+
+```
+inbox review [options]
+```
+
+**Options:**
+
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `inbox merge`
+
+Approve a canonical pending item and reject its near-duplicate copies
+
+```
+inbox merge [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
 ### `inbox reject`
 
 Reject an item (kept for the audit trail)

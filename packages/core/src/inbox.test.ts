@@ -6,9 +6,11 @@ import {
   addToInbox,
   loadInbox,
   annotateInboxDuplicates,
+  buildInboxReview,
   approveInboxItem,
   rejectInboxItem,
   editInboxItem,
+  mergeInboxDuplicates,
 } from "./inbox.js";
 import { loadPreferences, addPreference } from "./preferences.js";
 import { recordDirective } from "./lessons.js";
@@ -213,5 +215,69 @@ describe("reject / edit", () => {
     const { item } = await addToInbox(root, { kind: "preference", text: "prefix lookup test" });
     const rejected = await rejectInboxItem(root, item.id.slice(0, 6));
     expect(rejected?.id).toBe(item.id);
+  });
+});
+
+describe("buildInboxReview + mergeInboxDuplicates", () => {
+  it("suggests a merge for near-duplicate pending items", async () => {
+    const root = await tempRepo();
+    const { item: first } = await addToInbox(root, {
+      kind: "preference",
+      text: "always add retry logic with exponential backoff to outbound network calls",
+    });
+    const { item: second } = await addToInbox(root, {
+      kind: "preference",
+      text: "add retry logic with exponential backoff to outbound network calls always",
+    });
+
+    const review = await buildInboxReview(root);
+    expect(review.merge_suggestions).toHaveLength(1);
+    expect(review.merge_suggestions[0]!.canonical.id).toBe(first.id);
+    expect(review.merge_suggestions[0]!.duplicates.map((i) => i.id)).toEqual([second.id]);
+    expect(review.merge_suggestions[0]!.command).toBe(`gps inbox merge ${first.id}`);
+  });
+
+  it("merge approves the canonical item and rejects duplicate copies", async () => {
+    const root = await tempRepo();
+    const { item: first } = await addToInbox(root, {
+      kind: "preference",
+      text: "always add retry logic with exponential backoff to outbound network calls",
+    });
+    const { item: second } = await addToInbox(root, {
+      kind: "preference",
+      text: "add retry logic with exponential backoff to outbound network calls always",
+    });
+
+    const result = await mergeInboxDuplicates(root, first.id.slice(0, 6));
+    expect(result?.approved.item.id).toBe(first.id);
+    expect(result?.rejected.map((i) => i.id)).toEqual([second.id]);
+
+    const after = await loadInbox(root);
+    expect(after.find((i) => i.id === first.id)?.status).toBe("approved");
+    expect(after.find((i) => i.id === second.id)?.status).toBe("rejected");
+    expect((await loadPreferences(root)).map((p) => p.text)).toContain(first.text);
+  });
+
+  it("surfaces risk and scope suggestions", async () => {
+    const root = await tempRepo();
+    const { item: risky } = await addToInbox(root, {
+      kind: "preference",
+      text: "always require auth before issuing payment refunds",
+    });
+    const { item: scoped } = await addToInbox(root, {
+      kind: "preference",
+      text: "in src/api never log request secrets",
+    });
+    const { item: noArea } = await addToInbox(root, {
+      kind: "directive",
+      text: "do not add comments here",
+      polarity: "dont",
+    });
+
+    const review = await buildInboxReview(root);
+    expect(review.risky.map((i) => i.id)).toContain(risky.id);
+    expect(review.scope_suggestions.map((s) => s.item.id)).toEqual(
+      expect.arrayContaining([scoped.id, noArea.id]),
+    );
   });
 });
