@@ -162,7 +162,7 @@ export function buildProgram(): Command {
   const program = new Command()
     .name("gps")
     .description("Codebase context for coding agents.")
-    .version("0.2.0");
+    .version("0.2.1");
 
   program.addHelpText(
     "beforeAll",
