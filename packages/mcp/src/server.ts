@@ -131,7 +131,10 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       if (!symbol && a.intent) {
         const matches = await inferSymbols(root, a.intent, { limit: 5 });
         if (matches.length === 0) {
-          throw new Error(`prepare_edit: no symbol matches for intent "${a.intent}"; pass an explicit symbol`);
+          throw new Error(
+            `prepare_edit: no symbol matched intent "${a.intent}". ` +
+              `Use the \`find\` tool (or \`gps find "<keyword>"\`) to locate the symbol, then pass it as \`symbol\`.`,
+          );
         }
         candidates = matches.map((m) => ({
           symbol: m.symbol.qualified_name ?? m.symbol.name,
