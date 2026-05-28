@@ -77,35 +77,80 @@ function localBinPath(): string | null {
   }
 }
 
-/** Resolve the install-time command mode from user flags + workspace auto-detection. */
-export function resolveCmd(opts: { useGlobal?: boolean; useLocal?: boolean }): CmdSpec {
+/**
+ * Build the `--use-local` command spec for dogfood/dev installs.
+ *
+ * The entrypoint is emitted *relative to the install root* whenever the built
+ * CLI lives under that root (the common dogfood case: a repo wiring up its own
+ * checkout's build). A repo-relative path keeps the generated
+ * `.claude/settings.json` + `.mcp.json` portable — every clone that builds
+ * resolves the same path, with no machine-specific absolute baked into committed
+ * config. Hooks and MCP servers run with the project root as cwd, so the
+ * relative path resolves correctly at runtime.
+ *
+ * Only when the bin lives *outside* the root (e.g. a sibling checkout
+ * dogfooding another repo) do we fall back to an absolute path — and we warn
+ * loudly, because that path is not portable and must not be committed.
+ */
+function localCmdSpec(root: string): CmdSpec {
+  const bin = localBinPath();
+  if (!bin) {
+    throw new Error(
+      "--use-local requires a built CLI. Run `pnpm -r build` first, " +
+        "or install the published package and drop --use-local.",
+    );
+  }
+  const rel = path.relative(root, bin);
+  const underRoot = !!rel && !rel.startsWith("..") && !path.isAbsolute(rel);
+  if (!underRoot) {
+    process.stderr.write(
+      kleur.yellow(
+        "warning: --use-local resolved a CLI outside this repo, so the generated config would " +
+          "contain an absolute, machine-specific path. Do not commit it — prefer the default " +
+          "(npx) or --use-global for shared config.\n",
+      ),
+    );
+    return { shell: `node ${JSON.stringify(bin)}`, command: "node", baseArgs: [bin], mode: "local" };
+  }
+  // Posix separators so the committed path is identical across operating systems.
+  const relPosix = rel.split(path.sep).join("/");
+  return {
+    shell: `node ${JSON.stringify(relPosix)}`,
+    command: "node",
+    baseArgs: [relPosix],
+    mode: "local",
+  };
+}
+
+/**
+ * Resolve the install-time command mode from user flags.
+ *
+ * The default is the published package via `npx -y @invariance/gps`: portable
+ * across machines and the only mode safe to commit — no absolute path, no
+ * global-install assumption. `--use-global` emits a bare `gps` (requires a
+ * global install); `--use-local` emits the local build by a repo-relative path
+ * for dogfooding.
+ *
+ * NOTE: this previously auto-detected a workspace checkout and silently emitted
+ * an absolute `node <abs>/dist/index.js`, which broke the instant the committed
+ * `.claude/settings.json` / `.mcp.json` landed on another machine (or moved on
+ * the same one). The package is published now, so npx is the safe default and
+ * dogfooders opt into the local build explicitly with `--use-local` — which
+ * stays portable by emitting a repo-relative path. `root` is needed only to
+ * compute that relative path.
+ */
+export function resolveCmd(
+  opts: { useGlobal?: boolean; useLocal?: boolean },
+  root: string = process.cwd(),
+): CmdSpec {
   if (opts.useGlobal && opts.useLocal) {
     throw new Error("--use-global and --use-local are mutually exclusive");
   }
   if (opts.useLocal) {
-    const bin = localBinPath();
-    if (!bin) {
-      throw new Error(
-        "--use-local requires a built CLI. Run `pnpm -r build` first, " +
-          "or install the published package and drop --use-local.",
-      );
-    }
-    return { shell: `node ${JSON.stringify(bin)}`, command: "node", baseArgs: [bin], mode: "local" };
+    return localCmdSpec(root);
   }
   if (opts.useGlobal) {
     return { shell: "gps", command: "gps", baseArgs: [], mode: "global" };
-  }
-  // Auto-detect: when running from a workspace checkout (CLI not inside node_modules)
-  // and the user didn't pin a mode, prefer local — hooks built for npx silently no-op
-  // until `@invariance/gps` is on npm. CI keeps the npx default for predictability.
-  const bin = localBinPath();
-  if (bin && !process.env.CI && !bin.includes(`${path.sep}node_modules${path.sep}`)) {
-    process.stderr.write(
-      kleur.yellow(
-        "note: auto-detected workspace install → using local mode (override with --use-global or set CI=1 for npx)\n",
-      ),
-    );
-    return { shell: `node ${JSON.stringify(bin)}`, command: "node", baseArgs: [bin], mode: "local" };
   }
   return {
     shell: "npx -y @invariance/gps",
@@ -206,7 +251,7 @@ export function registerInstall(program: Command): void {
         .option("--force", "Overwrite existing gps-managed Claude files")
         .option("--skip-claude-md", "Do not append gps instructions to CLAUDE.md")
         .option("--use-global", "Generate hooks that call `gps` directly (requires global install)")
-        .option("--use-local", "Generate hooks that call this CLI by absolute path (for dogfood/dev)")
+        .option("--use-local", "Generate hooks that call this CLI by repo-relative path (for dogfood/dev)")
         .option("--dry-run", "Show what would be written without touching disk"),
     ),
   ).action(async (opts: InstallOpts) => {
@@ -214,7 +259,7 @@ export function registerInstall(program: Command): void {
     DRY_RUN = !!opts.dryRun;
     try {
       const policy = resolvePolicy(opts);
-      const spec = resolveCmd(opts);
+      const spec = resolveCmd(opts, root);
       await runInstallClaude(root, {
         force: !!opts.force,
         skipClaudeMd: !!opts.skipClaudeMd,
@@ -241,7 +286,7 @@ export function registerInstall(program: Command): void {
         .option("--force", "Overwrite existing gps-managed Codex files")
         .option("--skip-agents-md", "Do not append gps instructions to AGENTS.md")
         .option("--use-global", "Configure Codex to call `gps` directly (requires global install)")
-        .option("--use-local", "Configure Codex to call this CLI by absolute path (for dogfood/dev)")
+        .option("--use-local", "Configure Codex to call this CLI by repo-relative path (for dogfood/dev)")
         .option("--dry-run", "Show what would be written without touching disk"),
     ),
   ).action(async (opts: CodexInstallOpts) => {
@@ -249,7 +294,7 @@ export function registerInstall(program: Command): void {
     DRY_RUN = !!opts.dryRun;
     try {
       const policy = resolvePolicy(opts);
-      const spec = resolveCmd(opts);
+      const spec = resolveCmd(opts, root);
       await runInstallCodex(root, {
         force: !!opts.force,
         skipAgentsMd: !!opts.skipAgentsMd,
@@ -274,7 +319,7 @@ export function registerInstall(program: Command): void {
         .option("--force", "Overwrite existing gps-managed Cursor files")
         .option("--skip-mcp", "Do not write .cursor/mcp.json (rule file only)")
         .option("--use-global", "Configure MCP to call `gps` directly (requires global install)")
-        .option("--use-local", "Configure MCP to call this CLI by absolute path (for dogfood/dev)")
+        .option("--use-local", "Configure MCP to call this CLI by repo-relative path (for dogfood/dev)")
         .option("--dry-run", "Show what would be written without touching disk"),
     ),
   ).action(async (opts: CursorInstallOpts) => {
@@ -282,7 +327,7 @@ export function registerInstall(program: Command): void {
     DRY_RUN = !!opts.dryRun;
     try {
       const policy = resolvePolicy(opts);
-      const spec = resolveCmd(opts);
+      const spec = resolveCmd(opts, root);
       await runInstallCursor(root, {
         force: !!opts.force,
         skipMcp: !!opts.skipMcp,
