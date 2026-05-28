@@ -20,9 +20,31 @@ importers:
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.19.18)
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
       zod-to-json-schema:
         specifier: ^3.25.2
         version: 3.25.2(zod@3.25.76)
+
+  bench/memory:
+    dependencies:
+      '@invariance/gps-core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      yaml:
+        specifier: ^2.5.0
+        version: 2.9.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.18
+      tsx:
+        specifier: ^4.19.0
+        version: 4.21.0
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.18)
 
   packages/cli:
     dependencies:

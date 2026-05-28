@@ -1,0 +1,15 @@
+id: retry-post-too
+type: decision
+symbol: retry
+canonical: "Retry POST requests by default too, not only idempotent methods."
+rejected: "retry only idempotent methods (GET/HEAD/PUT/DELETE)"
+paraphrases:
+  - "in this repo we deliberately retry POSTs as well, not just the safe methods"
+  - "decision: POST should be retried by default like the idempotent verbs"
+  - "we want failed POSTs retried automatically, same as GET"
+test_task: "Decide which HTTP methods ky should retry by default and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "The decision retries POST by default (in addition to idempotent methods). Limiting retries to idempotent methods only — the standard, safe choice — violates the rule."
+tension: "ky and best practice retry only idempotent methods; retrying POST is contrarian. A model won't choose it unprompted — only memory would."
+surface_markers: ["POST", "retry"]
