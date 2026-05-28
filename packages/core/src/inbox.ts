@@ -93,6 +93,28 @@ export interface AnnotatedInboxItem {
  */
 export const INBOX_DUPLICATE_GATE = 0.7;
 
+export interface InboxMergeSuggestion {
+  canonical: InboxItemT;
+  duplicates: InboxItemT[];
+  reason: string;
+  command: string;
+}
+
+export interface InboxScopeSuggestion {
+  item: InboxItemT;
+  issue: string;
+  suggestion: string;
+}
+
+export interface InboxReview {
+  pending: AnnotatedInboxItem[];
+  active_duplicates: AnnotatedInboxItem[];
+  merge_suggestions: InboxMergeSuggestion[];
+  risky: InboxItemT[];
+  scope_suggestions: InboxScopeSuggestion[];
+  total: number;
+}
+
 /**
  * Compare each pending item against ACTIVE memory and mark the ones that
  * reproduce something already approved. Preferences are matched against
@@ -122,59 +144,179 @@ export async function annotateInboxDuplicates(
     return cached;
   }
 
+  // Earlier pending items, so a second phrasing of the same rule captured in the
+  // SAME session (e.g. "cap backoff at 17s" then "don't let backoff exceed 17s")
+  // is tagged against the first instead of both surfacing as fresh, actionable
+  // items. The first occurrence stays unmarked; later near/exact copies point at it.
+  const seenPending: Array<{
+    kind: InboxItemKind;
+    text: string;
+    norm: string;
+    tokens: Set<string>;
+    area?: string;
+  }> = [];
+  function pendingDuplicate(
+    kind: InboxItemKind,
+    norm: string,
+    tokens: Set<string>,
+    area: string | undefined,
+  ): { text: string; match: "exact" | "near" } | null {
+    let best: { text: string; score: number } | null = null;
+    for (const s of seenPending) {
+      if (s.kind !== kind) continue;
+      if (kind === "directive" && s.area !== area) continue;
+      if (s.norm === norm) return { text: s.text, match: "exact" };
+      const score = jaccard(tokens, s.tokens);
+      if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+        best = { text: s.text, score };
+      }
+    }
+    return best ? { text: best.text, match: "near" } : null;
+  }
+
   const out: AnnotatedInboxItem[] = [];
   for (const item of items) {
     if (item.status !== "pending") {
       out.push({ item });
       continue;
     }
+    const tokens = tokenize(item.text);
+    const norm = item.text.trim().toLowerCase();
+    let annotation: AnnotatedInboxItem = { item };
 
     if (item.kind === "preference") {
       // Exact: same normalized text → same sha1 as the stored preference.
       const exact = prefById.get(preferenceIdFor(item.text));
       if (exact) {
-        out.push({ item, duplicate_of: `preference "${exact.text}"`, match: "exact" });
-        continue;
-      }
-      const tokens = tokenize(item.text);
-      let best: { text: string; score: number } | null = null;
-      for (const { p, tokens: pt } of prefTokens) {
-        const score = jaccard(tokens, pt);
-        if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
-          best = { text: p.text, score };
+        annotation = { item, duplicate_of: `preference "${exact.text}"`, match: "exact" };
+      } else {
+        let best: { text: string; score: number } | null = null;
+        for (const { p, tokens: pt } of prefTokens) {
+          const score = jaccard(tokens, pt);
+          if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+            best = { text: p.text, score };
+          }
         }
+        if (best) annotation = { item, duplicate_of: `preference "${best.text}"`, match: "near" };
       }
-      out.push(
-        best ? { item, duplicate_of: `preference "${best.text}"`, match: "near" } : { item },
-      );
-      continue;
+    } else if (item.area) {
+      // directive → compare against the area notes of its resolved area.
+      const notes = await notesFor(item.area);
+      const exactNote = notes.find((n) => n.lesson.trim().toLowerCase() === norm);
+      if (exactNote) {
+        annotation = { item, duplicate_of: `area note "${exactNote.lesson}"`, match: "exact" };
+      } else {
+        let best: { lesson: string; score: number } | null = null;
+        for (const n of notes) {
+          const score = jaccard(tokens, n.tokens);
+          if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
+            best = { lesson: n.lesson, score };
+          }
+        }
+        if (best) annotation = { item, duplicate_of: `area note "${best.lesson}"`, match: "near" };
+      }
     }
 
-    // directive → compare against the area notes of its resolved area.
-    if (!item.area) {
-      out.push({ item });
-      continue;
+    // Fall back to pending-vs-pending only when not already a dup of active memory.
+    if (!annotation.duplicate_of) {
+      const pd = pendingDuplicate(item.kind, norm, tokens, item.area);
+      if (pd) annotation = { item, duplicate_of: `pending "${pd.text}"`, match: pd.match };
     }
-    const notes = await notesFor(item.area);
-    const norm = item.text.trim().toLowerCase();
-    const exactNote = notes.find((n) => n.lesson.trim().toLowerCase() === norm);
-    if (exactNote) {
-      out.push({ item, duplicate_of: `area note "${exactNote.lesson}"`, match: "exact" });
-      continue;
-    }
-    const tokens = tokenize(item.text);
-    let best: { lesson: string; score: number } | null = null;
-    for (const n of notes) {
-      const score = jaccard(tokens, n.tokens);
-      if (score >= INBOX_DUPLICATE_GATE && (!best || score > best.score)) {
-        best = { lesson: n.lesson, score };
-      }
-    }
-    out.push(
-      best ? { item, duplicate_of: `area note "${best.lesson}"`, match: "near" } : { item },
-    );
+
+    out.push(annotation);
+    seenPending.push({ kind: item.kind, text: item.text, norm, tokens, area: item.area });
   }
   return out;
+}
+
+function sameMergeBucket(a: InboxItemT, b: InboxItemT): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "directive" && a.area !== b.area) return false;
+  return true;
+}
+
+function buildMergeSuggestions(items: InboxItemT[]): InboxMergeSuggestion[] {
+  const pending = items.filter((i) => i.status === "pending");
+  const visited = new Set<string>();
+  const out: InboxMergeSuggestion[] = [];
+
+  for (let i = 0; i < pending.length; i++) {
+    const canonical = pending[i]!;
+    if (visited.has(canonical.id)) continue;
+    const canonicalTokens = tokenize(canonical.text);
+    const duplicates: InboxItemT[] = [];
+    for (let j = i + 1; j < pending.length; j++) {
+      const candidate = pending[j]!;
+      if (visited.has(candidate.id) || !sameMergeBucket(canonical, candidate)) continue;
+      const score = jaccard(canonicalTokens, tokenize(candidate.text));
+      if (score >= INBOX_DUPLICATE_GATE) duplicates.push(candidate);
+    }
+    if (duplicates.length === 0) continue;
+    visited.add(canonical.id);
+    for (const d of duplicates) visited.add(d.id);
+    out.push({
+      canonical,
+      duplicates,
+      reason: `${duplicates.length + 1} near-duplicate ${canonical.kind} captures`,
+      command: `gps inbox merge ${canonical.id}`,
+    });
+  }
+
+  return out;
+}
+
+function scopeSuggestions(items: InboxItemT[]): InboxScopeSuggestion[] {
+  const out: InboxScopeSuggestion[] = [];
+  const locationCue = /\b(this folder|this directory|here|in (?:src|apps|packages|docs|lib|server|client|api|ui|web|tests?)(?:\/|\b)|under (?:src|apps|packages|docs|lib|server|client|api|ui|web|tests?)(?:\/|\b))/i;
+  const durableCue = /\b(always|never|prefer|from now on|default to|use .* instead of)\b/i;
+
+  for (const item of items) {
+    if (item.status !== "pending") continue;
+    if (item.kind === "preference" && locationCue.test(item.text)) {
+      out.push({
+        item,
+        issue: "preference looks location-scoped",
+        suggestion: "consider rejecting it and recording a directive with an explicit area",
+      });
+    } else if (item.kind === "directive" && !item.area) {
+      out.push({
+        item,
+        issue: "directive has no resolved area",
+        suggestion: "edit/record it with an area before approving",
+      });
+    } else if (item.kind === "directive" && durableCue.test(item.text) && !locationCue.test(item.text)) {
+      out.push({
+        item,
+        issue: "directive may be repo-wide",
+        suggestion: "consider recording this as a preference instead of an area directive",
+      });
+    }
+  }
+  return out;
+}
+
+export async function buildInboxReview(root: string): Promise<InboxReview> {
+  const items = await loadInbox(root);
+  const annotated = await annotateInboxDuplicates(root, items);
+  const pending = annotated.filter((a) => a.item.status === "pending" && !a.duplicate_of);
+  const activeDuplicates = annotated.filter(
+    (a) => a.item.status === "pending" && !!a.duplicate_of && !a.duplicate_of.startsWith("pending "),
+  );
+  const mergeSuggestions = buildMergeSuggestions(items);
+  const duplicateIds = new Set(mergeSuggestions.flatMap((m) => m.duplicates.map((d) => d.id)));
+  const risky = pending
+    .map((a) => a.item)
+    .filter((i) => !duplicateIds.has(i.id) && i.risk_topics.length > 0);
+  const scope = scopeSuggestions(items);
+
+  return {
+    pending: pending.filter((a) => !duplicateIds.has(a.item.id)),
+    active_duplicates: activeDuplicates,
+    merge_suggestions: mergeSuggestions,
+    risky,
+    scope_suggestions: scope,
+    total: pending.length + activeDuplicates.length + mergeSuggestions.length + risky.length + scope.length,
+  };
 }
 
 export interface AddToInboxOpts {
@@ -278,6 +420,28 @@ export async function approveInboxItem(
   item.status = "approved";
   await persist(root, items);
   return { item, persisted };
+}
+
+export interface MergeInboxResult {
+  approved: ApproveResult;
+  rejected: InboxItemT[];
+}
+
+export async function mergeInboxDuplicates(root: string, idOrPrefix: string): Promise<MergeInboxResult | null> {
+  const review = await buildInboxReview(root);
+  const suggestions = review.merge_suggestions.filter(
+    (s) => s.canonical.id === idOrPrefix || s.canonical.id.startsWith(idOrPrefix),
+  );
+  if (suggestions.length !== 1) return null;
+  const suggestion = suggestions[0]!;
+  const approved = await approveInboxItem(root, suggestion.canonical.id);
+  if (!approved) return null;
+  const rejected: InboxItemT[] = [];
+  for (const dupe of suggestion.duplicates) {
+    const item = await rejectInboxItem(root, dupe.id);
+    if (item) rejected.push(item);
+  }
+  return { approved, rejected };
 }
 
 /** Where an explicit preference write landed, and why. */

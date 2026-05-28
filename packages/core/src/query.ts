@@ -25,6 +25,7 @@ import { classifyIntent, excludeForIntent } from "./intent.js";
 import { loadAssumptions } from "./assumptions.js";
 import { gapsForSymbol, type TestGap } from "./testgaps.js";
 import { loadPreferences, rankPreferences } from "./preferences.js";
+import { searchSymbols } from "./search.js";
 import { listTodos } from "./todos.js";
 import type { Assumption, Question, Decision, Note, TodoItem } from "@invariance/gps-schemas";
 import { PREPARE_EDIT_SCHEMA_VERSION } from "@invariance/gps-schemas";
@@ -134,6 +135,15 @@ function ancestorDirs(file: string): string[] {
   return out;
 }
 
+function memoryAgeLabel(recordedAt: string, now = Date.now()): string {
+  const recorded = Date.parse(recordedAt);
+  if (Number.isNaN(recorded)) return "";
+  const ageDays = Math.floor((now - recorded) / 86_400_000);
+  if (ageDays >= 180) return " stale memory";
+  if (ageDays >= 90) return " aging memory";
+  return "";
+}
+
 function buildLookups(index: GpsIndex): IndexLookups {
   const byId = new Map<string, SymbolRef>();
   const byQualified = new Map<string, SymbolRef>();
@@ -192,6 +202,21 @@ export function resolveSymbol(query: string, ctx: QueryContext): SymbolRef | nul
 
 function resolveByKey(key: string, L: IndexLookups): SymbolRef | undefined {
   return L.byId.get(key) ?? L.byQualified.get(key) ?? L.byName.get(key)?.[0];
+}
+
+/**
+ * `resolveSymbol` is exact-match only, so a near-miss a human would type
+ * (`calculateDelay` for `#calculateDelay`, a typo, the wrong casing) errors with
+ * no help. Use the fuzzy search to suggest what they probably meant.
+ */
+function symbolNotFound(query: string, ctx: QueryContext): Error {
+  const suggestions = searchSymbols(ctx.index, query, 3).map(
+    (m) => m.symbol.qualified_name ?? m.symbol.name,
+  );
+  const hint = suggestions.length
+    ? ` Did you mean: ${suggestions.join(", ")}?  (\`gps find "${query}"\` for more)`
+    : ` Run \`gps find "${query}"\` to search, or \`gps index\` if the graph may be stale.`;
+  return new Error(`symbol not found: ${query}.${hint}`);
 }
 
 export function callersOf(symbol: SymbolRef | string, ctx: QueryContext): SymbolRef[] {
@@ -331,7 +356,7 @@ export async function getContext(
 ): Promise<ContextResult> {
   const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
   const sym = resolveSymbol(args.symbol, ctx);
-  if (!sym) throw new Error(`symbol not found: ${args.symbol}`);
+  if (!sym) throw symbolNotFound(args.symbol, ctx);
 
   const mode = args.mode ?? "brief";
   const caps = mode === "full" ? FULL_CAPS : BRIEF_CAPS;
@@ -428,7 +453,7 @@ export async function impactOf(
 ): Promise<ImpactResult> {
   const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
   const sym = resolveSymbol(args.symbol, ctx);
-  if (!sym) throw new Error(`symbol not found: ${args.symbol}`);
+  if (!sym) throw symbolNotFound(args.symbol, ctx);
 
   const visited = new Set<string>();
   const frontier: SymbolRef[] = [sym];
@@ -657,7 +682,8 @@ function formatPrepareEdit(
       items: directiveNotes.map((n) => {
         const loc = n.applies_to ?? n.symbol;
         const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
-        return `- **[${n.scope}: \`${loc}\`]** ${n.lesson}${ev}`;
+        const age = memoryAgeLabel(n.recorded_at);
+        return `- **[${n.scope}: \`${loc}\`${age}]** ${n.lesson}${ev}`;
       }),
     });
   }
@@ -666,7 +692,8 @@ function formatPrepareEdit(
     heading: "## Notes from previous edits",
     items: symbolNotes.map((n) => {
       const ev = n.evidence ? `\n  - evidence: ${n.evidence}` : "";
-      return `- **[${n.severity}]** ${n.lesson}${ev}`;
+      const age = memoryAgeLabel(n.recorded_at);
+      return `- **[${n.severity}${age}]** ${n.lesson}${ev}`;
     }),
   });
 

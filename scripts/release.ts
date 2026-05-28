@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     console.log(`  ${data.name} → ${version}`);
   }
 
-  run("pnpm -r build");
+  run("pnpm build");
 
   if (doPublish) {
     // pnpm publishes in topological order and rewrites workspace:* to the

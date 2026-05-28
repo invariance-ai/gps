@@ -1,12 +1,14 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { brief, formatBriefMarkdown } from "@invariance/gps-core";
+import { brief, formatBriefMarkdown, estimateTokens } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   base?: string;
   json?: boolean;
   maxSymbols?: string;
+  tokens?: boolean;
+  cost?: boolean;
 }
 
 export function registerBrief(program: Command): void {
@@ -16,6 +18,8 @@ export function registerBrief(program: Command): void {
       .description("Pre-finalize briefing: changed symbols + invariants + notes + tests + 'no tests' warnings. Call before declaring done.")
       .option("--base <ref>", "Diff base (default HEAD)", "HEAD")
       .option("--max-symbols <n>", "Cap symbols processed (default 20)")
+      .option("--tokens", "Print estimated token cost of the brief")
+      .option("--cost", "Alias for --tokens")
       .option("--json", "Emit JSON"),
   ).action(async (opts: Opts) => {
     try {
@@ -25,9 +29,15 @@ export function registerBrief(program: Command): void {
         throw new Error("--max-symbols must be a positive integer");
       }
       const result = await brief(root, { base: opts.base, max_symbols: maxSymbols });
+      const showTokens = !!(opts.tokens || opts.cost);
+      const tokenFooter = () =>
+        kleur.dim(`\n~${estimateTokens(formatBriefMarkdown(result))} tokens`);
 
       if (opts.json) {
-        console.log(JSON.stringify(result, null, 2));
+        const out = showTokens
+          ? { ...result, tokens: { estimated: estimateTokens(formatBriefMarkdown(result)) } }
+          : result;
+        console.log(JSON.stringify(out, null, 2));
         process.exitCode = result.invariants.blocking_count > 0 ? 1 : 0;
         return;
       }
@@ -42,10 +52,12 @@ export function registerBrief(program: Command): void {
         // docs, config, etc.). Print one explicit status line — not empty
         // Invariants/Notes/Tests sections that look like a clean pass. Exit 0.
         console.log(formatBriefMarkdown(result).trimEnd());
+        if (showTokens) console.log(tokenFooter());
         return;
       }
 
       console.log(formatBriefMarkdown(result));
+      if (showTokens) console.log(tokenFooter());
 
       // Inline coloured warnings (markdown above stays neutral for piping to LLMs).
       if (result.untested_symbols.length > 0) {

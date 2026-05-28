@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GpsPolicy } from "@invariance/gps-schemas";
-import { loadConfig, loadPolicy, writePolicy } from "./scan.js";
+import { loadConfig, loadPolicy, writePolicy, loadDocConfig } from "./scan.js";
 
 const roots: string[] = [];
 async function tempRepo(configBody?: string): Promise<string> {
@@ -23,18 +23,22 @@ afterEach(async () => {
 });
 
 describe("loadConfig — policy defaults", () => {
-  it("defaults to capture=auto / promote=never when no config file exists", async () => {
+  it("defaults to capture=auto / promote=safe / auto_suggest=false when no config file exists", async () => {
     const root = await tempRepo();
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
-    expect(cfg.promote).toBe("never");
+    expect(cfg.promote).toBe("safe");
+    expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental).toEqual({ live_docs: false });
   });
 
   it("defaults policy when config file omits the fields", async () => {
     const root = await tempRepo("languages: [typescript]\ndepth: 5\n");
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("auto");
-    expect(cfg.promote).toBe("never");
+    expect(cfg.promote).toBe("safe");
+    expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental.live_docs).toBe(false);
     // non-policy fields still parse
     expect(cfg.languages).toEqual(["typescript"]);
     expect(cfg.depth).toBe(5);
@@ -47,14 +51,48 @@ describe("loadConfig — policy defaults", () => {
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("inbox");
     expect(cfg.promote).toBe("safe");
+    expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental.live_docs).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.exclude).toContain("tmp");
+  });
+
+  it("parses experimental feature flags explicitly", async () => {
+    const root = await tempRepo("experimental:\n  live_docs: true\n");
+    const cfg = await loadConfig(root);
+    expect(cfg.experimental.live_docs).toBe(true);
+  });
+});
+
+describe("doc config", () => {
+  it("defaults to all-off when no config / no doc block", async () => {
+    const root = await tempRepo();
+    const doc = await loadDocConfig(root);
+    expect(doc.enabled).toBe(false);
+    expect(doc.auto).toBe(false);
+    expect(doc.out_dir).toBe(".gps/docs");
+    expect(doc.diff_view).toBe("unified");
+  });
+
+  it("round-trips an explicit doc block", async () => {
+    const root = await tempRepo(
+      "doc:\n  enabled: true\n  auto: true\n  diff_view: split\n  out_dir: docs/gps\n",
+    );
+    const doc = await loadDocConfig(root);
+    expect(doc.enabled).toBe(true);
+    expect(doc.auto).toBe(true);
+    expect(doc.diff_view).toBe("split");
+    expect(doc.out_dir).toBe("docs/gps");
   });
 });
 
 describe("GpsPolicy schema", () => {
   it("yields locked defaults on empty input", () => {
-    expect(GpsPolicy.parse({})).toEqual({ capture: "auto", promote: "never" });
+    expect(GpsPolicy.parse({})).toEqual({
+      capture: "auto",
+      promote: "safe",
+      auto_suggest: false,
+    });
   });
 
   it("rejects invalid enum values", () => {
@@ -65,8 +103,12 @@ describe("GpsPolicy schema", () => {
 
 describe("loadPolicy", () => {
   it("returns just the policy", async () => {
-    const root = await tempRepo("capture: inbox\npromote: all\n");
-    expect(await loadPolicy(root)).toEqual({ capture: "inbox", promote: "all" });
+    const root = await tempRepo("capture: inbox\npromote: all\nauto_suggest: true\n");
+    expect(await loadPolicy(root)).toEqual({
+      capture: "inbox",
+      promote: "all",
+      auto_suggest: true,
+    });
   });
 });
 
@@ -78,6 +120,7 @@ describe("writePolicy", () => {
     await writePolicy(root, GpsPolicy.parse({ capture: "inbox", promote: "never" }));
     const cfg = await loadConfig(root);
     expect(cfg.capture).toBe("inbox");
+    expect(cfg.auto_suggest).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.depth).toBe(4);
     expect(cfg.exclude).toContain("tmp");
@@ -86,7 +129,14 @@ describe("writePolicy", () => {
 
   it("creates config.yml when none exists", async () => {
     const root = await tempRepo();
-    await writePolicy(root, GpsPolicy.parse({ capture: "auto", promote: "safe" }));
-    expect(await loadPolicy(root)).toEqual({ capture: "auto", promote: "safe" });
+    await writePolicy(
+      root,
+      GpsPolicy.parse({ capture: "auto", promote: "safe", auto_suggest: true }),
+    );
+    expect(await loadPolicy(root)).toEqual({
+      capture: "auto",
+      promote: "safe",
+      auto_suggest: true,
+    });
   });
 });

@@ -15,6 +15,8 @@ import {
   Decision,
   Preference,
   PrepareEditResult,
+  GpsPolicy,
+  ExperimentalFeatures,
 } from "../packages/schemas/src/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -30,6 +32,8 @@ const Config = z
       .array(z.enum(["structural", "tests", "provenance", "invariants"]))
       .default(["structural", "tests", "provenance", "invariants"]),
   })
+  .merge(GpsPolicy)
+  .extend({ experimental: ExperimentalFeatures.default({}) })
   .describe("gps repo configuration written to .gps/config.yml by `gps init`.");
 
 const InvariantsFile = z

@@ -50,6 +50,38 @@
             "provenance",
             "invariants"
           ]
+        },
+        "capture": {
+          "type": "string",
+          "enum": [
+            "inbox",
+            "auto"
+          ],
+          "default": "auto"
+        },
+        "promote": {
+          "type": "string",
+          "enum": [
+            "never",
+            "safe",
+            "all"
+          ],
+          "default": "safe"
+        },
+        "auto_suggest": {
+          "type": "boolean",
+          "default": false
+        },
+        "experimental": {
+          "type": "object",
+          "properties": {
+            "live_docs": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
         }
       },
       "additionalProperties": false,

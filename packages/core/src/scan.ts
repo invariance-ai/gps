@@ -2,7 +2,15 @@ import fg from "fast-glob";
 import path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { GpsPolicy, type CaptureMode, type PromoteMode } from "@invariance/gps-schemas";
+import {
+  DocConfig,
+  ExperimentalFeatures,
+  GpsPolicy,
+  type CaptureMode,
+  type DocConfig as DocConfigT,
+  type ExperimentalFeatures as ExperimentalFeaturesT,
+  type PromoteMode,
+} from "@invariance/gps-schemas";
 import {
   TS_GLOB,
   PY_GLOB,
@@ -31,6 +39,12 @@ export interface GpsConfig {
   capture: CaptureMode;
   /** Auto-promotion policy for note clusters. Default: "never". */
   promote: PromoteMode;
+  /** Whether hooks may print `gps suggest` authoring-queue nudges. Default: false. */
+  auto_suggest: boolean;
+  /** Doc-store feature config (shareable HTML/markdown docs). Default: all-off. */
+  doc: DocConfigT;
+  /** Launch-gated experimental surfaces. All false by default. */
+  experimental: ExperimentalFeaturesT;
 }
 
 const GLOBS_BY_LANG: Record<GpsLanguage, string[]> = {
@@ -53,9 +67,14 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
   try {
     const raw = await readFile(path.join(root, ".gps/config.yml"), "utf8");
     const data = parseYaml(raw) ?? {};
-    // Policy fields are absent in pre-v0.5 config files; Zod fills the
-    // locked defaults (auto / never) so old configs stay valid.
-    const policy = GpsPolicy.parse({ capture: data.capture, promote: data.promote });
+    // Policy fields may be absent in old config files; Zod fills the current
+    // locked defaults (auto / safe) so missing keys remain valid.
+    const policy = GpsPolicy.parse({
+      capture: data.capture,
+      promote: data.promote,
+      auto_suggest: data.auto_suggest,
+    });
+    const experimental = ExperimentalFeatures.parse(data.experimental ?? {});
     return {
       languages: data.languages ?? (["typescript", "python", "go", "rust", "java", "ruby", "csharp"] as GpsLanguage[]),
       exclude: [...DEFAULT_EXCLUDE, ...(data.exclude ?? [])],
@@ -63,9 +82,13 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       strands: data.strands ?? ["structural", "tests", "provenance", "invariants"],
       capture: policy.capture,
       promote: policy.promote,
+      auto_suggest: policy.auto_suggest,
+      doc: DocConfig.parse(data.doc ?? {}),
+      experimental,
     };
   } catch {
     const policy = GpsPolicy.parse({});
+    const experimental = ExperimentalFeatures.parse({});
     return {
       languages: ["typescript", "python", "go", "rust", "java", "ruby", "csharp"],
       exclude: DEFAULT_EXCLUDE,
@@ -73,8 +96,20 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       strands: ["structural", "tests", "provenance", "invariants"],
       capture: policy.capture,
       promote: policy.promote,
+      auto_suggest: policy.auto_suggest,
+      doc: DocConfig.parse({}),
+      experimental,
     };
   }
+}
+
+/**
+ * Thin reader for just the doc-store config. `gps doc` and the attach hook use
+ * this instead of pulling the whole scan config. A repo with no `doc:` block
+ * (the default) yields an all-disabled config, so the feature is opt-in.
+ */
+export async function loadDocConfig(root: string): Promise<DocConfigT> {
+  return (await loadConfig(root)).doc;
 }
 
 /**
@@ -83,7 +118,11 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
  */
 export async function loadPolicy(root: string): Promise<GpsPolicy> {
   const cfg = await loadConfig(root);
-  return GpsPolicy.parse({ capture: cfg.capture, promote: cfg.promote });
+  return GpsPolicy.parse({
+    capture: cfg.capture,
+    promote: cfg.promote,
+    auto_suggest: cfg.auto_suggest,
+  });
 }
 
 /**
@@ -101,7 +140,12 @@ export async function writePolicy(root: string, policy: GpsPolicy): Promise<void
   } catch {
     // no config yet — create one
   }
-  const next = { ...existing, capture: policy.capture, promote: policy.promote };
+  const next = {
+    ...existing,
+    capture: policy.capture,
+    promote: policy.promote,
+    auto_suggest: policy.auto_suggest,
+  };
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, stringifyYaml(next));
 }

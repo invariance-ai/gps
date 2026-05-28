@@ -1,6 +1,6 @@
 {
   "name": "@invariance/gps-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Parser, resolver, graph store, and query layer for gps.",
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,6 @@
   },
   "files": [
     "dist/**",
-    "src/**",
     "grammars/**/*.wasm",
     "README.md"
   ],

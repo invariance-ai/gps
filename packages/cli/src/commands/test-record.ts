@@ -5,6 +5,7 @@ import {
   parseFailedTests,
   readObservations,
   diffSymbols,
+  learnedTestCommandsForSymbol,
 } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
@@ -77,5 +78,14 @@ export function registerTestRecord(program: Command): void {
     console.log(
       `${tag} ${kleur.dim(opts.command)} → ${run.symbols.length} symbol(s), ${failed.length} failing test(s)`,
     );
+    if (opts.exit === 0 && run.symbols.length > 0) {
+      for (const symbol of run.symbols.slice(0, 3)) {
+        const learned = await learnedTestCommandsForSymbol(root, symbol, 1);
+        const top = learned[0];
+        if (top) {
+          console.log(kleur.dim(`learned: ${symbol} → ${top.command} (${top.pass_count} pass${top.pass_count === 1 ? "" : "es"})`));
+        }
+      }
+    }
   });
 }

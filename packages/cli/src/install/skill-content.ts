@@ -55,6 +55,8 @@ gps preferences                       # see the user's captured standing rules
 gps prepare --intent "<plan>"         # decision-ready brief; symbol inferred from intent
 gps prepare <symbol> --intent "<…>"   # same, with explicit symbol
 gps brief                             # pre-finalize: changed symbols, invariants, notes, tests, no-test warnings
+gps done                              # final self-audit plus memory nudges from wasted search/failure loops
+gps suggest                           # authoring queue: hot symbols, repeated lessons, agent-friction candidates
 \`\`\`
 
 When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), gps records it for you — automatically via hook in agents that support them, otherwise call the MCP tool \`record_preference\` (or \`gps prefer "<rule>"\`). Both passive and explicit captures honor the repo's capture policy: under \`capture=auto\` they land in active memory, under \`capture=inbox\` they're queued for review (\`gps inbox approve <id>\`) — so don't assume an explicit call is immediately live. The response says where it went. Treat \`gps preferences\` output as soft constraints in every session.
@@ -67,6 +69,29 @@ gps lessons reclassify <id> --to <scope>     # move a lesson between tiers
 gps learn <symbol> --lesson "<…>"            # legacy: always symbol-scoped
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
+
+Save hard-won findings. If you spent real time locating code, tests, config, owners, fixtures,
+or a non-obvious workflow, record the answer before you finish. When \`gps done\` or
+\`gps suggest\` prints an agent-friction candidate — or the MCP \`brief\` tool returns a
+non-empty \`memory_suggestions\` array — run the shown \`remember_command\` (a ready-to-run
+\`gps remember …\`) unless the fact is obvious or wrong:
+
+\`\`\`bash
+gps remember "Refund approval tests live in apps/api/src/refund-approval.test.ts"
+gps remember "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts" --symbol stripeWebhook
+\`\`\`
+
+Do this for findings that would save a future agent another search loop. Do not record obvious facts
+from the file you are already editing.
+
+If you know something is still left to do, record a reminder instead of relying on chat history:
+
+\`\`\`bash
+gps remember "still need to update the payer denial fixture" --reminder --symbol routeToPayer
+gps remember "confirm rollback plan before merge" --reminder --for both --symbol runMigration
+\`\`\`
+
+Use reminders for unfinished work, follow-up checks, or anything the next agent/human must not miss.
 
 \`gps lessons record\` returns the chosen scope and signals; if the scope looks wrong (e.g. it picked \`symbol\` for something repo-wide), call \`gps lessons reclassify <id> --to global\` to fix it. Global lessons land in the \`<!-- gps:global-lessons -->\` block of CLAUDE.md and are always loaded; scoped lessons live in \`.gps/notes/{symbol,file,feature,area}/\` and are auto-pulled when the prompt mentions the matching target.
 
@@ -100,7 +125,7 @@ description: >
   Use this skill when editing code, starting a task, reviewing a symbol, or recording what was learned.
   gps is automatic repo memory: it surfaces symbol-anchored invariants, callers, tests, prior decisions,
   and lessons from past edits — exactly when the relevant code is touched. Run \`gps prepare <symbol>\`
-  before any non-trivial edit and \`gps lessons record\` after. Prefer the MCP tool surface
+  before any non-trivial edit and \`gps remember\` for hard-won repo facts. Prefer the MCP tool surface
   (\`mcp__gps__prepare_edit\`) for a one-call decision-ready brief; fall back to CLI inside Bash.
 ---
 
@@ -166,12 +191,20 @@ gps feature use <short-kebab-label>
 ## After a successful edit — record what you learned
 
 \`\`\`bash
+gps remember "<hard-won repo fact>"            # simplest path: save durable context
+gps remember "<unfinished follow-up>" --reminder --symbol <symbol>
 gps lessons record "<one sentence>"          # auto-classified: global → CLAUDE.md; scoped → notes
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
 
 \`gps learn <symbol> --lesson "<…>"\` still works but is legacy — always symbol-scoped. Prefer
 \`gps lessons record\`.
+
+If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
+save that finding with \`gps remember\` before you finish. If \`gps done\` or \`gps suggest --auto\`
+prints an agent-friction candidate — or the MCP \`brief\` tool returns \`memory_suggestions\` —
+run its \`remember_command\` unless the suggested fact is obvious or incorrect. Future agents
+should not repeat the same search.
 `;
 
 /**
@@ -202,6 +235,8 @@ gps tests <symbol> --json                        # tests that protect a specific
 After a successful edit:
 
 \`\`\`bash
+gps done                                        # self-audit plus memory nudges from wasted search/failure loops
+gps remember "<hard-won repo fact>"             # save findings future agents should not rediscover
 gps lessons record "<one sentence>"              # persist what you learned
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`

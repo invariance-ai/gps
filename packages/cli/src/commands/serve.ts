@@ -12,7 +12,7 @@ export function registerServe(program: Command): void {
     .action(async (opts: { observe?: boolean }) => {
       if (opts.observe) process.env.GPS_OBSERVE = "1";
       try {
-        await import("@invariance/gps-mcp/dist/server.js");
+        await import("@invariance/gps-mcp");
       } catch (e) {
         console.error(kleur.red(`failed to start MCP server: ${(e as Error).message}`));
         console.error(kleur.dim("hint: did the workspace build? run `pnpm build` from the repo root."));

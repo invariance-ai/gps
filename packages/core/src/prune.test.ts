@@ -149,6 +149,81 @@ describe("pruneNotes — gating rules", () => {
     expect(await loadNotes(root, "myFn")).toHaveLength(1);
   });
 
+  it("prunes scoped file notes under .gps/notes subdirectories", async () => {
+    const root = await tempRepo();
+    const { writeFile, mkdir } = await import("node:fs/promises");
+    const { stringify: stringifyYaml } = await import("yaml");
+    const filePath = path.join(root, ".gps/notes/file/src__refunds_ts.yml");
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, stringifyYaml([{
+      symbol: "src/refunds.ts",
+      lesson: "old scoped note",
+      severity: "medium",
+      promoted: false,
+      recorded_at: daysAgo(200),
+      source: "agent",
+      scope: "file",
+      applies_to: "src/refunds.ts",
+    }]));
+
+    const report = await pruneNotes(root, { days: 90 });
+    expect(report.removed).toBe(1);
+    expect(report.details[0]!.file).toBe(".gps/notes/file/src__refunds_ts.yml");
+  });
+
+  it("keeps high-confidence agent notes even when stale", async () => {
+    const root = await tempRepo();
+    const { writeFile, mkdir } = await import("node:fs/promises");
+    const { stringify: stringifyYaml } = await import("yaml");
+    const filePath = path.join(root, ".gps/notes/myFn.yml");
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, stringifyYaml([{
+      symbol: "myFn",
+      lesson: "confident note",
+      severity: "medium",
+      promoted: false,
+      recorded_at: daysAgo(200),
+      source: "agent",
+      confidence: 0.95,
+    }]));
+
+    const report = await pruneNotes(root, { days: 90, minConfidence: 0.8 });
+    expect(report.removed).toBe(0);
+    expect(await loadNotes(root, "myFn")).toHaveLength(1);
+  });
+
+  it("prunes stale low-confidence non-human decisions", async () => {
+    const root = await tempRepo();
+    const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+    const { stringify: stringifyYaml } = await import("yaml");
+    const filePath = path.join(root, ".gps/decisions/myFn.yml");
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, stringifyYaml([{
+      symbol: "myFn",
+      decision: "tentative agent decision",
+      recorded_at: daysAgo(200),
+      source: "agent",
+      confidence: 0.3,
+    }]));
+
+    const report = await pruneNotes(root, { days: 90, minConfidence: 0.8 });
+    expect(report.removed).toBe(1);
+    expect(report.details[0]!.kind).toBe("decision");
+    await expect(readFile(filePath, "utf8")).rejects.toThrow();
+  });
+
+  it("auto mode is throttled by the maintenance marker", async () => {
+    const root = await tempRepo();
+    await appendNote(root, { symbol: "myFn", lesson: "stale note", severity: "low", source: "agent" });
+    const first = await pruneNotes(root, { days: 0, auto: true, intervalDays: 7 });
+    expect(first.removed).toBe(1);
+
+    await appendNote(root, { symbol: "otherFn", lesson: "another stale note", severity: "low", source: "agent" });
+    const second = await pruneNotes(root, { days: 0, auto: true, intervalDays: 7 });
+    expect(second.removed).toBe(0);
+    expect(await loadNotes(root, "otherFn")).toHaveLength(1);
+  });
+
   it("prunes stale medium note but keeps high-severity sibling", async () => {
     const root = await tempRepo();
     const { writeFile, mkdir } = await import("node:fs/promises");

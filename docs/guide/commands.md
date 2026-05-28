@@ -221,6 +221,8 @@ brief [options]
 
 - `--base <ref>` — Diff base (default HEAD) *(default: "HEAD")*
 - `--max-symbols <n>` — Cap symbols processed (default 20)
+- `--tokens` — Print estimated token cost of the brief
+- `--cost` — Alias for --tokens
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -437,6 +439,32 @@ directive list [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `doc`
+
+Generate shareable PR/local diff docs, or opt into experimental live docs
+
+```
+doc [options]
+```
+
+**Options:**
+
+- `--pr <number>` — Document a PR (uses `gh pr view` + `gh pr diff`)
+- `--base <ref>` — Document local working changes vs <ref> (default: HEAD)
+- `--out <path>` — Output directory for shareable docs, or HTML file for live docs
+- `--diff-view <mode>` — Diff layout: unified | split (default: unified)
+- `--no-llm` — Skip LLM gap-fill; only overlay captured notes
+- `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
+- `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
+- `--max-diff-bytes <n>` — Omit per-file bodies when the raw diff exceeds this many bytes
+- `--print-md` — Also print the generated Markdown to stdout after writing files
+- `--serve` — Serve the experimental live doc over HTTP; regenerates on each request
+- `--host <host>` — HTTP host for --serve (default: 127.0.0.1) *(default: "127.0.0.1")*
+- `--port <n>` — HTTP port for --serve (default: 17370) *(default: "17370")*
+- `--experimental-live-docs` — Enable experimental live docs for this run
+- `--json` — Emit the generated model as JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `doctor`
 
 Check that gps is installed, indexed, and wired into your agent
@@ -447,6 +475,20 @@ doctor [options]
 
 **Options:**
 
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `done`
+
+Post-edit self-audit: tests, invariants, durable memory, learned commands
+
+```
+done [options]
+```
+
+**Options:**
+
+- `--symbol <name>` — Symbol to include learned commands for
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -660,7 +702,7 @@ feature diff [options] <label>
 
 ## `find`
 
-Fuzzy search for symbols
+Fuzzy search for symbols (matches names and, on v2 indexes, body/doc tokens)
 
 ```
 find [options] <query>
@@ -669,6 +711,7 @@ find [options] <query>
 **Options:**
 
 - `--json` — Emit JSON instead of pretty output
+- `--rank <mode>` — Ranking mode: tiered (default) or bm25 (idf-weighted body tokens) *(default: "tiered")*
 - `--limit <n>` — Max results *(default: 20)*
 - `--root <path>` — Repo root (default: cwd)
 
@@ -757,6 +800,31 @@ inbox approve [options] <id>
 
 - `--root <path>` — Repo root (default: cwd)
 
+### `inbox review`
+
+Summarize pending memory, duplicates, merge suggestions, risk, and scope warnings
+
+```
+inbox review [options]
+```
+
+**Options:**
+
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `inbox merge`
+
+Approve a canonical pending item and reject its near-duplicate copies
+
+```
+inbox merge [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
 ### `inbox reject`
 
 Reject an item (kept for the audit trail)
@@ -833,7 +901,8 @@ install claude [options]
 - `--use-local` — Generate hooks that call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install codex`
@@ -852,7 +921,8 @@ install codex [options]
 - `--use-local` — Configure Codex to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ### `install cursor`
@@ -871,7 +941,8 @@ install cursor [options]
 - `--use-local` — Configure MCP to call this CLI by absolute path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
-- `--promote <mode>` — Auto-promotion: never | safe | all (default: never; requires --capture=auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
+- `--auto-suggest` — Feature flag: let supported hooks print `gps suggest` authoring-queue nudges
 - `--root <path>` — Repo root (default: cwd)
 
 ## `invariant`
@@ -1019,6 +1090,19 @@ notes [options] [symbol]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `packet`
+
+Emit a compact subagent-readable packet for a symbol
+
+```
+packet [options] <symbol>
+```
+
+**Options:**
+
+- `--json` — Emit JSON instead of markdown
+- `--root <path>` — Repo root (default: cwd)
+
 ## `plan`
 
 Rank candidate symbols for a prompt (used before `prepare`)
@@ -1126,6 +1210,23 @@ prepare [options] [symbol]
 - `--depth <n>` — Neighborhood depth for callee context (1-3)
 - `--from-prompt <text>` — Infer the symbol from a natural-language prompt
 - `--feature <label>` — Use the feature's top symbol when no symbol is given
+- `--tokens` — Print estimated token cost of the brief
+- `--cost` — Alias for --tokens
+- `--json` — Emit JSON instead of markdown
+- `--root <path>` — Repo root (default: cwd)
+
+## `prime`
+
+Compact, budgeted standing context for session start: preferences, blocking invariants, recent decisions, global lessons
+
+```
+prime [options]
+```
+
+**Options:**
+
+- `--budget <tokens>` — Approximate token budget *(default: "600")*
+- `--quiet` — Suppress the token-footprint footer
 - `--json` — Emit JSON instead of markdown
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1139,7 +1240,7 @@ promote [options] [symbol]
 
 **Options:**
 
-- `--auto` — Auto-promote per the configured policy (capture/promote in .gps/config.yml)
+- `--auto [policy]` — Auto-promote per configured policy; override for this run with --auto=safe|never|all
 - `--dry-run` — With --auto: show the promotion plan without writing
 - `--min <n>` — Minimum cluster size *(default: "3")*
 - `--threshold <f>` — Jaccard similarity threshold (0-1) *(default: "0.4")*
@@ -1148,7 +1249,7 @@ promote [options] [symbol]
 
 ## `prune`
 
-Remove stale notes that have not been surfaced for --days days (default 90). Notes that are promoted, high-severity, or from trusted sources (human/doc/incident/pr) are never removed. Use --dry-run to preview without writing.
+Remove stale notes that have not been surfaced for --days days (default 90). Promoted, verified, high-severity, trusted-source, and high-confidence memories are never removed. Use --dry-run to preview without writing.
 
 ```
 prune [options]
@@ -1157,7 +1258,11 @@ prune [options]
 **Options:**
 
 - `--days <n>` — Staleness threshold in days (default: 90) *(default: "90")*
+- `--min-confidence <n>` — Keep memories at or above this confidence (default: 0.8) *(default: "0.8")*
+- `--auto` — Background mode: no-op unless the interval has elapsed
+- `--interval-days <n>` — Background run cadence in days (default: 7) *(default: "7")*
 - `--dry-run` — Preview removals without writing changes
+- `--quiet` — Suppress stdout when nothing is removed
 - `--json` — Emit JSON output
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1208,6 +1313,24 @@ questions [options] [symbol]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `recall`
+
+Search all repo memory (notes, decisions, invariants, preferences, lessons) by topic
+
+```
+recall [options] <query>
+```
+
+**Options:**
+
+- `--limit <n>` — Max results *(default: 20)*
+- `--budget <tokens>` — Approximate token budget for the rendered output
+- `--kind <list>` — Restrict to comma-separated kinds (note,decision,invariant,preference,lesson)
+- `--tokens` — Print estimated token cost of the output
+- `--cost` — Alias for --tokens
+- `--json` — Emit JSON instead of markdown
+- `--root <path>` — Repo root (default: cwd)
+
 ## `record-failure`
 
 Record a tool/test failure against a symbol (fed into `gps suggest`)
@@ -1221,6 +1344,28 @@ record-failure [options]
 - `--symbol <name>` — Symbol to attribute (defaults to last-prepared)
 - `--kind <kind>` — test|typecheck|lint|bash|other *(default: "other")*
 - `--message <m>` — Short failure message (or pipe via stdin)
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `remember`
+
+Save a hard-won fact without choosing between lessons, notes, or scope
+
+```
+remember [options] <fact>
+```
+
+**Options:**
+
+- `--symbol <name>` — Attach to a symbol
+- `--file <path>` — Attach to a file
+- `--feature <label>` — Attach to a feature
+- `--area <dir>` — Attach to an area/directory
+- `--global` — Record as a repo-wide lesson
+- `--reminder` — Record a pending reminder / still-to-do item for the next agent or human
+- `--for <audience>` — Reminder audience: agent | human | both (default: agent)
+- `--evidence <ref>` — PR/commit/doc backing this fact
+- `--severity <level>` — low | medium | high
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1253,10 +1398,18 @@ review-diff [options]
 
 ## `review-memory`
 
-Maintainer queue: promotions, stale entries, open questions
+Maintainer queue: approve, reject, or promote captured memories
 
 ```
-review-memory [options]
+review-memory [options] [command]
+```
+
+### `review-memory list`
+
+List promotions, stale entries, and open questions
+
+```
+review-memory list [options]
 ```
 
 **Options:**
@@ -1264,6 +1417,45 @@ review-memory [options]
 - `--days <n>` — Staleness threshold in days *(default: 90)*
 - `--limit <n>` — Cap per section *(default: 25)*
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory approve`
+
+Mark a captured note as human-verified trusted context
+
+```
+review-memory approve [options] <id>
+```
+
+**Options:**
+
+- `--by <who>` — Reviewer identity
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory reject`
+
+Remove a captured note from memory
+
+```
+review-memory reject [options] <id>
+```
+
+**Options:**
+
+- `--root <path>` — Repo root (default: cwd)
+
+### `review-memory promote`
+
+Move a note to a more durable scope
+
+```
+review-memory promote [options] <id>
+```
+
+**Options:**
+
+- `--to <scope>` — global | symbol | file | feature | area
+- `--target <target>` — Required for symbol|file|feature|area
 - `--root <path>` — Repo root (default: cwd)
 
 ## `runtime`
@@ -1388,6 +1580,27 @@ session replay [options] <id>
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `setup`
+
+Interactive setup: init + agent hooks + first index + preferences seed
+
+```
+setup [options]
+```
+
+**Options:**
+
+- `--yes` — Non-interactive; accept defaults (detect Claude/Codex, do everything)
+- `--with-claude` — Install Claude Code hooks
+- `--with-codex` — Install Codex MCP + AGENTS.md block
+- `--with-cursor` — Install Cursor rules + MCP
+- `--capture <mode>` — Capture mode: inbox | auto (default: auto)
+- `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
+- `--auto-suggest` — Let supported hooks print `gps suggest` authoring-queue nudges
+- `--skip-index` — Skip building the initial symbol graph
+- `--skip-todos` — Skip lifting TODOs into notes
+- `--root <path>` — Repo root (default: cwd)
+
 ## `stale`
 
 List notes/decisions/open questions older than --days whose file has since changed
@@ -1416,6 +1629,7 @@ suggest [options]
 
 - `--min <n>` — Minimum query count to include *(default: 3)*
 - `--limit <n>` — Max suggestions *(default: 10)*
+- `--auto` — Hook-safe mode: no-op unless .gps/config.yml has auto_suggest: true
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1595,21 +1809,4 @@ why [options] <symbol>
 **Options:**
 
 - `--json` — Emit JSON
-- `--root <path>` — Repo root (default: cwd)
-
-## `wizard`
-
-Interactive setup: init + agent hooks + first index + preferences seed
-
-```
-wizard [options]
-```
-
-**Options:**
-
-- `--yes` — Non-interactive; accept defaults (detect Claude/Codex, do everything)
-- `--with-claude` — Install Claude Code hooks
-- `--with-codex` — Install Codex MCP + AGENTS.md block
-- `--skip-index` — Skip building the initial symbol graph
-- `--skip-todos` — Skip lifting TODOs into notes
 - `--root <path>` — Repo root (default: cwd)

@@ -17,7 +17,7 @@
  */
 import type { SymbolRef } from "@invariance/gps-schemas";
 import type { GpsIndex } from "./index_store.js";
-import { extractTokens } from "./tokens.js";
+import { extractTokens, splitIdentifier } from "./tokens.js";
 
 export type MatchReason = "qualified" | "name" | "tokens";
 
@@ -63,16 +63,111 @@ export function scoreSymbol(
   return null;
 }
 
+/** Test/spec files — real matches, but production code at the same tier should win. */
+const TEST_PATH = /(?:^|\/)(?:tests?|__tests__|spec)\/|\.(?:test|spec)\.[cm]?[jt]sx?$/i;
+const TEST_PENALTY = 12;
+
+export function isTestPath(file: string): boolean {
+  return TEST_PATH.test(file);
+}
+
 /**
- * Rank all symbols in the index against a query. Ties break toward the shorter
- * symbol name (more likely the thing you meant) for deterministic output.
+ * Sort by score (desc), then shorter name, then file, and collapse exact
+ * duplicates (same name+kind in same file). Shared by both rankers so they
+ * dedupe and tiebreak identically.
+ */
+function rankAndDedupe(matches: SearchMatch[], limit: number): SearchMatch[] {
+  matches.sort(
+    (a, b) =>
+      b.score - a.score ||
+      a.symbol.name.length - b.symbol.name.length ||
+      a.symbol.file.localeCompare(b.symbol.file),
+  );
+  const seen = new Set<string>();
+  const deduped: SearchMatch[] = [];
+  for (const m of matches) {
+    const key = `${m.symbol.name} ${m.symbol.kind} ${m.symbol.file}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(m);
+    if (deduped.length >= limit) break;
+  }
+  return deduped;
+}
+
+/**
+ * Rank all symbols in the index against a query. Test-file symbols take a small
+ * penalty so production code wins at the same tier (`find delay` shouldn't bury
+ * the real helper under per-test `customFetch` fixtures), and exact duplicates
+ * — same name+kind in the same file, e.g. a helper redefined in every test —
+ * collapse to one entry. Ties break toward the shorter name (more likely the
+ * thing meant) for deterministic output.
  */
 export function searchSymbols(index: GpsIndex, query: string, limit = 20): SearchMatch[] {
   const matches: SearchMatch[] = [];
   for (const symbol of index.symbols) {
     const scored = scoreSymbol(symbol, query);
-    if (scored) matches.push({ symbol, score: scored.score, match_reason: scored.match_reason });
+    if (!scored) continue;
+    const penalty = isTestPath(symbol.file) ? TEST_PENALTY : 0;
+    matches.push({ symbol, score: scored.score - penalty, match_reason: scored.match_reason });
   }
-  matches.sort((a, b) => b.score - a.score || a.symbol.name.length - b.symbol.name.length);
-  return matches.slice(0, limit);
+  return rankAndDedupe(matches, limit);
+}
+
+/** Distinct tokens for a symbol: name + qualified-name parts + indexed body/doc tokens. */
+function docTokens(s: SymbolRef): string[] {
+  const set = new Set<string>();
+  for (const t of splitIdentifier(s.name)) set.add(t);
+  if (s.qualified_name) for (const t of splitIdentifier(s.qualified_name)) set.add(t);
+  if (s.tokens) for (const t of s.tokens.split(" ")) if (t) set.add(t);
+  return [...set];
+}
+
+/**
+ * BM25 ranker over each symbol's token set — opt-in via `find --rank bm25`.
+ * Rare query terms (low document frequency) are weighted higher, so searching
+ * for what a symbol *does* ranks the symbols that implement it above ones that
+ * mention a common word in passing. Tokens are deduped at index time, so term
+ * frequency is binary and BM25 reduces to length-normalized idf coverage. The
+ * exact/prefix name tiers from `scoreSymbol` are added as a prior so a symbol
+ * *named* for the query still wins, and the test-file penalty + dedupe match
+ * the default ranker.
+ */
+export function searchSymbolsBm25(index: GpsIndex, query: string, limit = 20): SearchMatch[] {
+  const symbols = index.symbols;
+  const N = symbols.length || 1;
+  const docs = symbols.map(docTokens);
+  const df = new Map<string, number>();
+  let totalLen = 0;
+  for (const d of docs) {
+    totalLen += d.length;
+    for (const t of d) df.set(t, (df.get(t) ?? 0) + 1);
+  }
+  const avgdl = totalLen / N || 1;
+  const qTokens = extractTokens(query);
+  const terms = qTokens.length ? qTokens : [query.toLowerCase().trim()].filter(Boolean);
+  const k1 = 1.5;
+  const b = 0.75;
+
+  const matches: SearchMatch[] = [];
+  for (let i = 0; i < symbols.length; i++) {
+    const s = symbols[i]!;
+    const dset = new Set(docs[i]!);
+    const dl = docs[i]!.length || 1;
+    let bm = 0;
+    for (const t of terms) {
+      if (!dset.has(t)) continue;
+      const n = df.get(t) ?? 0;
+      const idf = Math.log(1 + (N - n + 0.5) / (n + 0.5));
+      bm += (idf * (k1 + 1)) / (1 + k1 * (1 - b + (b * dl) / avgdl));
+    }
+    const prior = scoreSymbol(s, query);
+    if (bm <= 0 && !prior) continue;
+    // Name/qualified tiers dominate; bm25 orders body-token relevance beneath them.
+    const tierBonus = prior && prior.match_reason !== "tokens" ? prior.score : 0;
+    const match_reason: MatchReason = tierBonus ? prior!.match_reason : "tokens";
+    const penalty = isTestPath(s.file) ? TEST_PENALTY : 0;
+    matches.push({ symbol: s, score: tierBonus + bm - penalty, match_reason });
+  }
+  return rankAndDedupe(matches, limit);
 }

@@ -1,7 +1,10 @@
 import type { Command } from "commander";
 import kleur from "kleur";
 import {
+  loadPolicy,
   suggest,
+  hardSearchSuggestionsForActiveSession,
+  repeatedMistakePatterns,
   listPending,
   DEFAULT_COUNT_GATE,
   DEFAULT_CONFIDENCE_GATE,
@@ -24,6 +27,32 @@ function nearPromotion(pending: PendingLesson[]): PendingLesson[] {
     .sort((a, b) => b.count - a.count || b.confidence - a.confidence);
 }
 
+function frictionDetail(
+  h: { command_count: number; suggestion: string },
+): { why: string; remember: string; nextTime?: string } {
+  const record = h as Record<string, unknown>;
+  return {
+    why: typeof record.why === "string" ? record.why : h.suggestion,
+    remember:
+      typeof record.remember_command === "string"
+        ? record.remember_command
+        : "gps remember '<hard-won repo fact>'",
+    nextTime:
+      typeof record.next_time_command === "string"
+        ? record.next_time_command
+        : undefined,
+  };
+}
+
+function mistakeRememberCommand(symbol: string, message: string): string {
+  return [
+    "gps remember",
+    JSON.stringify(`Avoid repeat failure for ${symbol}: ${message}`),
+    "--symbol",
+    JSON.stringify(symbol),
+  ].join(" ");
+}
+
 export function registerSuggest(program: Command): void {
   addRootOption(
     program
@@ -31,22 +60,35 @@ export function registerSuggest(program: Command): void {
       .description("Symbols with high query traffic and no covering invariant — the authoring queue")
       .option("--min <n>", "Minimum query count to include", (v) => parseInt(v, 10), 3)
       .option("--limit <n>", "Max suggestions", (v) => parseInt(v, 10), 10)
+      .option("--auto", "Hook-safe mode: no-op unless .gps/config.yml has auto_suggest: true")
       .option("--json", "Emit JSON"),
   ).action(
     async (
-      opts: RootOption & { min: number; limit: number; json?: boolean },
+      opts: RootOption & { min: number; limit: number; auto?: boolean; json?: boolean },
     ) => {
       const root = resolveRoot(opts);
       try {
+        if (opts.auto) {
+          const policy = await loadPolicy(root);
+          if (!policy.auto_suggest) {
+            if (opts.json) {
+              console.log(JSON.stringify({ skipped: true, reason: "auto_suggest disabled" }));
+            }
+            return;
+          }
+        }
         const results = await suggest(root, { min_count: opts.min, limit: opts.limit });
         const lessons = nearPromotion(await listPending(root)).slice(0, opts.limit);
+        const hardSearch = await hardSearchSuggestionsForActiveSession(root);
+        const mistakes = (await repeatedMistakePatterns(root)).slice(0, opts.limit);
         if (opts.json) {
           console.log(
-            JSON.stringify({ suggestions: results, lessons_near_promotion: lessons }, null, 2),
+            JSON.stringify({ suggestions: results, lessons_near_promotion: lessons, hard_search: hardSearch, mistake_patterns: mistakes }, null, 2),
           );
           return;
         }
-        if (results.length === 0 && lessons.length === 0) {
+        if (results.length === 0 && lessons.length === 0 && hardSearch.length === 0 && mistakes.length === 0) {
+          if (opts.auto) return;
           console.log(
             kleur.dim(
               "no suggestions — either no observations recorded yet (start `gps serve --observe`) or all hot symbols already have invariants.",
@@ -77,6 +119,24 @@ export function registerSuggest(program: Command): void {
             console.log(
               `  ${l.text}  ${kleur.dim(`(seen ${l.count}×, conf ${l.confidence.toFixed(2)} — needs ${gap})`)}`,
             );
+          }
+        }
+        if (hardSearch.length > 0) {
+          if (results.length > 0 || lessons.length > 0) console.log("");
+          console.log(kleur.bold(`${hardSearch.length} agent-friction memory candidate(s):`));
+          for (const h of hardSearch) {
+            const detail = frictionDetail(h);
+            console.log(`  ${kleur.yellow("search")} ${detail.why} ${kleur.dim(`(${h.command_count} commands)`)}`);
+            if (detail.nextTime) console.log(`    next time: ${kleur.cyan(detail.nextTime)}`);
+            console.log(`    remember:  ${kleur.cyan(detail.remember)}`);
+          }
+        }
+        if (mistakes.length > 0) {
+          if (results.length > 0 || lessons.length > 0 || hardSearch.length > 0) console.log("");
+          console.log(kleur.bold(`${mistakes.length} repeated mistake pattern(s):`));
+          for (const m of mistakes) {
+            console.log(`  ${kleur.red("failure")} ${m.symbol}: ${m.message} ${kleur.dim(`${m.count}x`)}`);
+            console.log(`    remember: ${kleur.cyan(mistakeRememberCommand(m.symbol, m.message))}`);
           }
         }
       } catch (e) {

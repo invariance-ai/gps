@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { TOOLS, type ToolName } from "@invariance/gps-schemas";
+import { TOOLS, type NoteScope, type ToolName } from "@invariance/gps-schemas";
 import {
   open as openQuery,
   getContext,
@@ -53,6 +53,8 @@ import {
   findRejectedConflicts,
   findPromotionCandidates,
   readIndex,
+  recallMemory,
+  type RecallKind as RecallKindT,
   verifyIndex,
   readGateStream,
   gateChanged,
@@ -61,6 +63,7 @@ import {
   ALL_SOURCE_GLOBS,
   validateKnowledge,
   brief,
+  hardSearchSuggestionsForActiveSession,
   pruneNotes,
   resume,
 } from "@invariance/gps-core";
@@ -212,7 +215,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         dry_run?: boolean;
         no_llm?: boolean;
       };
-      let scope = a.force_scope ?? null;
+      let scope: NoteScope | undefined = a.force_scope;
       let target = a.force_target;
       let signals: string[] = [];
       let confidence = 1;
@@ -247,6 +250,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         signals = ["forced"];
       }
       if (a.dry_run) {
+        if (!scope) throw new Error("record_learning: unable to classify lesson scope");
         return {
           scope,
           target,
@@ -258,6 +262,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
           dry_run: true,
         };
       }
+      if (!scope) throw new Error("record_learning: unable to classify lesson scope");
       const persisted = await persistLesson(root, {
         scope,
         target,
@@ -324,6 +329,11 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         .sort((a, b) => b.score - a.score)
         .slice(0, a.limit ?? 10);
       return { candidates: cands };
+    }
+    case "recall_memory": {
+      const a = args as { query: string; limit?: number; kinds?: RecallKindT[] };
+      const hits = await recallMemory(root, a.query, { limit: a.limit, kinds: a.kinds });
+      return { query: a.query, hits };
     }
     case "list_todos": {
       const a = args as { file?: string; symbol?: string; include_resolved?: boolean };
@@ -484,7 +494,11 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "brief": {
       const a = args as { base?: string; max_symbols?: number };
-      return brief(root, { base: a.base, max_symbols: a.max_symbols });
+      const result = await brief(root, { base: a.base, max_symbols: a.max_symbols });
+      // Surface the agent-friction "remember candidate" to MCP-only agents
+      // (e.g. Cursor) that never see the CLI `gps done` / `gps suggest` output.
+      const memory_suggestions = await hardSearchSuggestionsForActiveSession(root);
+      return { ...result, memory_suggestions };
     }
     case "seed_propose": {
       const a = args as { tier?: "safe" | "medium" | "aggressive"; limit?: number };
@@ -506,8 +520,14 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       return { tier, proposals, scanned: r.scanned };
     }
     case "prune": {
-      const a = args as { days?: number; dry_run?: boolean };
-      return pruneNotes(root, { days: a.days, dryRun: a.dry_run });
+      const a = args as { days?: number; min_confidence?: number; auto?: boolean; interval_days?: number; dry_run?: boolean };
+      return pruneNotes(root, {
+        days: a.days,
+        minConfidence: a.min_confidence,
+        auto: a.auto,
+        intervalDays: a.interval_days,
+        dryRun: a.dry_run,
+      } as Parameters<typeof pruneNotes>[1]);
     }
     case "resume": {
       return resume(root);

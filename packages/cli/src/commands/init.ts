@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { mkdir, writeFile, access } from "node:fs/promises";
+import { mkdir, writeFile, access, readFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import { stringify as yamlStringify } from "yaml";
@@ -21,6 +21,9 @@ strands:
   - tests
   - provenance
   - invariants
+capture: auto
+promote: safe
+auto_suggest: false
 `;
 
 const INVARIANTS = `# .gps/invariants.yml — declarative constraints for symbols in your repo.
@@ -45,6 +48,8 @@ export interface InitResult {
   writes: Array<{ action: "wrote" | "exists"; relPath: string }>;
 }
 
+const LOCAL_GITIGNORE_ENTRIES = [".gps/index/", ".gps/observations.json"] as const;
+
 export async function runInitCore(root: string, opts: InitOpts): Promise<InitResult> {
   const gpsDir = path.join(root, ".gps");
   await mkdir(gpsDir, { recursive: true });
@@ -67,7 +72,31 @@ export async function runInitCore(root: string, opts: InitOpts): Promise<InitRes
     await writeFile(p, content);
     writes.push({ action: "wrote", relPath: rel });
   }
+  writes.push(await ensureLocalArtifactIgnores(root));
   return { writes };
+}
+
+async function ensureLocalArtifactIgnores(root: string): Promise<InitResult["writes"][number]> {
+  const file = path.join(root, ".gitignore");
+  let existing = "";
+  try {
+    existing = await readFile(file, "utf8");
+  } catch {
+    // create below
+  }
+  const missing = LOCAL_GITIGNORE_ENTRIES.filter((entry) => !hasGitignoreEntry(existing, entry));
+  if (missing.length === 0) {
+    return { action: "exists", relPath: ".gitignore" };
+  }
+  const prefix = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(file, existing + prefix + missing.join("\n") + "\n");
+  return { action: "wrote", relPath: ".gitignore" };
+}
+
+function hasGitignoreEntry(contents: string, entry: string): boolean {
+  if (entry === ".gps/index/" && /^\.gps\/index\.json$/m.test(contents)) return true;
+  const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped}$`, "m").test(contents);
 }
 
 export interface SeedSample {
@@ -161,6 +190,6 @@ export function registerInit(program: Command): void {
       console.log(kleur.dim(`Next: open ${r.path} to review, then run \`gps seed --apply\` to promote into .gps/notes and .gps/decisions.`));
     }
     console.log("");
-    console.log(`Next: ${kleur.bold("gps wizard")} to wire agents, or ${kleur.bold("gps index")} to build the symbol graph.`);
+    console.log(`Next: ${kleur.bold("gps setup")} to wire agents and build the graph, or ${kleur.bold("gps index")} to build only the symbol graph.`);
   });
 }

@@ -2,8 +2,7 @@ import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseFile } from "./parser.js";
-import { buildIndex, writeIndex } from "./index_store.js";
+import { writeIndex, type GpsIndex } from "./index_store.js";
 import { open, getContext } from "./query.js";
 import { appendNote, appendAreaNote } from "./notes.js";
 
@@ -18,8 +17,24 @@ async function fixtureRepo(): Promise<string> {
     path.join(root, "src/api.ts"),
     "export function refundEndpoint(amount: number) { return amount; }",
   );
-  const parsed = await Promise.all([parseFile(path.join(root, "src/api.ts"))]);
-  const index = await buildIndex(root, parsed);
+  const index: GpsIndex = {
+    version: 2,
+    built_at: new Date().toISOString(),
+    root,
+    files: ["src/api.ts"],
+    symbols: [
+      {
+        id: "src/api.ts#refundEndpoint",
+        name: "refundEndpoint",
+        qualified_name: "refundEndpoint",
+        kind: "function",
+        file: "src/api.ts",
+        line: 1,
+        end_line: 1,
+      },
+    ],
+    edges: [],
+  };
   await writeIndex(root, index);
   return root;
 }

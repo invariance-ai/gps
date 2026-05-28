@@ -15,16 +15,21 @@ import {
   appendNote,
   loadNotes,
   suggest,
+  writePolicy,
 } from "@invariance/gps-core";
 import { readFile } from "node:fs/promises";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 import { runInitCore } from "./init.js";
-import { runInstallClaude, runInstallCodex, resolveCmd } from "./install.js";
+import { runInstallClaude, runInstallCodex, runInstallCursor, resolveCmd, resolvePolicy } from "./install.js";
 
 interface Opts extends RootOption {
   yes?: boolean;
   withClaude?: boolean;
   withCodex?: boolean;
+  withCursor?: boolean;
+  capture?: string;
+  promote?: string;
+  autoSuggest?: boolean;
   skipIndex?: boolean;
   skipTodos?: boolean;
 }
@@ -62,16 +67,24 @@ function skipped(label: string, reason: string): void {
 export function registerWizard(program: Command): void {
   addRootOption(
     program
-      .command("wizard")
-      .alias("setup")
+      .command("setup")
+      .alias("wizard")
       .description("Interactive setup: init + agent hooks + first index + preferences seed")
       .option("--yes", "Non-interactive; accept defaults (detect Claude/Codex, do everything)")
       .option("--with-claude", "Install Claude Code hooks")
       .option("--with-codex", "Install Codex MCP + AGENTS.md block")
+      .option("--with-cursor", "Install Cursor rules + MCP")
+      .option("--capture <mode>", "Capture mode: inbox | auto (default: auto)")
+      .option(
+        "--promote <mode>",
+        "Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)",
+      )
+      .option("--auto-suggest", "Let supported hooks print `gps suggest` authoring-queue nudges")
       .option("--skip-index", "Skip building the initial symbol graph")
       .option("--skip-todos", "Skip lifting TODOs into notes"),
   ).action(async (opts: Opts) => {
     const root = resolveRoot(opts);
+    const policy = resolvePolicy(opts);
     const rl = opts.yes
       ? null
       : readline.createInterface({ input, output });
@@ -85,16 +98,19 @@ export function registerWizard(program: Command): void {
 
     try {
       console.log("");
-      console.log(kleur.bold("gps wizard") + kleur.dim(" — set up codebase context for coding agents"));
+      console.log(kleur.bold("gps setup") + kleur.dim(" — set up codebase context for coding agents"));
       console.log(kleur.dim(`root: ${root}`));
 
       const claudeDetected = await isDir(path.join(root, ".claude"));
       const codexDetected = (await isDir(path.join(root, ".codex"))) || (await exists(path.join(root, "AGENTS.md")));
+      const explicitAgentSelection = !!(opts.withClaude || opts.withCodex || opts.withCursor);
 
       // 1. init
       header("1. initialize .gps/");
       const initResult = await runInitCore(root, { force: false });
       for (const w of initResult.writes) step(w.action, w.relPath);
+      await writePolicy(root, policy);
+      step("policy", `capture=${policy.capture}, promote=${policy.promote}, auto_suggest=${policy.auto_suggest}`);
 
       // 2. index
       if (!opts.skipIndex) {
@@ -143,7 +159,9 @@ export function registerWizard(program: Command): void {
       header("4. wire coding agents");
       const wantClaude =
         opts.withClaude ??
-        (opts.yes
+        (explicitAgentSelection
+          ? false
+          : opts.yes
           ? claudeDetected || !codexDetected
           : await ask(
               claudeDetected
@@ -153,7 +171,12 @@ export function registerWizard(program: Command): void {
             ));
       const spec = resolveCmd({});
       if (wantClaude) {
-        await runInstallClaude(root, { force: false, skipClaudeMd: false, spec });
+        await runInstallClaude(root, {
+          force: false,
+          skipClaudeMd: false,
+          spec,
+          autoSuggest: policy.auto_suggest,
+        });
         step("Claude Code", "hooks + skill + CLAUDE.md block written to .claude/");
       } else {
         skipped("Claude Code", "declined");
@@ -161,7 +184,9 @@ export function registerWizard(program: Command): void {
 
       const wantCodex =
         opts.withCodex ??
-        (opts.yes
+        (explicitAgentSelection
+          ? false
+          : opts.yes
           ? codexDetected
           : await ask(
               codexDetected
@@ -170,10 +195,40 @@ export function registerWizard(program: Command): void {
               codexDetected,
             ));
       if (wantCodex) {
-        await runInstallCodex(root, { force: false, skipAgentsMd: false, spec });
+        await runInstallCodex(root, {
+          force: false,
+          skipAgentsMd: false,
+          spec,
+          autoSuggest: policy.auto_suggest,
+        });
         step("Codex", "MCP server registered + AGENTS.md block written");
       } else {
         skipped("Codex", "declined");
+      }
+
+      const cursorDetected = await isDir(path.join(root, ".cursor"));
+      const wantCursor =
+        opts.withCursor ??
+        (explicitAgentSelection
+          ? false
+          : opts.yes
+          ? cursorDetected
+          : await ask(
+              cursorDetected
+                ? "Cursor detected. Install rules + MCP?"
+                : "Install Cursor rules + MCP?",
+              cursorDetected,
+            ));
+      if (wantCursor) {
+        await runInstallCursor(root, {
+          force: false,
+          skipMcp: false,
+          spec,
+          autoSuggest: policy.auto_suggest,
+        });
+        step("Cursor", "always-attached rule + MCP server registered");
+      } else {
+        skipped("Cursor", "declined");
       }
 
       // 5. seed a preference so the user can see the loop
@@ -206,10 +261,10 @@ export function registerWizard(program: Command): void {
       console.log(`  ${kleur.cyan("gps suggest")}                 see authoring queue (high-traffic symbols)`);
       console.log(`  ${kleur.cyan("gps prepare <symbol>")}        decision-ready brief before editing`);
       console.log("");
-      if (wantClaude || wantCodex) {
+      if (wantClaude || wantCodex || wantCursor) {
         console.log(
           kleur.dim(
-            "Agents will now run gps automatically on session start, around edits, and on failures.",
+            "Agents will now get gps instructions, context hooks where supported, and MCP tools.",
           ),
         );
       }

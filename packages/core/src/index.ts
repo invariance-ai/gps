@@ -3,6 +3,7 @@ export * from "./scan.js";
 export * from "./index_store.js";
 export * from "./tokens.js";
 export * from "./search.js";
+export * from "./recall.js";
 export * from "./git.js";
 export * from "./invariants.js";
 export * from "./notes.js";
@@ -61,5 +62,15 @@ export * from "./resume.js";
 export * from "./risk_topics.js";
 export * from "./inbox.js";
 export * from "./auto_promote.js";
+export * from "./agent_memory.js";
 export { runBench, runTask, loadTasks, summarize, resetWorkingTree, parseShellArgs, parseMatrix, AGENT_PRESETS, GPS_MCP_CONFIG } from "./bench.js";
 export type { BenchTask, RunResult, BenchSummary, RunOptions, BenchAgent, CellSummary, PerTaskAgentRow } from "./bench.js";
+
+// Doc store: shareable HTML/markdown docs.
+export * from "./doc/diff_split.js";
+export * from "./doc/highlight.js";
+export * from "./doc/doc_annotations.js";
+export * from "./doc/md_render.js";
+export * from "./doc/html_render.js";
+export * from "./doc/doc_store.js";
+export * from "./doc/doc_model.js";

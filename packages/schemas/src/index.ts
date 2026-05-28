@@ -142,6 +142,7 @@ export const ClassifierMeta = z.object({
   confidence: z.number().min(0).max(1),
   used_llm: z.boolean().default(false),
   model: z.string().optional(),
+  correction_kind: z.string().optional(),
 });
 export type ClassifierMeta = z.infer<typeof ClassifierMeta>;
 
@@ -260,13 +261,30 @@ export type PromoteMode = z.infer<typeof PromoteMode>;
 /**
  * The governance policy persisted to `.gps/config.yml` by `gps install`.
  * Defaults are baked in here so this schema is the single source of truth:
- * `GpsPolicy.parse({})` yields the locked defaults (auto / never).
+ * `GpsPolicy.parse({})` yields the locked defaults (auto / safe).
  */
 export const GpsPolicy = z.object({
   capture: CaptureMode.default("auto"),
-  promote: PromoteMode.default("never"),
+  promote: PromoteMode.default("safe"),
+  /**
+   * Feature flag for hook-triggered authoring queue suggestions.
+   * false — `gps suggest` remains manual only.
+   * true  — supported hooks may run `gps suggest --auto` and print suggestions
+   *         when high-traffic/failure symbols need notes or invariants.
+   */
+  auto_suggest: z.boolean().default(false),
 });
 export type GpsPolicy = z.infer<typeof GpsPolicy>;
+
+export const ExperimentalFeatures = z.object({
+  /**
+   * Enables `gps doc --serve` / HTML live documentation. This is intentionally
+   * off by default for launch: it opens a local HTTP surface and is still
+   * iterating on UX, so users must opt in explicitly.
+   */
+  live_docs: z.boolean().default(false),
+});
+export type ExperimentalFeatures = z.infer<typeof ExperimentalFeatures>;
 
 /**
  * An item queued in `.gps/inbox.yml` when `capture=inbox`. It captures the same
@@ -1231,6 +1249,15 @@ export const PruneInput = z.object({
   days: z.number().int().min(1).default(90).describe(
     "Notes unsurfaced (or never surfaced) for this many days are candidates for pruning.",
   ),
+  min_confidence: z.number().min(0).max(1).default(0.8).describe(
+    "Keep memories at or above this confidence threshold.",
+  ),
+  auto: z.boolean().default(false).describe(
+    "Background mode: skip the prune if the interval has not elapsed.",
+  ),
+  interval_days: z.number().int().min(1).default(7).describe(
+    "Minimum days between background prune runs.",
+  ),
   dry_run: z.boolean().default(false).describe("Print what would be removed without writing."),
 });
 export type PruneInput = z.infer<typeof PruneInput>;
@@ -1239,9 +1266,11 @@ export const PruneResult = z.object({
   removed: z.number().int().nonnegative(),
   dry_run: z.boolean(),
   details: z.array(z.object({
+    kind: z.enum(["note", "decision"]),
     symbol: z.string(),
-    lesson: z.string(),
+    text: z.string(),
     reason: z.string(),
+    file: z.string(),
   })),
 });
 export type PruneResult = z.infer<typeof PruneResult>;
@@ -1257,6 +1286,32 @@ export const ResumeResult = z.object({
   markdown: z.string(),
 });
 export type ResumeResult = z.infer<typeof ResumeResult>;
+
+export const RecallKind = z.enum(["note", "decision", "invariant", "preference", "lesson"]);
+export type RecallKind = z.infer<typeof RecallKind>;
+
+export const RecallMemoryInput = z.object({
+  query: z.string(),
+  limit: z.number().int().positive().optional(),
+  kinds: z.array(RecallKind).optional(),
+});
+export type RecallMemoryInput = z.infer<typeof RecallMemoryInput>;
+
+export const RecallHit = z.object({
+  kind: RecallKind,
+  text: z.string(),
+  anchor: z.string().optional(),
+  score: z.number(),
+  severity: z.string().optional(),
+  source: z.string().optional(),
+});
+export type RecallHit = z.infer<typeof RecallHit>;
+
+export const RecallMemoryResult = z.object({
+  query: z.string(),
+  hits: z.array(RecallHit),
+});
+export type RecallMemoryResult = z.infer<typeof RecallMemoryResult>;
 
 export const TOOLS = {
   prepare_edit: {
@@ -1294,6 +1349,12 @@ export const TOOLS = {
       "Search the symbol graph for existing helpers before writing new code. Call this whenever you're about to add a utility function — there's usually one already.",
     input: FindReusableInput,
     output: FindReusableResult,
+  },
+  recall_memory: {
+    description:
+      "Search ALL repo memory by topic — notes, decisions, invariants, preferences, and global lessons ranked against a free-text query. Use this to answer \"what do we already know about X?\" (e.g. refunds, auth, rate limiting) when you don't have a specific symbol in mind; prefer it over grepping docs or re-deriving conventions. For depth on one known symbol, use prepare_edit/get_context instead.",
+    input: RecallMemoryInput,
+    output: RecallMemoryResult,
   },
   record_learning: {
     description:
@@ -1517,6 +1578,160 @@ export const TOOLS = {
 } as const;
 
 export type ToolName = keyof typeof TOOLS;
+
+/* ---------- Doc store (v1.0) ----------
+ *
+ * Shareable, human-facing documentation generated from a repo or a PR diff.
+ * `gps doc` (and the optional attach auto-hook) assembles a `DocModel` and
+ * renders it to a self-contained HTML file + a markdown sibling under
+ * `.gps/docs/`. Annotations ("lines 14-30 do X") come from existing gps
+ * notes/decisions, with `gps-llm` filling in changed hunks that have no note.
+ */
+
+/** Feature config persisted under the `doc:` key of `.gps/config.yml`. */
+export const DocConfig = z.object({
+  /** Master switch. When false the attach hook never auto-generates docs. */
+  enabled: z.boolean().default(false),
+  /** Regenerate inside the attach/PR Stop hook (only honored when enabled). */
+  auto: z.boolean().default(false),
+  /** Where generated docs land, relative to repo root. */
+  out_dir: z.string().default(".gps/docs"),
+  /** Syntax-highlight code in the HTML output. */
+  highlight: z.boolean().default(true),
+  /** Allow the LLM to annotate changed hunks that have no captured note. */
+  llm_fill: z.boolean().default(true),
+  /** Diff layout in the HTML code view. */
+  diff_view: z.enum(["unified", "split"]).default("unified"),
+  /** Skip per-file bodies once the raw diff exceeds this many bytes. */
+  max_diff_bytes: z.number().int().positive().default(1_500_000),
+});
+export type DocConfig = z.infer<typeof DocConfig>;
+
+export const DocLanguage = z.enum(["typescript", "javascript", "python", "other"]);
+export type DocLanguage = z.infer<typeof DocLanguage>;
+
+/** A line range on the new side of a changed file (1-indexed, inclusive). */
+export const HunkRangeSchema = z.object({
+  file: z.string(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+});
+export type HunkRangeSchema = z.infer<typeof HunkRangeSchema>;
+
+export const DocAnnotationKind = z.enum(["note", "decision", "lesson", "llm", "question"]);
+export type DocAnnotationKind = z.infer<typeof DocAnnotationKind>;
+
+/** One "lines X-Y do Z" callout, anchored to a file + line range. */
+export const DocAnnotation = z.object({
+  file: z.string(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+  /** Plain-english explanation / lesson text. */
+  text: z.string(),
+  kind: DocAnnotationKind,
+  severity: NoteSeverity.optional(),
+  /** Origin label: note.source, "decision", "llm", … */
+  source: z.string(),
+  symbol: z.string().optional(),
+  evidence_link: z.string().optional(),
+});
+export type DocAnnotation = z.infer<typeof DocAnnotation>;
+
+export const DocFileStatus = z.enum(["added", "modified", "deleted", "renamed"]);
+export type DocFileStatus = z.infer<typeof DocFileStatus>;
+
+/** A single changed file in a doc, with its diff body and overlaid annotations. */
+export const DocFileEntry = z.object({
+  path: z.string(),
+  language: DocLanguage,
+  status: DocFileStatus,
+  /** Per-file unified-diff segment (the raw `diff --git …` block). */
+  diff: z.string().optional(),
+  /** Full new-side source, when rendering a non-diff (repo) file view. */
+  after: z.string().optional(),
+  hunks: z.array(HunkRangeSchema).default([]),
+  annotations: z.array(DocAnnotation).default([]),
+  binary: z.boolean().default(false),
+  truncated: z.boolean().default(false),
+});
+export type DocFileEntry = z.infer<typeof DocFileEntry>;
+
+export const DocStats = z.object({
+  files_changed: z.number().int().nonnegative().default(0),
+  added_lines: z.number().int().nonnegative().default(0),
+  deleted_lines: z.number().int().nonnegative().default(0),
+  annotations: z.number().int().nonnegative().default(0),
+  high_severity_annotations: z.number().int().nonnegative().default(0),
+  unannotated_hunks: z.number().int().nonnegative().default(0),
+  binary_files: z.number().int().nonnegative().default(0),
+  truncated_files: z.number().int().nonnegative().default(0),
+  by_status: z.record(z.number().int().nonnegative()).default({}),
+});
+export type DocStats = z.infer<typeof DocStats>;
+
+/** A prose/feature block in the human-readable view. */
+export const DocSection = z.object({
+  id: z.string(),
+  title: z.string(),
+  markdown: z.string(),
+  kind: z.enum(["narrative", "mermaid", "image", "html"]).default("narrative"),
+});
+export type DocSection = z.infer<typeof DocSection>;
+
+/**
+ * The intermediate structure both renderers (`renderDocMarkdown`,
+ * `renderDocHtml`) consume. The builder is the only place doing I/O; renderers
+ * are pure `DocModel -> string`.
+ */
+export const DocModel = z.object({
+  schema_version: z.literal(1).default(1),
+  kind: z.enum(["pr", "repo"]),
+  title: z.string(),
+  subtitle: z.string().optional(),
+  generated_at: z.string(),
+  base: z.string().optional(),
+  pr: z
+    .object({ number: z.number(), title: z.string(), body: z.string() })
+    .optional(),
+  /** Machine-readable summary used by renderers and PR comments. */
+  stats: DocStats.optional(),
+  files: z.array(DocFileEntry).default([]),
+  sections: z.array(DocSection).default([]),
+  /** Notes whose line range could not be resolved onto a changed file. */
+  annotations_unanchored: z.array(DocAnnotation).default([]),
+});
+export type DocModel = z.infer<typeof DocModel>;
+
+/** Index of generated docs, persisted at `<out_dir>/manifest.json`. */
+export const DocManifest = z.object({
+  version: z.literal(1).default(1),
+  docs: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(["pr", "repo"]),
+        title: z.string(),
+        html_path: z.string(),
+        md_path: z.string(),
+        generated_at: z.string(),
+        pr_number: z.number().optional(),
+      }),
+    )
+    .default([]),
+});
+export type DocManifest = z.infer<typeof DocManifest>;
+
+/** One un-annotated changed hunk handed to the LLM for a plain-english gloss. */
+export const DocAnnotateRequest = z.object({
+  file: z.string(),
+  symbol: z.string().optional(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+  language: z.string(),
+  /** The changed code (new side) the LLM should explain. */
+  code: z.string(),
+});
+export type DocAnnotateRequest = z.infer<typeof DocAnnotateRequest>;
 
 export function toJsonSchema(schema: z.ZodTypeAny): JsonSchema {
   return convertJsonSchema(schema);

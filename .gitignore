@@ -11,3 +11,7 @@ build/
 coverage/
 *.log
 .turbo/
+.claude/worktrees/
+# Local artifacts that must never be committed
+launch-video/
+bench/**/results/
