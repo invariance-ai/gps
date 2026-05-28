@@ -14,6 +14,32 @@ interface Opts extends RootOption {
   json?: boolean;
 }
 
+function frictionDetail(
+  h: { command_count: number; suggestion: string },
+): { why: string; remember: string; nextTime?: string } {
+  const record = h as Record<string, unknown>;
+  return {
+    why: typeof record.why === "string" ? record.why : h.suggestion,
+    remember:
+      typeof record.remember_command === "string"
+        ? record.remember_command
+        : "gps remember '<hard-won repo fact>'",
+    nextTime:
+      typeof record.next_time_command === "string"
+        ? record.next_time_command
+        : undefined,
+  };
+}
+
+function mistakeRememberCommand(symbol: string, message: string): string {
+  return [
+    "gps remember",
+    JSON.stringify(`Avoid repeat failure for ${symbol}: ${message}`),
+    "--symbol",
+    JSON.stringify(symbol),
+  ].join(" ");
+}
+
 export function registerDone(program: Command): void {
   addRootOption(
     program
@@ -48,11 +74,19 @@ export function registerDone(program: Command): void {
     }
     if (patterns.length > 0) {
       console.log("\nRepeated failure patterns:");
-      for (const p of patterns.slice(0, 5)) console.log(`  ${kleur.yellow("!")} ${p.symbol}: ${p.message} ${kleur.dim(`${p.count}x`)}`);
+      for (const p of patterns.slice(0, 5)) {
+        console.log(`  ${kleur.yellow("!")} ${p.symbol}: ${p.message} ${kleur.dim(`${p.count}x`)}`);
+        console.log(`    remember: ${kleur.cyan(mistakeRememberCommand(p.symbol, p.message))}`);
+      }
     }
     if (hardSearch.length > 0) {
-      console.log("\nSearch memory candidate:");
-      for (const h of hardSearch) console.log(`  ${kleur.yellow("!")} ${h.suggestion}`);
+      console.log("\nAgent-friction memory candidate:");
+      for (const h of hardSearch) {
+        const detail = frictionDetail(h);
+        console.log(`  ${kleur.yellow("!")} ${detail.why}`);
+        if (detail.nextTime) console.log(`    next time: ${kleur.cyan(detail.nextTime)}`);
+        console.log(`    remember:  ${kleur.cyan(detail.remember)}`);
+      }
     }
     const failed = audit.checks.filter((c) => !c.pass).length;
     if (failed > 0) process.exitCode = 1;

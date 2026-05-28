@@ -27,6 +27,32 @@ function nearPromotion(pending: PendingLesson[]): PendingLesson[] {
     .sort((a, b) => b.count - a.count || b.confidence - a.confidence);
 }
 
+function frictionDetail(
+  h: { command_count: number; suggestion: string },
+): { why: string; remember: string; nextTime?: string } {
+  const record = h as Record<string, unknown>;
+  return {
+    why: typeof record.why === "string" ? record.why : h.suggestion,
+    remember:
+      typeof record.remember_command === "string"
+        ? record.remember_command
+        : "gps remember '<hard-won repo fact>'",
+    nextTime:
+      typeof record.next_time_command === "string"
+        ? record.next_time_command
+        : undefined,
+  };
+}
+
+function mistakeRememberCommand(symbol: string, message: string): string {
+  return [
+    "gps remember",
+    JSON.stringify(`Avoid repeat failure for ${symbol}: ${message}`),
+    "--symbol",
+    JSON.stringify(symbol),
+  ].join(" ");
+}
+
 export function registerSuggest(program: Command): void {
   addRootOption(
     program
@@ -97,9 +123,12 @@ export function registerSuggest(program: Command): void {
         }
         if (hardSearch.length > 0) {
           if (results.length > 0 || lessons.length > 0) console.log("");
-          console.log(kleur.bold(`${hardSearch.length} hard-search memory candidate(s):`));
+          console.log(kleur.bold(`${hardSearch.length} agent-friction memory candidate(s):`));
           for (const h of hardSearch) {
-            console.log(`  ${kleur.yellow("search")} ${h.suggestion} ${kleur.dim(`(${h.command_count} commands)`)}`);
+            const detail = frictionDetail(h);
+            console.log(`  ${kleur.yellow("search")} ${detail.why} ${kleur.dim(`(${h.command_count} commands)`)}`);
+            if (detail.nextTime) console.log(`    next time: ${kleur.cyan(detail.nextTime)}`);
+            console.log(`    remember:  ${kleur.cyan(detail.remember)}`);
           }
         }
         if (mistakes.length > 0) {
@@ -107,6 +136,7 @@ export function registerSuggest(program: Command): void {
           console.log(kleur.bold(`${mistakes.length} repeated mistake pattern(s):`));
           for (const m of mistakes) {
             console.log(`  ${kleur.red("failure")} ${m.symbol}: ${m.message} ${kleur.dim(`${m.count}x`)}`);
+            console.log(`    remember: ${kleur.cyan(mistakeRememberCommand(m.symbol, m.message))}`);
           }
         }
       } catch (e) {
