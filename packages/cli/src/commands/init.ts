@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { mkdir, writeFile, access } from "node:fs/promises";
+import { mkdir, writeFile, access, readFile } from "node:fs/promises";
 import path from "node:path";
 import kleur from "kleur";
 import { stringify as yamlStringify } from "yaml";
@@ -48,6 +48,8 @@ export interface InitResult {
   writes: Array<{ action: "wrote" | "exists"; relPath: string }>;
 }
 
+const LOCAL_GITIGNORE_ENTRIES = [".gps/index/", ".gps/observations.json"] as const;
+
 export async function runInitCore(root: string, opts: InitOpts): Promise<InitResult> {
   const gpsDir = path.join(root, ".gps");
   await mkdir(gpsDir, { recursive: true });
@@ -70,7 +72,31 @@ export async function runInitCore(root: string, opts: InitOpts): Promise<InitRes
     await writeFile(p, content);
     writes.push({ action: "wrote", relPath: rel });
   }
+  writes.push(await ensureLocalArtifactIgnores(root));
   return { writes };
+}
+
+async function ensureLocalArtifactIgnores(root: string): Promise<InitResult["writes"][number]> {
+  const file = path.join(root, ".gitignore");
+  let existing = "";
+  try {
+    existing = await readFile(file, "utf8");
+  } catch {
+    // create below
+  }
+  const missing = LOCAL_GITIGNORE_ENTRIES.filter((entry) => !hasGitignoreEntry(existing, entry));
+  if (missing.length === 0) {
+    return { action: "exists", relPath: ".gitignore" };
+  }
+  const prefix = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(file, existing + prefix + missing.join("\n") + "\n");
+  return { action: "wrote", relPath: ".gitignore" };
+}
+
+function hasGitignoreEntry(contents: string, entry: string): boolean {
+  if (entry === ".gps/index/" && /^\.gps\/index\.json$/m.test(contents)) return true;
+  const escaped = entry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped}$`, "m").test(contents);
 }
 
 export interface SeedSample {

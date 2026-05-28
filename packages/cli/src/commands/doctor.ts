@@ -90,6 +90,14 @@ export async function runChecks(root: string): Promise<Check[]> {
       detail: `capture=${cfg.capture}, promote=${cfg.promote}, auto_suggest=${cfg.auto_suggest}`,
       hint: risky ? "use `gps install <agent> --promote=safe` unless you intentionally bypass review gates" : undefined,
     });
+    checks.push({
+      name: "experimental features",
+      ok: true,
+      detail: `live_docs=${cfg.experimental.live_docs}`,
+      hint: cfg.experimental.live_docs
+        ? "live docs are experimental; keep them local/private for launch usage"
+        : "enable live docs per run with `gps doc --experimental-live-docs --serve`",
+    });
   } catch (err) {
     checks.push({
       name: "capture policy",

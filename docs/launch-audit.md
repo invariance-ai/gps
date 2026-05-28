@@ -30,6 +30,7 @@ gps brief
 | Cursor | Always-attached rule plus MCP server | Verify `.cursor/rules/gps.mdc` and `.cursor/mcp.json` |
 | Memory governance | `capture=auto|inbox`, `promote=never|safe|all` | Default is useful-but-gated (`promote=safe`); recommend `--capture=inbox` for teams that need review |
 | Auto suggestions | Feature flag: `auto_suggest=false` by default, enabled by `--auto-suggest` | Hook-safe `gps suggest --auto` must never write memory and must no-op unless enabled |
+| Live docs | Experimental local HTML docs via `gps doc --experimental-live-docs` | Must stay explicitly feature-flagged; server binds localhost by default and must not be represented as stable launch surface |
 | Benchmarks | Measured perf and dogfood docs exist | Market claims must cite the exact benchmark file and caveats |
 | Package hygiene | Build excludes compiled tests from dist | Keep `npm pack --dry-run` clean before publishing |
 
@@ -50,6 +51,15 @@ gps brief
 - MCP config uses `gps serve --observe` when enabled, recording only symbol names, counts, timestamps, and tool counts.
 - CLI `gps prepare` traffic also feeds the authoring queue, so CLI-first usage works without MCP.
 - Suggestions never write active memory and never promote invariants.
+
+## Experimental surfaces
+
+Experimental features must be opt-in and labeled in CLI help, docs, and output:
+
+- `gps doc --experimental-live-docs` writes `.gps/docs/live.html`.
+- `gps doc --experimental-live-docs --serve` starts a localhost-only live view for browser panes in online IDEs.
+- Persistent opt-in is `experimental.live_docs: true` in `.gps/config.yml`.
+- Do not include experimental live docs in launch claims except as a clearly labeled preview.
 
 ## Claims safe for launch
 
