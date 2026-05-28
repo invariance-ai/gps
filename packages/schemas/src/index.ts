@@ -1569,6 +1569,160 @@ export const TOOLS = {
 
 export type ToolName = keyof typeof TOOLS;
 
+/* ---------- Doc store (v1.0) ----------
+ *
+ * Shareable, human-facing documentation generated from a repo or a PR diff.
+ * `gps doc` (and the optional attach auto-hook) assembles a `DocModel` and
+ * renders it to a self-contained HTML file + a markdown sibling under
+ * `.gps/docs/`. Annotations ("lines 14-30 do X") come from existing gps
+ * notes/decisions, with `gps-llm` filling in changed hunks that have no note.
+ */
+
+/** Feature config persisted under the `doc:` key of `.gps/config.yml`. */
+export const DocConfig = z.object({
+  /** Master switch. When false the attach hook never auto-generates docs. */
+  enabled: z.boolean().default(false),
+  /** Regenerate inside the attach/PR Stop hook (only honored when enabled). */
+  auto: z.boolean().default(false),
+  /** Where generated docs land, relative to repo root. */
+  out_dir: z.string().default(".gps/docs"),
+  /** Syntax-highlight code in the HTML output. */
+  highlight: z.boolean().default(true),
+  /** Allow the LLM to annotate changed hunks that have no captured note. */
+  llm_fill: z.boolean().default(true),
+  /** Diff layout in the HTML code view. */
+  diff_view: z.enum(["unified", "split"]).default("unified"),
+  /** Skip per-file bodies once the raw diff exceeds this many bytes. */
+  max_diff_bytes: z.number().int().positive().default(1_500_000),
+});
+export type DocConfig = z.infer<typeof DocConfig>;
+
+export const DocLanguage = z.enum(["typescript", "javascript", "python", "other"]);
+export type DocLanguage = z.infer<typeof DocLanguage>;
+
+/** A line range on the new side of a changed file (1-indexed, inclusive). */
+export const HunkRangeSchema = z.object({
+  file: z.string(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+});
+export type HunkRangeSchema = z.infer<typeof HunkRangeSchema>;
+
+export const DocAnnotationKind = z.enum(["note", "decision", "lesson", "llm", "question"]);
+export type DocAnnotationKind = z.infer<typeof DocAnnotationKind>;
+
+/** One "lines X-Y do Z" callout, anchored to a file + line range. */
+export const DocAnnotation = z.object({
+  file: z.string(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+  /** Plain-english explanation / lesson text. */
+  text: z.string(),
+  kind: DocAnnotationKind,
+  severity: NoteSeverity.optional(),
+  /** Origin label: note.source, "decision", "llm", … */
+  source: z.string(),
+  symbol: z.string().optional(),
+  evidence_link: z.string().optional(),
+});
+export type DocAnnotation = z.infer<typeof DocAnnotation>;
+
+export const DocFileStatus = z.enum(["added", "modified", "deleted", "renamed"]);
+export type DocFileStatus = z.infer<typeof DocFileStatus>;
+
+/** A single changed file in a doc, with its diff body and overlaid annotations. */
+export const DocFileEntry = z.object({
+  path: z.string(),
+  language: DocLanguage,
+  status: DocFileStatus,
+  /** Per-file unified-diff segment (the raw `diff --git …` block). */
+  diff: z.string().optional(),
+  /** Full new-side source, when rendering a non-diff (repo) file view. */
+  after: z.string().optional(),
+  hunks: z.array(HunkRangeSchema).default([]),
+  annotations: z.array(DocAnnotation).default([]),
+  binary: z.boolean().default(false),
+  truncated: z.boolean().default(false),
+});
+export type DocFileEntry = z.infer<typeof DocFileEntry>;
+
+export const DocStats = z.object({
+  files_changed: z.number().int().nonnegative().default(0),
+  added_lines: z.number().int().nonnegative().default(0),
+  deleted_lines: z.number().int().nonnegative().default(0),
+  annotations: z.number().int().nonnegative().default(0),
+  high_severity_annotations: z.number().int().nonnegative().default(0),
+  unannotated_hunks: z.number().int().nonnegative().default(0),
+  binary_files: z.number().int().nonnegative().default(0),
+  truncated_files: z.number().int().nonnegative().default(0),
+  by_status: z.record(z.number().int().nonnegative()).default({}),
+});
+export type DocStats = z.infer<typeof DocStats>;
+
+/** A prose/feature block in the human-readable view. */
+export const DocSection = z.object({
+  id: z.string(),
+  title: z.string(),
+  markdown: z.string(),
+  kind: z.enum(["narrative", "mermaid", "image", "html"]).default("narrative"),
+});
+export type DocSection = z.infer<typeof DocSection>;
+
+/**
+ * The intermediate structure both renderers (`renderDocMarkdown`,
+ * `renderDocHtml`) consume. The builder is the only place doing I/O; renderers
+ * are pure `DocModel -> string`.
+ */
+export const DocModel = z.object({
+  schema_version: z.literal(1).default(1),
+  kind: z.enum(["pr", "repo"]),
+  title: z.string(),
+  subtitle: z.string().optional(),
+  generated_at: z.string(),
+  base: z.string().optional(),
+  pr: z
+    .object({ number: z.number(), title: z.string(), body: z.string() })
+    .optional(),
+  /** Machine-readable summary used by renderers and PR comments. */
+  stats: DocStats.optional(),
+  files: z.array(DocFileEntry).default([]),
+  sections: z.array(DocSection).default([]),
+  /** Notes whose line range could not be resolved onto a changed file. */
+  annotations_unanchored: z.array(DocAnnotation).default([]),
+});
+export type DocModel = z.infer<typeof DocModel>;
+
+/** Index of generated docs, persisted at `<out_dir>/manifest.json`. */
+export const DocManifest = z.object({
+  version: z.literal(1).default(1),
+  docs: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(["pr", "repo"]),
+        title: z.string(),
+        html_path: z.string(),
+        md_path: z.string(),
+        generated_at: z.string(),
+        pr_number: z.number().optional(),
+      }),
+    )
+    .default([]),
+});
+export type DocManifest = z.infer<typeof DocManifest>;
+
+/** One un-annotated changed hunk handed to the LLM for a plain-english gloss. */
+export const DocAnnotateRequest = z.object({
+  file: z.string(),
+  symbol: z.string().optional(),
+  start_line: z.number().int().nonnegative(),
+  end_line: z.number().int().nonnegative(),
+  language: z.string(),
+  /** The changed code (new side) the LLM should explain. */
+  code: z.string(),
+});
+export type DocAnnotateRequest = z.infer<typeof DocAnnotateRequest>;
+
 export function toJsonSchema(schema: z.ZodTypeAny): JsonSchema {
   return convertJsonSchema(schema);
 }

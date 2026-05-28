@@ -221,6 +221,8 @@ brief [options]
 
 - `--base <ref>` — Diff base (default HEAD) *(default: "HEAD")*
 - `--max-symbols <n>` — Cap symbols processed (default 20)
+- `--tokens` — Print estimated token cost of the brief
+- `--cost` — Alias for --tokens
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -435,6 +437,28 @@ directive list [options]
 - `--area <dir>` — Directory path
 - `--alias <name>` — Alias name
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `doc`
+
+Generate a shareable HTML + Markdown doc for a PR or local diff
+
+```
+doc [options]
+```
+
+**Options:**
+
+- `--pr <number>` — Document a PR (uses `gh pr view` + `gh pr diff`)
+- `--base <ref>` — Document local working changes vs <ref> (default: HEAD)
+- `--out <dir>` — Output directory (default: doc.out_dir or .gps/docs)
+- `--diff-view <mode>` — Diff layout: unified | split (default: unified)
+- `--no-llm` — Skip LLM gap-fill; only overlay captured notes
+- `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
+- `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
+- `--max-diff-bytes <n>` — Omit per-file bodies when the raw diff exceeds this many bytes
+- `--print-md` — Also print the generated Markdown to stdout after writing files
+- `--json` — Emit the DocModel as JSON instead of writing files
 - `--root <path>` — Repo root (default: cwd)
 
 ## `doctor`
@@ -683,6 +707,7 @@ find [options] <query>
 **Options:**
 
 - `--json` — Emit JSON instead of pretty output
+- `--rank <mode>` — Ranking mode: tiered (default) or bm25 (idf-weighted body tokens) *(default: "tiered")*
 - `--limit <n>` — Max results *(default: 20)*
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1181,6 +1206,23 @@ prepare [options] [symbol]
 - `--depth <n>` — Neighborhood depth for callee context (1-3)
 - `--from-prompt <text>` — Infer the symbol from a natural-language prompt
 - `--feature <label>` — Use the feature's top symbol when no symbol is given
+- `--tokens` — Print estimated token cost of the brief
+- `--cost` — Alias for --tokens
+- `--json` — Emit JSON instead of markdown
+- `--root <path>` — Repo root (default: cwd)
+
+## `prime`
+
+Compact, budgeted standing context for session start: preferences, blocking invariants, recent decisions, global lessons
+
+```
+prime [options]
+```
+
+**Options:**
+
+- `--budget <tokens>` — Approximate token budget *(default: "600")*
+- `--quiet` — Suppress the token-footprint footer
 - `--json` — Emit JSON instead of markdown
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1265,6 +1307,24 @@ questions [options] [symbol]
 - `--status <s>` — unresolved | resolved | wontfix
 - `--limit <n>` — Max questions to print *(default: 50)*
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `recall`
+
+Search all repo memory (notes, decisions, invariants, preferences, lessons) by topic
+
+```
+recall [options] <query>
+```
+
+**Options:**
+
+- `--limit <n>` — Max results *(default: 20)*
+- `--budget <tokens>` — Approximate token budget for the rendered output
+- `--kind <list>` — Restrict to comma-separated kinds (note,decision,invariant,preference,lesson)
+- `--tokens` — Print estimated token cost of the output
+- `--cost` — Alias for --tokens
+- `--json` — Emit JSON instead of markdown
 - `--root <path>` — Repo root (default: cwd)
 
 ## `record-failure`

@@ -32,3 +32,20 @@ export async function changedFiles(root: string, base = "HEAD"): Promise<DiffRes
     return { base, files: [] };
   }
 }
+
+/**
+ * Full unified diff text between `base` and the working tree, with default
+ * context. Best-effort: returns "" outside a git repo or on failure. The doc
+ * builder feeds this into splitDiffByFile for the local `gps doc --base` path.
+ */
+export async function diffText(root: string, base = "HEAD"): Promise<string> {
+  try {
+    const { stdout } = await execFile("git", ["diff", base], {
+      cwd: root,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    return stdout;
+  } catch {
+    return "";
+  }
+}

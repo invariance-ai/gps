@@ -14,8 +14,15 @@ import {
   redact,
   recordPreference,
   readObservations,
+  loadDocConfig,
+  currentPrNumber,
+  fetchPr,
+  buildPrDocModel,
+  buildDiffDocModel,
+  writeDocStore,
+  type LlmAnnotator,
 } from "@invariance/gps-core";
-import { GpsLlm, extractDecisions } from "@invariance/gps-llm";
+import { GpsLlm, extractDecisions, annotateDiff } from "@invariance/gps-llm";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 /**
@@ -534,7 +541,45 @@ async function runHookStdin(opts: Opts): Promise<void> {
         ),
       );
     }
+
+    // Doc-store auto-regen: only when the toggle is on. Best-effort and fully
+    // guarded so it can never fail the Stop hook.
+    await maybeRegenDoc(root, opts);
   } catch {
     // Never fail the Stop hook.
+  }
+}
+
+/**
+ * When `doc.enabled && doc.auto`, regenerate the shareable doc for the current
+ * PR (or the local HEAD diff as a fallback). Silent and never-throwing.
+ */
+async function maybeRegenDoc(root: string, opts: Opts): Promise<void> {
+  try {
+    const cfg = await loadDocConfig(root);
+    if (!cfg.enabled || !cfg.auto) return;
+
+    const haveKey = !!(opts.apiKey ?? process.env.ANTHROPIC_API_KEY);
+    const llm = new GpsLlm({
+      apiKey: opts.apiKey,
+      model: opts.model,
+      dryRun: !cfg.llm_fill || !haveKey,
+    });
+    const annotate: LlmAnnotator = async (reqs) => (await annotateDiff(llm, reqs)).annotations;
+    const buildOpts = { annotate, llmFill: cfg.llm_fill, maxDiffBytes: cfg.max_diff_bytes };
+
+    const prNum = await currentPrNumber(root);
+    const model = prNum
+      ? await (async () => {
+          const snap = await fetchPr(prNum);
+          return snap ? buildPrDocModel(root, snap, buildOpts) : null;
+        })()
+      : await buildDiffDocModel(root, "HEAD", buildOpts);
+
+    if (!model || model.files.length === 0) return; // nothing changed
+    const result = await writeDocStore(root, model, { out_dir: cfg.out_dir });
+    console.error(kleur.dim(`gps: regenerated doc → ${result.htmlPath}`));
+  } catch {
+    // best-effort: never fail the Stop hook on doc generation
   }
 }

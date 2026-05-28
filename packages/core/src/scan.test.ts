@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GpsPolicy } from "@invariance/gps-schemas";
-import { loadConfig, loadPolicy, writePolicy } from "./scan.js";
+import { loadConfig, loadPolicy, writePolicy, loadDocConfig } from "./scan.js";
 
 const roots: string[] = [];
 async function tempRepo(configBody?: string): Promise<string> {
@@ -52,6 +52,28 @@ describe("loadConfig — policy defaults", () => {
     expect(cfg.auto_suggest).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.exclude).toContain("tmp");
+  });
+});
+
+describe("doc config", () => {
+  it("defaults to all-off when no config / no doc block", async () => {
+    const root = await tempRepo();
+    const doc = await loadDocConfig(root);
+    expect(doc.enabled).toBe(false);
+    expect(doc.auto).toBe(false);
+    expect(doc.out_dir).toBe(".gps/docs");
+    expect(doc.diff_view).toBe("unified");
+  });
+
+  it("round-trips an explicit doc block", async () => {
+    const root = await tempRepo(
+      "doc:\n  enabled: true\n  auto: true\n  diff_view: split\n  out_dir: docs/gps\n",
+    );
+    const doc = await loadDocConfig(root);
+    expect(doc.enabled).toBe(true);
+    expect(doc.auto).toBe(true);
+    expect(doc.diff_view).toBe("split");
+    expect(doc.out_dir).toBe("docs/gps");
   });
 });
 

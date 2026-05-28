@@ -17,7 +17,8 @@ The default loop should stay boring:
 ```bash
 npx -y @invariance/gps setup --yes --with-claude    # or --with-codex / --with-cursor
 gps prepare --intent "what I am about to change"
-gps brief
+gps remember "hard-won repo fact"
+gps done
 ```
 
 ## Launch-critical capabilities
@@ -32,6 +33,7 @@ gps brief
 | Auto suggestions | Feature flag: `auto_suggest=false` by default, enabled by `--auto-suggest` | Hook-safe `gps suggest --auto` must never write memory and must no-op unless enabled |
 | Benchmarks | Measured perf and dogfood docs exist | Market claims must cite the exact benchmark file and caveats |
 | Package hygiene | Build excludes compiled tests from dist | Keep `npm pack --dry-run` clean before publishing |
+| Help surface | Curated top-level commands | `gps --help` should show setup/prepare/remember/done/doc/find/doctor, while advanced commands remain callable |
 
 ## MVP install surface
 
@@ -55,33 +57,55 @@ gps brief
 
 Use these because they map to committed evidence:
 
-- **Graph brief vs ripgrep on Django:** `gps-brief` averaged 819 tokens at 85% recall vs ripgrep's 34,717 tokens at 56% recall. Source: `bench/perf/results/compare-django-2026-05-16.md`.
+- **Graph brief vs ripgrep on Django:** `gps-brief` averaged 819 tokens at 85% recall vs ripgrep's 34,717 tokens at 56% recall in the targeted symbol-brief benchmark. Source: `bench/perf/results/compare-django-2026-05-16.md`.
 - **Dogfood quality:** in one internal repo, gps answers won 13 of 19 valid blinded comparisons, with overall quality 4.47 vs 4.03. Source: `bench/dogfood/2026-05-12-invariance-platform.md`.
 - **Privacy line:** passive observation records symbol name, timestamp, and tool counts only. No prompt text, tool results, or conversation content.
 
-Do not overclaim general productivity lift. The dogfood result is one repo and should stay framed that way.
+Do not overclaim general productivity lift. The dogfood result is one repo and should stay framed that way. Do not lead Product Hunt with token savings; lead with repo memory, context quality, governed capture, and the correction-to-reuse loop.
+
+## 60-second demo bar
+
+The launch video should make the product obvious without explaining the whole command surface:
+
+1. Run `gps prepare refundEndpoint --intent "return a typed error on overflow"` and show the brief.
+2. Add the correction once: `gps remember "in apps/api, don't build error strings inline — use the errors module" --area apps/api`.
+3. Run the same `gps prepare` again and show the directive under "Directives for this path".
+4. Run `gps done` or `gps doc --base HEAD` to show review-time value.
+
+If the viewer remembers only one sentence, it should be: "GPS helps coding agents remember the repo-specific lessons you already taught them."
 
 ## X thread hooks
 
 1. Agents do not need a bigger context window for every task; they need the right repo memory before edits.
 2. `gps prepare createRefund` returns callers, tests, invariants, notes, decisions, and recent changes in one brief.
-3. The interesting part is not another code graph. It is author-defined invariants with evidence links, surfaced before the agent edits.
-4. Memory capture is governed: `capture=inbox` queues suggestions for review, `capture=auto` preserves the fast path.
-5. Auto memory suggestions are feature-flagged: `--auto-suggest` prints an authoring queue but never writes memory.
-6. Works across Claude Code, Codex CLI, and Cursor using the same CLI/MCP backend.
-7. Measured benchmark: on Django symbol briefs, 819 tokens at 85% recall vs ripgrep's 34,717 tokens at 56% recall.
-8. Honest caveat: the end-to-end dogfood result is promising but small. The repo includes the methodology and raw numbers.
+3. `gps remember` turns a correction into durable memory; the next relevant edit sees it before touching code.
+4. The interesting part is not another code graph. It is author-defined invariants and human corrections with evidence links, surfaced before the agent edits.
+5. Memory capture is governed: `capture=inbox` queues suggestions for review, `capture=auto` preserves the fast path.
+6. `gps doc` turns the current diff into a shareable review artifact with relevant GPS memory attached.
+7. Works across Claude Code, Codex CLI, and Cursor using the same CLI/MCP backend.
+8. Measured benchmark: on Django symbol briefs, 819 tokens at 85% recall vs ripgrep's 34,717 tokens at 56% recall.
+9. Honest caveat: the end-to-end dogfood result is promising but small. The repo includes the methodology and raw numbers.
 
 ## Pre-publish checklist
 
 ```bash
 pnpm gen:docs
 pnpm gen:schemas
+pnpm --filter @invariance/gps-schemas build
+pnpm --filter @invariance/gps-core build
 pnpm -r build
 pnpm -r typecheck
 pnpm -r test
 pnpm smoke:pack
 pnpm release:check
+```
+
+When iterating on the doc/review feature specifically, use the narrow checks first:
+
+```bash
+pnpm --dir packages/core exec vitest run src/doc/doc_model.test.ts src/doc/render.test.ts src/doc/doc_store.test.ts src/doc/doc_annotations.test.ts src/doc/diff_split.test.ts src/doc/highlight.test.ts
+pnpm --dir packages/llm exec vitest run src/doc_annotate.test.ts
+pnpm --dir packages/cli exec vitest run src/commands/doc.test.ts
 ```
 
 Then test from a clean directory:

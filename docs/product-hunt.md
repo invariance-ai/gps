@@ -14,13 +14,15 @@ Coding agents are strong at the current prompt and weak at remembering how your 
 
 GPS fixes that by adding a local memory layer beside your code. It indexes symbols, callers, tests, TODOs, and provenance, then lets you add the human context agents usually miss: "run this test twice before done", "do not log PII here", "use the errors module in apps/api", "we rejected this approach last quarter", "this helper is the blessed path".
 
-Before an edit, the agent runs:
+The default loop is deliberately small:
 
 ```bash
 gps prepare --intent "what I am about to change"
+gps remember "hard-won repo fact"
+gps done
 ```
 
-GPS returns a focused brief: relevant files, callers, likely tests, invariants, notes, prior decisions, and preferences. Before the agent hands work back, `gps brief` checks changed symbols against the memory that applies.
+`gps prepare` returns a focused brief: relevant files, callers, likely tests, invariants, notes, prior decisions, and preferences. `gps remember` saves the correction or fact you do not want to repeat. `gps done` checks the dirty diff against the memory that applies before the agent hands work back.
 
 The same memory works across Claude Code, Codex, Cursor, and shell-based agents:
 
@@ -33,6 +35,24 @@ npx -y @invariance/gps setup --yes --with-cursor
 Claude Code gets a skill, hooks, `CLAUDE.md`, and MCP. Codex gets `AGENTS.md`, MCP, and a `notify` hook that can capture durable preferences after a turn. Cursor gets an always-attached rule and MCP.
 
 The core idea is simple: stop re-explaining the same repo context every session. Save it once. Retrieve the relevant slice when it matters.
+
+## 60-second demo
+
+Show the correction loop, not a wall of commands:
+
+```bash
+gps prepare refundEndpoint --intent "return a typed error on overflow"
+# no directive about errors yet
+
+gps remember "in apps/api, don't build error strings inline — use the errors module" --area apps/api
+
+gps prepare refundEndpoint --intent "return a typed error on overflow"
+# now shows:
+# Directives for this path
+# - in apps/api, don't build error strings inline — use the errors module
+```
+
+That is GPS in one minute: the agent gets corrected once, and the next relevant edit sees the lesson before touching code.
 
 ## First comment
 
@@ -79,7 +99,7 @@ GPS is local-first and CLI-first. MCP is available where the agent supports it, 
 ```bash
 gps prepare --intent "what I am about to change"
 gps remember "hard-won repo fact"
-gps brief
+gps done
 ```
 
 The careful claim: GPS does not guarantee an agent will never make mistakes. It makes the important repo context much harder to miss.
@@ -93,6 +113,7 @@ The careful claim: GPS does not guarantee an agent will never make mistakes. It 
 - Claude Code integration: skill, hooks, `CLAUDE.md`, and MCP.
 - Codex integration: `AGENTS.md`, MCP, and turn-end `notify` capture.
 - Governance options: capture live or queue memory in `gps inbox` for review.
+- Shareable `gps doc` output for a PR or local diff, with GPS memory and reviewer checklist attached.
 
 ## X thread outline
 
@@ -110,3 +131,4 @@ The careful claim: GPS does not guarantee an agent will never make mistakes. It 
 - Do not claim broad productivity percentages without citing a benchmark.
 - Do not imply Codex has a pre-tool hook. Codex learns from `AGENTS.md`, uses MCP, and captures after turns through `notify`.
 - Do not imply all captured memory is always active. Teams can use `--capture=inbox` to review memory before activation.
+- Do not lead with token savings. The strongest launch claim is quality/context/review memory; token numbers should be cited only with the benchmark and caveats.

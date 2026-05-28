@@ -53,6 +53,24 @@ export async function fetchPr(prNumber: number | string): Promise<PrSnapshot | n
   }
 }
 
+/**
+ * Best-effort PR number for the current branch via `gh pr view`. Returns null
+ * when gh is unavailable, there's no associated PR, or the call fails. Used by
+ * the doc auto-hook to decide between a PR doc and a local-diff doc.
+ */
+export async function currentPrNumber(root: string): Promise<number | null> {
+  if (!(await ghAvailable())) return null;
+  try {
+    const { stdout } = await execFile("gh", ["pr", "view", "--json", "number"], {
+      cwd: root,
+    });
+    const m = JSON.parse(stdout) as { number?: number };
+    return typeof m.number === "number" ? m.number : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PrThread {
   number: number;
   title: string;

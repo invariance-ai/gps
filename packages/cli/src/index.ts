@@ -62,6 +62,7 @@ import { registerDoctor } from "./commands/doctor.js";
 import { registerVerifyIndex } from "./commands/verify-index.js";
 import { registerReviewDiff } from "./commands/review-diff.js";
 import { registerBrief } from "./commands/brief.js";
+import { registerDoc } from "./commands/doc.js";
 import { registerValidateKnowledge } from "./commands/validate-knowledge.js";
 import { registerPulse } from "./commands/pulse.js";
 import { registerSeed } from "./commands/seed.js";
@@ -93,24 +94,24 @@ const COMMANDS: CommandRegistration[] = [
   { name: "context-from-path", register: registerContextFromPath },
   { name: "directive", register: registerDirective },
   { name: "feature", register: registerFeature },
-  { name: "index", register: registerIndex, primary: true },
+  { name: "index", register: registerIndex },
   { name: "prepare", register: registerPrepare, primary: true },
-  { name: "context", register: registerContext, primary: true },
-  { name: "learn", register: registerLearn, primary: true },
+  { name: "context", register: registerContext },
+  { name: "learn", register: registerLearn },
   { name: "remember", register: registerRemember, primary: true },
-  { name: "notes", register: registerNotes, primary: true },
-  { name: "learn-todos", register: registerLearnTodos, primary: true },
-  { name: "decide", register: registerDecide, primary: true },
-  { name: "decisions", register: registerDecisions, primary: true },
-  { name: "suggest", register: registerSuggest, primary: true },
+  { name: "notes", register: registerNotes },
+  { name: "learn-todos", register: registerLearnTodos },
+  { name: "decide", register: registerDecide },
+  { name: "decisions", register: registerDecisions },
+  { name: "suggest", register: registerSuggest },
   { name: "postmortem", register: registerPostmortem },
   { name: "promote", register: registerPromote },
   { name: "attach", register: registerAttach },
   { name: "pr-intent", register: registerPrIntent },
-  { name: "impact", register: registerImpact, primary: true },
-  { name: "tests", register: registerTests, primary: true },
-  { name: "invariants", register: registerInvariants, primary: true },
-  { name: "invariant", register: registerInvariant, primary: true },
+  { name: "impact", register: registerImpact },
+  { name: "tests", register: registerTests },
+  { name: "invariants", register: registerInvariants },
+  { name: "invariant", register: registerInvariant },
   { name: "find", register: registerFind, primary: true },
   { name: "recall", register: registerRecall, primary: true },
   { name: "prime", register: registerPrime, primary: true },
@@ -144,12 +145,13 @@ const COMMANDS: CommandRegistration[] = [
   { name: "review-diff", register: registerReviewDiff },
   { name: "brief", register: registerBrief },
   { name: "validate-knowledge", register: registerValidateKnowledge },
-  { name: "pulse", register: registerPulse, primary: true },
-  { name: "seed", register: registerSeed, primary: true },
-  { name: "verify", register: registerVerify, primary: true },
+  { name: "pulse", register: registerPulse },
+  { name: "seed", register: registerSeed },
+  { name: "verify", register: registerVerify },
   { name: "packet", register: registerPacket },
   { name: "done", register: registerDone, primary: true },
-  { name: "sync", register: registerSync, primary: true },
+  { name: "sync", register: registerSync },
+  { name: "doc", register: registerDoc, primary: true },
   { name: "prune", register: registerPrune },
   { name: "resume", register: registerResume },
 ];
@@ -170,15 +172,15 @@ export function buildProgram(): Command {
       "  gps remember <fact>                   save a hard-won repo fact",
       "  gps done                              post-edit self-audit",
       "",
-      "Other essentials: gps doctor (health check), gps find, gps context, gps impact, gps tests.",
-      "Full surface is available — see https://github.com/invariance-ai/gps#cli.",
+      "Also useful: gps doc (PR/local diff doc), gps find (symbol search), gps brief (pre-final check).",
+      "Advanced commands still work — run `gps <command> --help` or see https://github.com/invariance-ai/gps#cli.",
       "",
     ].join("\n"),
   );
 
   registerAll(program);
 
-  // Curate `gps --help`: only README-documented commands are visible by default.
+  // Curate `gps --help`: keep launch focused on the default loop.
   // The full surface still runs and is reachable via `gps <name> --help`.
   const PRIMARY = new Set(COMMANDS.filter((c) => c.primary).map((c) => c.name));
   for (const cmd of program.commands) {

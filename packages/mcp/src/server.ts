@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import { TOOLS, type ToolName } from "@invariance/gps-schemas";
+import { TOOLS, type NoteScope, type ToolName } from "@invariance/gps-schemas";
 import {
   open as openQuery,
   getContext,
@@ -214,7 +214,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         dry_run?: boolean;
         no_llm?: boolean;
       };
-      let scope = a.force_scope ?? null;
+      let scope: NoteScope | undefined = a.force_scope;
       let target = a.force_target;
       let signals: string[] = [];
       let confidence = 1;
@@ -249,6 +249,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         signals = ["forced"];
       }
       if (a.dry_run) {
+        if (!scope) throw new Error("record_learning: unable to classify lesson scope");
         return {
           scope,
           target,
@@ -260,6 +261,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
           dry_run: true,
         };
       }
+      if (!scope) throw new Error("record_learning: unable to classify lesson scope");
       const persisted = await persistLesson(root, {
         scope,
         target,

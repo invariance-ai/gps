@@ -50,13 +50,13 @@ GPS is CLI-first because coding agents already know how to run shell commands. T
 | **Codex CLI** | `npx -y @invariance/gps setup --yes --with-codex` | `AGENTS.md`, `.codex/config.toml` | `AGENTS.md` teaches Codex to run `gps prepare` / `gps brief`. MCP exposes structured GPS tools. `notify` captures durable preferences after each turn. |
 | **Cursor** | `npx -y @invariance/gps setup --yes --with-cursor` | `.cursor/rules/gps.mdc`, `.cursor/mcp.json` | The always-attached rule teaches the workflow. MCP tools are available for context and explicit memory capture. |
 
-The core loop is the same everywhere:
+The core loop is the same everywhere. This is the part to remember:
 
 ```bash
 gps prepare --intent "what I am about to change"   # get the repo-specific brief
 gps remember "hard-won fact worth reusing"         # save a durable lesson
 gps remember "still need to update the fixture" --reminder --symbol createRefund
-gps brief                                          # check changed symbols, tests, and invariants before done
+gps done                                           # check changed symbols, tests, and invariants before handoff
 ```
 
 For Claude Code and Codex, GPS can also capture instructions like "always run this test twice" or "in this package, use the errors module" from the session transcript according to your capture policy.
@@ -122,7 +122,33 @@ Defaults (`capture=auto`, `promote=safe`, `auto_suggest=false`) make memory usef
 
 Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`. Override the policy for a single run with `gps promote --auto=safe` (or `=never` / `=all`).
 
-## Demo: correction → review → reuse
+## 60-second demo: correction → reuse
+
+The launch demo should show one thing clearly: an agent makes or nearly makes a repo-specific mistake, GPS captures the correction, and the next edit sees it before touching code.
+
+```console
+$ gps prepare refundEndpoint --intent "return a typed error on overflow"
+# prepare_edit: refundEndpoint
+# ... no directive about errors yet ...
+
+# Developer correction during the session:
+# "In apps/api, don't build error strings inline — use the errors module."
+
+$ gps remember "in apps/api, don't build error strings inline — use the errors module" --area apps/api
+remembered area note for apps/api
+
+$ gps prepare refundEndpoint --intent "return a typed error on overflow"
+# prepare_edit: refundEndpoint
+## Directives for this path
+- **[area: `apps/api`]** in apps/api, don't build error strings inline — use the errors module
+
+$ gps done
+# pre-final check: changed symbols, relevant memory, likely tests, missing coverage
+```
+
+That is the product: teach the agent once, then make the relevant lesson hard to miss.
+
+## Governed demo: correction → review → reuse
 
 The full loop — an agent gets context, a developer's correction is captured for review, a human approves it, and the next session inherits it:
 
@@ -227,11 +253,12 @@ gps prepare <symbol> --intent "<one-liner>"           # decision-ready brief bef
 gps remember "<one sentence>"                         # save hard-won repo facts
 gps remember "still need to update the fixture" --reminder --symbol <symbol>
 gps done                                              # post-edit self-audit
+gps doc --base HEAD                                   # optional shareable review doc for the diff
 ```
 
-Everything below is the full surface for power users and automation.
+That is the launch surface. Everything below is the larger surface for power users and automation.
 
-### Full command reference
+### Advanced command map
 
 ```bash
 # Reading
@@ -259,7 +286,7 @@ gps serve --observe                                   # opt-in: record per-symbo
 gps suggest                                           # surface symbols agents ask about repeatedly with no covering invariant
 ```
 
-Run `gps --help` for the curated surface, or `gps <command> --help` for any advanced command. Full reference: [`docs/guide/commands.md`](docs/guide/commands.md).
+Run `gps --help` for the curated launch surface. Advanced commands are still available with `gps <command> --help`; the full generated reference lives in [`docs/guide/commands.md`](docs/guide/commands.md).
 
 ### Passive observer — opt-in, metadata only
 
@@ -442,7 +469,7 @@ Honest, up-front:
 
 ### Token efficiency (architectural result)
 
-On Django (8 symbols), a gps brief averages **819 tokens at 85% recall** vs ripgrep's **34,717 tokens at 56% recall** — roughly 98% fewer tokens, higher recall. This is an architectural consequence of graph lookup vs text dump: gps fetches exactly the strands relevant to a symbol, ripgrep dumps every matching line.
+On Django (8 symbols), a gps brief averaged **819 tokens at 85% recall** vs ripgrep's **34,717 tokens at 56% recall** — roughly 98% fewer tokens for this symbol-brief benchmark. This measures targeted context retrieval, not total agent productivity.
 
 | tool | tokens (mean) | tokens (p95) | recall | callers | callees | tests |
 |---|---|---|---|---|---|---|
@@ -451,7 +478,7 @@ On Django (8 symbols), a gps brief averages **819 tokens at 85% recall** vs ripg
 | rg | 34,717 | 129,351 | 56% | 27% | 60% | 80% |
 | codebase-memory-mcp | 450 | 1,265 | 47% | 40% | 60% | 40% |
 
-Source: [`bench/perf/results/compare-django-2026-05-16.md`](bench/perf/results/compare-django-2026-05-16.md). Recall is judged by a separate LLM extracting answers from each tool's output, scored against the gps structural oracle. The token/recall advantage is architectural (graph lookup vs text dump). **We do not claim end-to-end productivity gains from this measurement.**
+Source: [`bench/perf/results/compare-django-2026-05-16.md`](bench/perf/results/compare-django-2026-05-16.md). Recall is judged by a separate LLM extracting answers from each tool's output, scored against the gps structural oracle. The careful claim is: GPS can return a much smaller, more focused symbol brief than text search on this benchmark. **We do not claim end-to-end productivity gains from this measurement.**
 
 ### End-to-end quality (dogfood, n=1 repo)
 

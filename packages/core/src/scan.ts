@@ -2,7 +2,13 @@ import fg from "fast-glob";
 import path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { GpsPolicy, type CaptureMode, type PromoteMode } from "@invariance/gps-schemas";
+import {
+  GpsPolicy,
+  DocConfig,
+  type CaptureMode,
+  type PromoteMode,
+  type DocConfig as DocConfigT,
+} from "@invariance/gps-schemas";
 import {
   TS_GLOB,
   PY_GLOB,
@@ -33,6 +39,8 @@ export interface GpsConfig {
   promote: PromoteMode;
   /** Whether hooks may print `gps suggest` authoring-queue nudges. Default: false. */
   auto_suggest: boolean;
+  /** Doc-store feature config (shareable HTML/markdown docs). Default: all-off. */
+  doc: DocConfigT;
 }
 
 const GLOBS_BY_LANG: Record<GpsLanguage, string[]> = {
@@ -70,6 +78,7 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       capture: policy.capture,
       promote: policy.promote,
       auto_suggest: policy.auto_suggest,
+      doc: DocConfig.parse(data.doc ?? {}),
     };
   } catch {
     const policy = GpsPolicy.parse({});
@@ -81,8 +90,18 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       capture: policy.capture,
       promote: policy.promote,
       auto_suggest: policy.auto_suggest,
+      doc: DocConfig.parse({}),
     };
   }
+}
+
+/**
+ * Thin reader for just the doc-store config. `gps doc` and the attach hook use
+ * this instead of pulling the whole scan config. A repo with no `doc:` block
+ * (the default) yields an all-disabled config, so the feature is opt-in.
+ */
+export async function loadDocConfig(root: string): Promise<DocConfigT> {
+  return (await loadConfig(root)).doc;
 }
 
 /**

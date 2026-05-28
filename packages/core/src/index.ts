@@ -65,3 +65,12 @@ export * from "./auto_promote.js";
 export * from "./agent_memory.js";
 export { runBench, runTask, loadTasks, summarize, resetWorkingTree, parseShellArgs, parseMatrix, AGENT_PRESETS } from "./bench.js";
 export type { BenchTask, RunResult, BenchSummary, RunOptions, BenchAgent, CellSummary, PerTaskAgentRow } from "./bench.js";
+
+// Doc store: shareable HTML/markdown docs.
+export * from "./doc/diff_split.js";
+export * from "./doc/highlight.js";
+export * from "./doc/doc_annotations.js";
+export * from "./doc/md_render.js";
+export * from "./doc/html_render.js";
+export * from "./doc/doc_store.js";
+export * from "./doc/doc_model.js";
