@@ -2,7 +2,13 @@ import fg from "fast-glob";
 import path from "node:path";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { GpsPolicy, type CaptureMode, type PromoteMode } from "@invariance/gps-schemas";
+import {
+  ExperimentalFeatures,
+  GpsPolicy,
+  type CaptureMode,
+  type ExperimentalFeatures as ExperimentalFeaturesT,
+  type PromoteMode,
+} from "@invariance/gps-schemas";
 import {
   TS_GLOB,
   PY_GLOB,
@@ -33,6 +39,8 @@ export interface GpsConfig {
   promote: PromoteMode;
   /** Whether hooks may print `gps suggest` authoring-queue nudges. Default: false. */
   auto_suggest: boolean;
+  /** Launch-gated experimental surfaces. All false by default. */
+  experimental: ExperimentalFeaturesT;
 }
 
 const GLOBS_BY_LANG: Record<GpsLanguage, string[]> = {
@@ -62,6 +70,7 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       promote: data.promote,
       auto_suggest: data.auto_suggest,
     });
+    const experimental = ExperimentalFeatures.parse(data.experimental ?? {});
     return {
       languages: data.languages ?? (["typescript", "python", "go", "rust", "java", "ruby", "csharp"] as GpsLanguage[]),
       exclude: [...DEFAULT_EXCLUDE, ...(data.exclude ?? [])],
@@ -70,9 +79,11 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       capture: policy.capture,
       promote: policy.promote,
       auto_suggest: policy.auto_suggest,
+      experimental,
     };
   } catch {
     const policy = GpsPolicy.parse({});
+    const experimental = ExperimentalFeatures.parse({});
     return {
       languages: ["typescript", "python", "go", "rust", "java", "ruby", "csharp"],
       exclude: DEFAULT_EXCLUDE,
@@ -81,6 +92,7 @@ export async function loadConfig(root: string): Promise<GpsConfig> {
       capture: policy.capture,
       promote: policy.promote,
       auto_suggest: policy.auto_suggest,
+      experimental,
     };
   }
 }

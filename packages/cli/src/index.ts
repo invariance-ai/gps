@@ -70,6 +70,7 @@ import { registerResume } from "./commands/resume.js";
 import { registerRemember } from "./commands/remember.js";
 import { registerPacket } from "./commands/packet.js";
 import { registerDone } from "./commands/done.js";
+import { registerDoc } from "./commands/doc.js";
 
 type CommandRegistrar = (program: Command) => void;
 
@@ -100,6 +101,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "learn-todos", register: registerLearnTodos, primary: true },
   { name: "decide", register: registerDecide, primary: true },
   { name: "decisions", register: registerDecisions, primary: true },
+  { name: "doc", register: registerDoc },
   { name: "suggest", register: registerSuggest, primary: true },
   { name: "postmortem", register: registerPostmortem },
   { name: "promote", register: registerPromote },

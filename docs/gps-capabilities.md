@@ -36,6 +36,17 @@ gps done
 - `gps brief` checks changed symbols, invariants, notes, tests, and missing coverage before finalizing.
 - `gps done` runs the post-edit self-audit flow.
 
+## Experimental Live Docs
+
+The live HTML documentation view is available as an explicitly experimental local preview:
+
+```bash
+gps doc --experimental-live-docs
+gps doc --experimental-live-docs --serve
+```
+
+It surfaces the current diff, changed symbols, relevant memory, tests, blocking invariants, pending inbox items, and the full `gps brief` markdown. The server binds to `127.0.0.1` by default so it can be opened in browser panes inside online IDEs. Persistent opt-in is `experimental.live_docs: true` in `.gps/config.yml`.
+
 ## Context GPS Can Surface
 
 - Symbols, definitions, callers, and call edges.

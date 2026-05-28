@@ -71,6 +71,17 @@
         "auto_suggest": {
           "type": "boolean",
           "default": false
+        },
+        "experimental": {
+          "type": "object",
+          "properties": {
+            "live_docs": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
         }
       },
       "additionalProperties": false,

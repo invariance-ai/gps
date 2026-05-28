@@ -437,6 +437,25 @@ directive list [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `doc`
+
+[experimental] Generate or serve live HTML documentation for the current diff
+
+```
+doc [options]
+```
+
+**Options:**
+
+- `--base <ref>` — Diff base for the live doc (default: HEAD) *(default: "HEAD")*
+- `--out <file>` — HTML output path (default: .gps/docs/live.html)
+- `--serve` — Serve the live doc over HTTP; regenerates on each request
+- `--host <host>` — HTTP host for --serve (default: 127.0.0.1) *(default: "127.0.0.1")*
+- `--port <n>` — HTTP port for --serve (default: 17370) *(default: "17370")*
+- `--experimental-live-docs` — Required unless .gps/config.yml has experimental.live_docs: true
+- `--json` — Emit the live doc model as JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `doctor`
 
 Check that gps is installed, indexed, and wired into your agent
