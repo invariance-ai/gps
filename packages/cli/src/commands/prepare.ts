@@ -88,7 +88,10 @@ export function registerPrepare(program: Command): void {
         }
       }
       if (!symbol && intentText && intentMatchesAttempted && candidates.length === 0) {
-        throw new Error(`no symbol matches for intent; try \`gps plan "${intentText}"\``);
+        throw new Error(
+          `no symbol matched intent "${intentText}". ` +
+            `Run \`gps find "<keyword>"\` to locate the symbol, then pass it explicitly: \`gps prepare <symbol>\`.`,
+        );
       }
       if (!symbol) {
         throw new Error("symbol is required (or pass --intent <text> / --feature <label>)");
