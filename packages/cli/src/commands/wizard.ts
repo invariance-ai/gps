@@ -103,6 +103,7 @@ export function registerWizard(program: Command): void {
 
       const claudeDetected = await isDir(path.join(root, ".claude"));
       const codexDetected = (await isDir(path.join(root, ".codex"))) || (await exists(path.join(root, "AGENTS.md")));
+      const explicitAgentSelection = !!(opts.withClaude || opts.withCodex || opts.withCursor);
 
       // 1. init
       header("1. initialize .gps/");
@@ -158,7 +159,9 @@ export function registerWizard(program: Command): void {
       header("4. wire coding agents");
       const wantClaude =
         opts.withClaude ??
-        (opts.yes
+        (explicitAgentSelection
+          ? false
+          : opts.yes
           ? claudeDetected || !codexDetected
           : await ask(
               claudeDetected
@@ -181,7 +184,9 @@ export function registerWizard(program: Command): void {
 
       const wantCodex =
         opts.withCodex ??
-        (opts.yes
+        (explicitAgentSelection
+          ? false
+          : opts.yes
           ? codexDetected
           : await ask(
               codexDetected
@@ -204,7 +209,9 @@ export function registerWizard(program: Command): void {
       const cursorDetected = await isDir(path.join(root, ".cursor"));
       const wantCursor =
         opts.withCursor ??
-        (opts.yes
+        (explicitAgentSelection
+          ? false
+          : opts.yes
           ? cursorDetected
           : await ask(
               cursorDetected

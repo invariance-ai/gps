@@ -36,6 +36,17 @@ gps done
 - `gps brief` checks changed symbols, invariants, notes, tests, and missing coverage before finalizing.
 - `gps done` runs the post-edit self-audit flow.
 
+## Experimental Live Docs
+
+The live HTML documentation view is available as an explicitly experimental local preview:
+
+```bash
+gps doc --experimental-live-docs
+gps doc --experimental-live-docs --serve
+```
+
+It surfaces the current diff, changed symbols, relevant memory, tests, blocking invariants, pending inbox items, and the full `gps brief` markdown. The server binds to `127.0.0.1` by default so it can be opened in browser panes inside online IDEs. Persistent opt-in is `experimental.live_docs: true` in `.gps/config.yml`.
+
 ## Context GPS Can Surface
 
 - Symbols, definitions, callers, and call edges.
@@ -99,11 +110,12 @@ These commands help agents find existing helpers, understand blast radius, ident
 GPS can observe when an agent spends a long time searching and then suggest saving the result:
 
 ```text
-You spent a while finding this.
-Save "Stripe retries live in src/webhooks.ts"?
+GPS saw 9 search/read commands without a prior prepare brief.
+next time: gps prepare --intent '<what you are about to change>'
+remember:  gps remember 'src/webhooks.ts is the relevant location for stripeWebhook' --symbol 'stripeWebhook'
 ```
 
-This turns expensive repo exploration into reusable memory.
+This turns expensive repo exploration into reusable memory and teaches the next agent to use GPS earlier.
 
 ## Test Command Learning
 
@@ -157,7 +169,7 @@ GPS can surface:
 - Symbols without enough notes or invariants.
 - Lessons near promotion.
 - Repeated failures like “agents forget `pnpm gen:schemas` after schema edits.”
-- Hard-search memories worth saving.
+- Agent-friction memories worth saving, with concrete `gps remember ...` commands.
 
 ## Benchmarks And Launch Validation
 

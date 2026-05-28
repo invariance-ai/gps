@@ -441,7 +441,7 @@ directive list [options]
 
 ## `doc`
 
-Generate a shareable HTML + Markdown doc for a PR or local diff
+Generate shareable PR/local diff docs, or opt into experimental live docs
 
 ```
 doc [options]
@@ -451,14 +451,18 @@ doc [options]
 
 - `--pr <number>` — Document a PR (uses `gh pr view` + `gh pr diff`)
 - `--base <ref>` — Document local working changes vs <ref> (default: HEAD)
-- `--out <dir>` — Output directory (default: doc.out_dir or .gps/docs)
+- `--out <path>` — Output directory for shareable docs, or HTML file for live docs
 - `--diff-view <mode>` — Diff layout: unified | split (default: unified)
 - `--no-llm` — Skip LLM gap-fill; only overlay captured notes
 - `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
 - `--model <id>` — Anthropic model ID (default: claude-opus-4-7)
 - `--max-diff-bytes <n>` — Omit per-file bodies when the raw diff exceeds this many bytes
 - `--print-md` — Also print the generated Markdown to stdout after writing files
-- `--json` — Emit the DocModel as JSON instead of writing files
+- `--serve` — Serve the experimental live doc over HTTP; regenerates on each request
+- `--host <host>` — HTTP host for --serve (default: 127.0.0.1) *(default: "127.0.0.1")*
+- `--port <n>` — HTTP port for --serve (default: 17370) *(default: "17370")*
+- `--experimental-live-docs` — Enable experimental live docs for this run
+- `--json` — Emit the generated model as JSON
 - `--root <path>` — Repo root (default: cwd)
 
 ## `doctor`

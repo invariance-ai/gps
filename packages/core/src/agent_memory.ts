@@ -95,9 +95,13 @@ export async function repeatedMistakePatterns(root: string, minCount = 2): Promi
 }
 
 export interface HardSearchSuggestion {
+  kind: "hard_search";
   symbol?: string;
   file?: string;
   command_count: number;
+  why: string;
+  remember_command: string;
+  next_time_command?: string;
   suggestion: string;
 }
 
@@ -116,19 +120,43 @@ export function detectHardSearch(events: SessionEvent[], threshold = 8): HardSea
   if (recent.length < threshold) return [];
   const lastLocated = [...events].reverse().find((e) => e.file || e.path);
   const lastSymbol = [...events].reverse().find((e) => e.symbol);
+  const prepared = events.some((e) => e.type === "prepare" || e.tool === "prepare_edit");
   const file = lastLocated?.file ?? lastLocated?.path;
   const symbol = lastLocated?.symbol ?? lastSymbol?.symbol;
   const target = symbol ?? file;
+  const fact = symbol && file
+    ? `${file} is the relevant location for ${symbol}`
+    : target
+    ? `${target} is the relevant location for this task`
+    : "record the path, test, config, or workflow found during this search";
+  const rememberCommand =
+    symbol && file
+      ? `gps remember ${shellQuote(fact)} --symbol ${shellQuote(symbol)}`
+      : file
+      ? `gps remember ${shellQuote(fact)} --file ${shellQuote(file)}`
+      : `gps remember ${shellQuote(fact)}`;
+  const nextTimeCommand = prepared ? undefined : `gps prepare --intent ${shellQuote("<what you are about to change>")}`;
+  const why = prepared
+    ? `GPS saw ${recent.length} search/read commands before this finding became clear.`
+    : `GPS saw ${recent.length} search/read commands without a prior prepare brief.`;
   return [{
+    kind: "hard_search",
     symbol,
     file,
     command_count: recent.length,
+    why,
+    remember_command: rememberCommand,
+    next_time_command: nextTimeCommand,
     suggestion: symbol && file
-      ? `You spent a while finding ${file} while working on ${symbol}. Save it with gps remember "... ${file}" --symbol ${symbol}?`
+      ? `You spent a while finding ${file} while working on ${symbol}. Save it for future agents with: ${rememberCommand}`
       : target
-      ? `You spent a while finding this. Save "${target} lives in ${file ?? target}" with gps remember?`
-      : "You spent a while searching. Save the path you found with gps remember?",
+      ? `You spent a while finding this. Save it for future agents with: ${rememberCommand}`
+      : `You spent a while searching. Save the answer for future agents with: ${rememberCommand}`,
   }];
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 export async function hardSearchSuggestionsForActiveSession(root: string): Promise<HardSearchSuggestion[]> {

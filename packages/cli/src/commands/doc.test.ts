@@ -15,7 +15,7 @@ describe("registerDoc", () => {
     expect(docCommand().name()).toBe("doc");
   });
 
-  it("exposes the expected options", () => {
+  it("exposes stable doc and experimental live-doc options", () => {
     const flags = docCommand().options.map((o) => o.long);
     expect(flags).toEqual(
       expect.arrayContaining([
@@ -28,6 +28,10 @@ describe("registerDoc", () => {
         "--model",
         "--max-diff-bytes",
         "--print-md",
+        "--experimental-live-docs",
+        "--serve",
+        "--host",
+        "--port",
         "--json",
         "--root",
       ]),

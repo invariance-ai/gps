@@ -71,6 +71,8 @@ describe("agent memory helpers", () => {
     const suggestions = detectHardSearch(events);
     expect(suggestions).toHaveLength(1);
     expect(suggestions[0]!.suggestion).toContain("gps remember");
+    expect(suggestions[0]!.remember_command).toContain("gps remember");
+    expect(suggestions[0]!.next_time_command).toContain("gps prepare");
     expect(suggestions[0]!.file).toBe("src/refunds.ts");
   });
 
@@ -82,6 +84,10 @@ describe("agent memory helpers", () => {
     const suggestions = detectHardSearch(events);
     expect(suggestions[0]!.symbol).toBe("createRefund");
     expect(suggestions[0]!.file).toBe("src/refunds.ts");
-    expect(suggestions[0]!.suggestion).toContain("--symbol createRefund");
+    expect(suggestions[0]!.suggestion).toContain("--symbol 'createRefund'");
+    expect(suggestions[0]!.remember_command).toBe(
+      "gps remember 'src/refunds.ts is the relevant location for createRefund' --symbol 'createRefund'",
+    );
+    expect(suggestions[0]!.next_time_command).toBeUndefined();
   });
 });

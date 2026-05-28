@@ -276,6 +276,16 @@ export const GpsPolicy = z.object({
 });
 export type GpsPolicy = z.infer<typeof GpsPolicy>;
 
+export const ExperimentalFeatures = z.object({
+  /**
+   * Enables `gps doc --serve` / HTML live documentation. This is intentionally
+   * off by default for launch: it opens a local HTTP surface and is still
+   * iterating on UX, so users must opt in explicitly.
+   */
+  live_docs: z.boolean().default(false),
+});
+export type ExperimentalFeatures = z.infer<typeof ExperimentalFeatures>;
+
 /**
  * An item queued in `.gps/inbox.yml` when `capture=inbox`. It captures the same
  * payload the always-on path would persist, but holds it for human review.

@@ -122,6 +122,27 @@ Defaults (`capture=auto`, `promote=safe`, `auto_suggest=false`) make memory usef
 
 Run `gps inbox` to review queued captures, and `gps promote --auto` to apply the promotion policy (add `--dry-run` to preview). Both read the policy from `.gps/config.yml`. Override the policy for a single run with `gps promote --auto=safe` (or `=never` / `=all`).
 
+## Experimental live docs
+
+`gps doc` generates stable local HTML and Markdown docs for a PR or local diff.
+The live browser view is launch-labeled experimental and stays off unless you
+opt in explicitly:
+
+```bash
+gps doc --experimental-live-docs                    # write .gps/docs/live.html
+gps doc --experimental-live-docs --serve            # local browser view for IDE panes
+```
+
+To opt in persistently for a repo, set:
+
+```yaml
+experimental:
+  live_docs: true
+```
+
+The server binds to `127.0.0.1` by default, regenerates on refresh, and is
+intended for local preview only while the UX settles.
+
 ## 60-second demo: correction → reuse
 
 The launch demo should show one thing clearly: an agent makes or nearly makes a repo-specific mistake, GPS captures the correction, and the next edit sees it before touching code.

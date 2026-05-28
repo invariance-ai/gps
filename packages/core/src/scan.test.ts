@@ -29,6 +29,7 @@ describe("loadConfig — policy defaults", () => {
     expect(cfg.capture).toBe("auto");
     expect(cfg.promote).toBe("safe");
     expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental).toEqual({ live_docs: false });
   });
 
   it("defaults policy when config file omits the fields", async () => {
@@ -37,6 +38,7 @@ describe("loadConfig — policy defaults", () => {
     expect(cfg.capture).toBe("auto");
     expect(cfg.promote).toBe("safe");
     expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental.live_docs).toBe(false);
     // non-policy fields still parse
     expect(cfg.languages).toEqual(["typescript"]);
     expect(cfg.depth).toBe(5);
@@ -50,8 +52,15 @@ describe("loadConfig — policy defaults", () => {
     expect(cfg.capture).toBe("inbox");
     expect(cfg.promote).toBe("safe");
     expect(cfg.auto_suggest).toBe(false);
+    expect(cfg.experimental.live_docs).toBe(false);
     expect(cfg.languages).toEqual(["typescript", "python"]);
     expect(cfg.exclude).toContain("tmp");
+  });
+
+  it("parses experimental feature flags explicitly", async () => {
+    const root = await tempRepo("experimental:\n  live_docs: true\n");
+    const cfg = await loadConfig(root);
+    expect(cfg.experimental.live_docs).toBe(true);
   });
 });
 

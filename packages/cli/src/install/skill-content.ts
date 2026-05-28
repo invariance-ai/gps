@@ -55,6 +55,8 @@ gps preferences                       # see the user's captured standing rules
 gps prepare --intent "<plan>"         # decision-ready brief; symbol inferred from intent
 gps prepare <symbol> --intent "<…>"   # same, with explicit symbol
 gps brief                             # pre-finalize: changed symbols, invariants, notes, tests, no-test warnings
+gps done                              # final self-audit plus memory nudges from wasted search/failure loops
+gps suggest                           # authoring queue: hot symbols, repeated lessons, agent-friction candidates
 \`\`\`
 
 When the user gives a durable instruction ("from now on…", "always…", "i prefer…", "don't ever…"), gps records it for you — automatically via hook in agents that support them, otherwise call the MCP tool \`record_preference\` (or \`gps prefer "<rule>"\`). Both passive and explicit captures honor the repo's capture policy: under \`capture=auto\` they land in active memory, under \`capture=inbox\` they're queued for review (\`gps inbox approve <id>\`) — so don't assume an explicit call is immediately live. The response says where it went. Treat \`gps preferences\` output as soft constraints in every session.
@@ -69,11 +71,14 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
 
 Save hard-won findings. If you spent real time locating code, tests, config, owners, fixtures,
-or a non-obvious workflow, record the answer before you finish:
+or a non-obvious workflow, record the answer before you finish. When \`gps done\` or
+\`gps suggest\` prints an agent-friction candidate — or the MCP \`brief\` tool returns a
+non-empty \`memory_suggestions\` array — run the shown \`remember_command\` (a ready-to-run
+\`gps remember …\`) unless the fact is obvious or wrong:
 
 \`\`\`bash
-gps lessons record "Refund approval tests live in apps/api/src/refund-approval.test.ts"
-gps lessons record "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts"
+gps remember "Refund approval tests live in apps/api/src/refund-approval.test.ts"
+gps remember "The Stripe webhook entrypoint is stripeWebhook in apps/api/src/webhooks.ts" --symbol stripeWebhook
 \`\`\`
 
 Do this for findings that would save a future agent another search loop. Do not record obvious facts
@@ -196,8 +201,10 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`gps lessons record\`.
 
 If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
-save that finding with \`gps remember\` before you finish. Future agents should not repeat
-the same search.
+save that finding with \`gps remember\` before you finish. If \`gps done\` or \`gps suggest --auto\`
+prints an agent-friction candidate — or the MCP \`brief\` tool returns \`memory_suggestions\` —
+run its \`remember_command\` unless the suggested fact is obvious or incorrect. Future agents
+should not repeat the same search.
 `;
 
 /**
@@ -228,6 +235,8 @@ gps tests <symbol> --json                        # tests that protect a specific
 After a successful edit:
 
 \`\`\`bash
+gps done                                        # self-audit plus memory nudges from wasted search/failure loops
+gps remember "<hard-won repo fact>"             # save findings future agents should not rediscover
 gps lessons record "<one sentence>"              # persist what you learned
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
