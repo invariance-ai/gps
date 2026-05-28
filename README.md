@@ -4,6 +4,8 @@
 
 `gps` is a memory layer for Claude Code, Codex, Cursor, and shell-based coding agents. It stores the things humans usually have to repeat: repo conventions, best practices, user preferences, invariants, decisions, TODOs, test commands, and hard-won lessons from past edits. Then it retrieves the relevant slice before the agent edits.
 
+**Product page → [useinvariance.com/product/gps](https://useinvariance.com/product/gps)** — what it is, the command reference, and setup docs.
+
 ```bash
 cd your-repo
 npx -y @invariance/gps setup --yes --with-claude   # or --with-codex
