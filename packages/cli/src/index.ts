@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Command } from "commander";
+import { resolveRoot } from "./root.js";
 import { registerContext } from "./commands/context.js";
 import { registerImpact } from "./commands/impact.js";
 import { registerTests } from "./commands/tests.js";
@@ -195,6 +197,30 @@ function registerAll(program: Command): void {
   }
 }
 
+/** Commands that are expected to run before `.gps/` exists. */
+const NO_INIT_REQUIRED = new Set(["setup", "init", "install", "doctor", "serve"]);
+
+/**
+ * Proactive setup nudge. Fires before any command's action so the agent always
+ * sees the same instruction when gps is not initialized — instead of an opaque
+ * ENOENT from whichever file the command happened to read first. Walks up to the
+ * top-level command name and skips bootstrap commands. The ENOENT handler below
+ * stays as a fallback for anything that slips past (e.g. a missing index).
+ */
+function requireInitialized(actionCommand: Command): void {
+  let cmd: Command = actionCommand;
+  while (cmd.parent && cmd.parent.parent) cmd = cmd.parent;
+  if (NO_INIT_REQUIRED.has(cmd.name())) return;
+  const root = resolveRoot(actionCommand.opts() as { root?: string });
+  if (existsSync(path.join(root, ".gps", "config.yml"))) return;
+  console.error("gps is not initialized in this directory.");
+  console.error(
+    "  Run:  npx -y @invariance/gps setup --yes --with-claude   (or --with-codex / --with-cursor)",
+  );
+  console.error("  Then: gps doctor   to verify the install.");
+  process.exit(2);
+}
+
 const isMain = (() => {
   try {
     const entry = process.argv[1];
@@ -208,7 +234,11 @@ const isMain = (() => {
 })();
 
 if (isMain) {
-  buildProgram()
+  const program = buildProgram();
+  program.hook("preAction", (_thisCommand, actionCommand) => {
+    requireInitialized(actionCommand);
+  });
+  program
     .parseAsync(process.argv)
     .catch((err: Error & { code?: string }) => {
       const msg = err.message ?? String(err);

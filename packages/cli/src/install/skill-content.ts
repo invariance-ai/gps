@@ -72,8 +72,9 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 
 Save hard-won findings. If you spent real time locating code, tests, config, owners, fixtures,
 or a non-obvious workflow, record the answer before you finish. When \`gps done\` or
-\`gps suggest\` prints an agent-friction candidate, run the shown \`gps remember …\` command
-unless the fact is obvious or wrong:
+\`gps suggest\` prints an agent-friction candidate — or the MCP \`brief\` tool returns a
+non-empty \`memory_suggestions\` array — run the shown \`remember_command\` (a ready-to-run
+\`gps remember …\`) unless the fact is obvious or wrong:
 
 \`\`\`bash
 gps remember "Refund approval tests live in apps/api/src/refund-approval.test.ts"
@@ -201,8 +202,9 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 
 If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
 save that finding with \`gps remember\` before you finish. If \`gps done\` or \`gps suggest --auto\`
-prints an agent-friction candidate, run its \`remember:\` command unless the suggested fact is
-obvious or incorrect. Future agents should not repeat the same search.
+prints an agent-friction candidate — or the MCP \`brief\` tool returns \`memory_suggestions\` —
+run its \`remember_command\` unless the suggested fact is obvious or incorrect. Future agents
+should not repeat the same search.
 `;
 
 /**
