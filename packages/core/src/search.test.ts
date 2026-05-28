@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { SymbolRef } from "@invariance/gps-schemas";
 import type { GpsIndex } from "./index_store.js";
-import { scoreSymbol, searchSymbols } from "./search.js";
+import { scoreSymbol, searchSymbols, searchSymbolsBm25 } from "./search.js";
 
 function sym(partial: Omit<Partial<SymbolRef>, "tokens"> & { name: string; tokens?: string[] }): SymbolRef {
   return {
@@ -87,5 +87,38 @@ describe("searchSymbols", () => {
     ]);
     const results = searchSymbols(idx, "customFetch");
     expect(results).toHaveLength(1);
+  });
+});
+
+describe("searchSymbolsBm25", () => {
+  it("keeps a symbol named for the query ahead of body-only matches", () => {
+    const idx = indexOf([
+      sym({ name: "calculateDelay", tokens: ["backoff", "delay"] }),
+      sym({ name: "backoff" }),
+    ]);
+    const results = searchSymbolsBm25(idx, "backoff");
+    expect(results[0]?.symbol.name).toBe("backoff");
+    expect(results[0]?.match_reason).not.toBe("tokens");
+  });
+
+  it("weights rare query terms higher: ranks the rare-token symbol above a common-token one", () => {
+    // "request" appears in many docs (common, low idf); "idempotency" in one (rare, high idf).
+    const idx = indexOf([
+      sym({ name: "a", tokens: ["request", "send"] }),
+      sym({ name: "b", tokens: ["request", "parse"] }),
+      sym({ name: "c", tokens: ["request", "headers"] }),
+      sym({ name: "handler", tokens: ["request", "idempotency", "key"] }),
+    ]);
+    const results = searchSymbolsBm25(idx, "request idempotency");
+    expect(results[0]?.symbol.name).toBe("handler");
+  });
+
+  it("collapses duplicates and applies the test-file penalty like the default ranker", () => {
+    const idx = indexOf([
+      sym({ name: "customFetch", file: "test/retry.ts" }),
+      sym({ name: "customFetch", file: "source/core/Ky.ts" }),
+    ]);
+    const results = searchSymbolsBm25(idx, "customFetch");
+    expect(results[0]?.symbol.file).toBe("source/core/Ky.ts");
   });
 });

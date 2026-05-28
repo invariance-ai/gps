@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { prepareEdit, recordPrepared, inferSymbols, topSymbols } from "@invariance/gps-core";
+import { prepareEdit, recordPrepared, inferSymbols, topSymbols, estimateTokens } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface PrepareOpts extends RootOption {
@@ -11,6 +11,8 @@ interface PrepareOpts extends RootOption {
   depth?: string;
   fromPrompt?: string;
   feature?: string;
+  tokens?: boolean;
+  cost?: boolean;
 }
 
 export function registerPrepare(program: Command): void {
@@ -24,6 +26,8 @@ export function registerPrepare(program: Command): void {
       .option("--depth <n>", "Neighborhood depth for callee context (1-3)")
       .option("--from-prompt <text>", "Infer the symbol from a natural-language prompt")
       .option("--feature <label>", "Use the feature's top symbol when no symbol is given")
+      .option("--tokens", "Print estimated token cost of the brief")
+      .option("--cost", "Alias for --tokens")
       .option("--json", "Emit JSON instead of markdown"),
   ).action(async (symbolArg: string | undefined, opts: PrepareOpts) => {
     try {
@@ -125,8 +129,13 @@ export function registerPrepare(program: Command): void {
       const withCandidates = candidates.length > 1
         ? { ...r, candidates, ...(lowConfidence ? { low_confidence: true } : {}) }
         : (lowConfidence ? { ...r, low_confidence: true } : r);
-      if (opts.json) console.log(JSON.stringify(withCandidates, null, 2));
-      else {
+      const showTokens = !!(opts.tokens || opts.cost);
+      const tokenInfo = showTokens ? { estimated: estimateTokens(r.markdown) } : undefined;
+      if (opts.json) {
+        console.log(
+          JSON.stringify(tokenInfo ? { ...withCandidates, tokens: tokenInfo } : withCandidates, null, 2),
+        );
+      } else {
         console.log(r.markdown);
         if (pickedVia) {
           console.log(`\n_picked symbol via_ \`${pickedVia}\`${pickedScore !== undefined ? ` (score ${pickedScore})` : ""}`);
@@ -135,6 +144,9 @@ export function registerPrepare(program: Command): void {
           console.log("\n## Candidates");
           for (const c of candidates) console.log(`- ${c.symbol} (score=${c.score}, via=${c.via})`);
           console.log(kleur.dim("\nPass the symbol name directly to lock the choice."));
+        }
+        if (tokenInfo) {
+          console.log(kleur.dim(`\n~${tokenInfo.estimated} tokens`));
         }
         console.log(kleur.dim("\n→ Run `gps brief` after editing to verify changed symbols, invariants, notes, and tests."));
       }

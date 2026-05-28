@@ -1277,6 +1277,32 @@ export const ResumeResult = z.object({
 });
 export type ResumeResult = z.infer<typeof ResumeResult>;
 
+export const RecallKind = z.enum(["note", "decision", "invariant", "preference", "lesson"]);
+export type RecallKind = z.infer<typeof RecallKind>;
+
+export const RecallMemoryInput = z.object({
+  query: z.string(),
+  limit: z.number().int().positive().optional(),
+  kinds: z.array(RecallKind).optional(),
+});
+export type RecallMemoryInput = z.infer<typeof RecallMemoryInput>;
+
+export const RecallHit = z.object({
+  kind: RecallKind,
+  text: z.string(),
+  anchor: z.string().optional(),
+  score: z.number(),
+  severity: z.string().optional(),
+  source: z.string().optional(),
+});
+export type RecallHit = z.infer<typeof RecallHit>;
+
+export const RecallMemoryResult = z.object({
+  query: z.string(),
+  hits: z.array(RecallHit),
+});
+export type RecallMemoryResult = z.infer<typeof RecallMemoryResult>;
+
 export const TOOLS = {
   prepare_edit: {
     description:
@@ -1313,6 +1339,12 @@ export const TOOLS = {
       "Search the symbol graph for existing helpers before writing new code. Call this whenever you're about to add a utility function — there's usually one already.",
     input: FindReusableInput,
     output: FindReusableResult,
+  },
+  recall_memory: {
+    description:
+      "Search ALL repo memory by topic — notes, decisions, invariants, preferences, and global lessons ranked against a free-text query. Use this to answer \"what do we already know about X?\" (e.g. refunds, auth, rate limiting) when you don't have a specific symbol in mind; prefer it over grepping docs or re-deriving conventions. For depth on one known symbol, use prepare_edit/get_context instead.",
+    input: RecallMemoryInput,
+    output: RecallMemoryResult,
   },
   record_learning: {
     description:

@@ -3,6 +3,7 @@ export * from "./scan.js";
 export * from "./index_store.js";
 export * from "./tokens.js";
 export * from "./search.js";
+export * from "./recall.js";
 export * from "./git.js";
 export * from "./invariants.js";
 export * from "./notes.js";

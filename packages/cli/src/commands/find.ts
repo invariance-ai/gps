@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { readIndex, searchSymbols } from "@invariance/gps-core";
+import { readIndex, searchSymbols, searchSymbolsBm25 } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 export function registerFind(program: Command): void {
@@ -8,12 +8,19 @@ export function registerFind(program: Command): void {
     .command("find <query>")
     .description("Fuzzy search for symbols (matches names and, on v2 indexes, body/doc tokens)")
     .option("--json", "Emit JSON instead of pretty output")
+    .option("--rank <mode>", "Ranking mode: tiered (default) or bm25 (idf-weighted body tokens)", "tiered")
     .option("--limit <n>", "Max results", (v) => parseInt(v, 10), 20))
-    .action(async (query: string, opts: RootOption & { json?: boolean; limit: number }) => {
+    .action(async (query: string, opts: RootOption & { json?: boolean; limit: number; rank?: string }) => {
       const root = resolveRoot(opts);
       try {
+        if (opts.rank && opts.rank !== "tiered" && opts.rank !== "bm25") {
+          throw new Error('--rank must be "tiered" or "bm25"');
+        }
         const index = await readIndex(root);
-        const matches = searchSymbols(index, query, opts.limit);
+        const matches =
+          opts.rank === "bm25"
+            ? searchSymbolsBm25(index, query, opts.limit)
+            : searchSymbols(index, query, opts.limit);
         if (opts.json) {
           // Additive contract: every prior SymbolRef field is preserved and we
           // add match_reason + score. `tokens` is an index-internal recall aid,

@@ -10,6 +10,8 @@ import { registerInvariant } from "./commands/invariant.js";
 import { registerInit } from "./commands/init.js";
 import { registerIndex } from "./commands/index.js";
 import { registerFind } from "./commands/find.js";
+import { registerRecall } from "./commands/recall.js";
+import { registerPrime } from "./commands/prime.js";
 import { registerTrace } from "./commands/trace.js";
 import { registerServe } from "./commands/serve.js";
 import { registerBench } from "./commands/bench.js";
@@ -110,6 +112,8 @@ const COMMANDS: CommandRegistration[] = [
   { name: "invariants", register: registerInvariants, primary: true },
   { name: "invariant", register: registerInvariant, primary: true },
   { name: "find", register: registerFind, primary: true },
+  { name: "recall", register: registerRecall, primary: true },
+  { name: "prime", register: registerPrime, primary: true },
   { name: "trace", register: registerTrace, primary: true },
   { name: "serve", register: registerServe, primary: true },
   { name: "bench", register: registerBench },

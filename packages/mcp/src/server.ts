@@ -53,6 +53,8 @@ import {
   findRejectedConflicts,
   findPromotionCandidates,
   readIndex,
+  recallMemory,
+  type RecallKind as RecallKindT,
   verifyIndex,
   readGateStream,
   gateChanged,
@@ -324,6 +326,11 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
         .sort((a, b) => b.score - a.score)
         .slice(0, a.limit ?? 10);
       return { candidates: cands };
+    }
+    case "recall_memory": {
+      const a = args as { query: string; limit?: number; kinds?: RecallKindT[] };
+      const hits = await recallMemory(root, a.query, { limit: a.limit, kinds: a.kinds });
+      return { query: a.query, hits };
     }
     case "list_todos": {
       const a = args as { file?: string; symbol?: string; include_resolved?: boolean };
