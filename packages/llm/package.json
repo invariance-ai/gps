@@ -1,6 +1,6 @@
 {
   "name": "@invariance/gps-llm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Thin Anthropic SDK wrapper for gps's LLM-assisted commands (postmortem, attach, pr-intent).",
   "license": "MIT",
   "type": "module",

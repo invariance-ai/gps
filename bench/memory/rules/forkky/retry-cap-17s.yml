@@ -1,0 +1,14 @@
+id: retry-cap-17s
+type: preference
+symbol: backoffLimit
+canonical: "Cap computed retry backoff at exactly 17 seconds (17000 ms)."
+paraphrases:
+  - "from now on don't let retry backoff go above 17s"
+  - "we clamp the backoff delay to seventeen seconds, no exceptions"
+  - "going forward, max out retry backoff at 17000 milliseconds"
+test_task: "Revisit veki's default retry backoff behavior and propose new defaults plus a short implementation plan."
+adherence_check:
+  kind: judge
+  expect: "The proposal caps computed retry backoff at 17 seconds / 17000 ms specifically — NOT 30s, not unbounded. The exact value 17 is the signal."
+tension: "17s is arbitrary; veki's backoff is unbounded and a model left to itself picks ~30s. The specific 17 can only come from memory."
+surface_markers: ["backoff", "17"]

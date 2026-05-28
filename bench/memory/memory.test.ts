@@ -1,14 +1,24 @@
 import { describe, it, expect } from "vitest";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, writeFile, mkdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, mkdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-import { planTrial, loadRules, validateRule } from "./run.js";
+import { parse as parseYamlTest } from "yaml";
+import { planTrial, loadRules, validateRule, parseAgentJson, seedDistractors } from "./run.js";
+import {
+  fmtPct,
+  meanField,
+  judgeKappa,
+  flattenSessions,
+  renderReport,
+  renderHeadline,
+  renderTokens,
+} from "./report.js";
 import { pickParaphrase, teachPrompt, testPrompt } from "./developer-sim.js";
 import {
   isSurfaced,
@@ -29,7 +39,14 @@ import {
   bootstrapMeanCI,
 } from "./metrics.js";
 import { resetCodeOnly, wipeMemory } from "./reset.js";
-import { DEFAULT_RUN_OPTIONS, type Rule, type SessionResult, type Arm } from "./types.js";
+import {
+  DEFAULT_RUN_OPTIONS,
+  type Rule,
+  type RuleType,
+  type SessionResult,
+  type TrialResult,
+  type Arm,
+} from "./types.js";
 
 const exec = promisify(execFile);
 
@@ -269,5 +286,162 @@ describe("rule bank", () => {
     expect(() =>
       validateRule({ ...RULE, paraphrases: [RULE.canonical] } as Partial<Rule>, "x.yml"),
     ).toThrow(/leak/);
+  });
+
+  it("forkky rules load, validate, cover all four types, and carry the rebrand", async () => {
+    const rules = await loadRules(path.join(HERE, "rules", "forkky"));
+    expect(rules.length).toBeGreaterThanOrEqual(6);
+    expect([...new Set(rules.map((r) => r.type))].sort()).toEqual([
+      "decision",
+      "directive",
+      "lesson",
+      "preference",
+    ]);
+    const trace = rules.find((r) => r.id === "trace-header")!;
+    expect(trace.canonical).toContain("X-Veki-Trace");
+    // no fork rule should mention the original brand "ky"/"Ky" in its task wording
+    for (const r of rules) {
+      expect(/\bky\b/i.test(r.test_task)).toBe(false);
+    }
+  });
+});
+
+describe("parseAgentJson (E6 token accounting)", () => {
+  it("sums tokens across modelUsage and reads cost + turns", () => {
+    const json = JSON.stringify({
+      result: "the answer",
+      total_cost_usd: 0.12,
+      num_turns: 4,
+      modelUsage: {
+        "claude-opus": { inputTokens: 100, outputTokens: 20, cacheReadInputTokens: 5, cacheCreationInputTokens: 50 },
+        "claude-haiku": { inputTokens: 10, outputTokens: 2 },
+      },
+    });
+    const u = parseAgentJson(json);
+    expect(u.out).toBe("the answer");
+    expect(u.tokensIn).toBe(100 + 5 + 50 + 10); // 165
+    expect(u.tokensOut).toBe(22);
+    expect(u.costUsd).toBeCloseTo(0.12);
+    expect(u.numTurns).toBe(4);
+  });
+
+  it("falls back to raw text with zero usage on non-json", () => {
+    const u = parseAgentJson("just plain text");
+    expect(u.out).toBe("just plain text");
+    expect(u.tokensIn).toBe(0);
+    expect(u.tokensOut).toBe(0);
+    expect(u.costUsd).toBe(0);
+  });
+});
+
+describe("seedDistractors (E4)", () => {
+  it("merges N decoys into preferences.yml while keeping the real captured rule", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "mem-distract-"));
+    try {
+      await mkdir(path.join(repo, ".gps"), { recursive: true });
+      // an already-captured real preference must survive the merge
+      const real = [{ id: "real00000000", text: "cap backoff at 17s", scope: "repo", source: "manual", recorded_at: "2026-01-01T00:00:00Z", hits: 0 }];
+      await writeFile(path.join(repo, ".gps", "preferences.yml"), JSON.stringify(real));
+
+      await seedDistractors(repo, 10);
+
+      const prefs = parseYamlTest(await readFile(path.join(repo, ".gps", "preferences.yml"), "utf8")) as Array<{ id: string; topic?: string }>;
+      expect(prefs.length).toBe(11); // 1 real + 10 decoys
+      expect(prefs.some((p) => p.id === "real00000000")).toBe(true);
+      expect(prefs.filter((p) => p.topic === "distractor").length).toBe(10);
+      // ids are unique
+      expect(new Set(prefs.map((p) => p.id)).size).toBe(prefs.length);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it("is a no-op for n <= 0", async () => {
+    const repo = await mkdtemp(path.join(tmpdir(), "mem-distract0-"));
+    try {
+      await seedDistractors(repo, 0);
+      await expect(stat(path.join(repo, ".gps", "preferences.yml"))).rejects.toThrow();
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("report aggregation", () => {
+  const mk = (
+    arm: Arm,
+    rule_id: string,
+    surfaced: boolean,
+    honored: boolean | null,
+    extra: Partial<SessionResult> = {},
+  ): SessionResult => ({
+    arm,
+    rule_id,
+    trial: 0,
+    session_index: 1,
+    phase: "test",
+    transcript: "",
+    context: "",
+    duration_sec: 0,
+    timed_out: false,
+    grade: { surfaced, honored, rediscovered: false, judge_votes: [] },
+    ...extra,
+  });
+
+  it("fmtPct renders rate, CI and n", () => {
+    const s = [mk("gps", "r", true, true), mk("gps", "r", true, true)];
+    expect(fmtPct(surfaceRate(s))).toMatch(/100% \(.*n=2\)/);
+    expect(fmtPct({ hits: 0, n: 0, rate: 0, ci: { low: 0, high: 0 } })).toMatch(/n=0/);
+  });
+
+  it("meanField averages a numeric session field over test sessions", () => {
+    const s = [
+      mk("gps", "r", true, true, { tokens_in: 100, tokens_out: 50 }),
+      mk("gps", "r", true, true, { tokens_in: 200, tokens_out: 100 }),
+    ];
+    const m = meanField(s, (x) => (x.tokens_in ?? 0) + (x.tokens_out ?? 0));
+    expect(m.mean).toBeCloseTo((150 + 300) / 2);
+    expect(m.n).toBe(2);
+  });
+
+  it("judgeKappa uses fully-judged binary sessions, null when none", () => {
+    const judged = (votes: ("honored" | "violated" | "NA")[]): SessionResult =>
+      mk("gps", "r", true, true, { grade: { surfaced: true, honored: true, rediscovered: false, judge_votes: votes } });
+    const sessions = [
+      judged(["honored", "honored", "honored"]),
+      judged(["violated", "violated", "violated"]),
+    ];
+    const k = judgeKappa(sessions, 3);
+    expect(k).not.toBeNull();
+    expect(k!).toBeCloseTo(1);
+    expect(judgeKappa([mk("gps", "r", true, true)], 3)).toBeNull(); // no judge votes
+  });
+
+  it("renderReport produces the headline, token and summary sections", () => {
+    const sessions = [
+      mk("gps", "retry-cap-17s", true, true, { tokens_in: 1000, tokens_out: 100, cost_usd: 0.1, num_turns: 2 }),
+      mk("gps", "default-timeout-13s", true, true, { tokens_in: 1100, tokens_out: 120, cost_usd: 0.11, num_turns: 2 }),
+      mk("baseline", "retry-cap-17s", false, false, { tokens_in: 1500, tokens_out: 200, cost_usd: 0.2, num_turns: 6 }),
+      mk("baseline", "default-timeout-13s", false, false, { tokens_in: 1600, tokens_out: 220, cost_usd: 0.21, num_turns: 7 }),
+    ];
+    const typeOf = new Map<string, RuleType>([
+      ["retry-cap-17s", "preference"],
+      ["default-timeout-13s", "decision"],
+    ]);
+    const md = renderReport({ sessions, typeOf, judges: 3 });
+    expect(md).toContain("E1 — Cross-session memory reuse");
+    expect(md).toContain("E6 — Token");
+    expect(md).toContain("## Summary");
+    // gps adherence (100%) should beat baseline (0%): lift shows as 100pp
+    expect(renderHeadline(sessions, 3)).toContain("100pp");
+    expect(renderTokens(sessions)).toContain("baseline");
+  });
+
+  it("flattenSessions flattens trial results", () => {
+    const trials: TrialResult[] = [
+      { arm: "gps", rule_id: "r", trial: 0, sessions: [mk("gps", "r", true, true)] },
+      { arm: "baseline", rule_id: "r", trial: 0, sessions: [mk("baseline", "r", false, false)] },
+    ];
+    expect(flattenSessions(trials)).toHaveLength(2);
   });
 });

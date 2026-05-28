@@ -1,5 +1,5 @@
 import path from "node:path";
-import { realpathSync } from "node:fs";
+import { accessSync, constants, realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -157,12 +157,24 @@ function normalizePyTarget(p: string): string {
  */
 export function findPyrightLangserver(override?: string): string | undefined {
   if (override) return override;
-  const cmd = process.platform === "win32" ? "where" : "command";
-  const args = process.platform === "win32" ? ["pyright-langserver"] : ["-v", "pyright-langserver"];
-  const r = spawnSync(cmd, args, { encoding: "utf8", shell: true });
-  if (r.status !== 0) return undefined;
-  const found = r.stdout.split(/\r?\n/).find((l) => l.trim());
-  return found?.trim();
+  if (process.platform === "win32") {
+    const r = spawnSync("where", ["pyright-langserver"], { encoding: "utf8" });
+    if (r.status !== 0) return undefined;
+    const found = r.stdout.split(/\r?\n/).find((l) => l.trim());
+    return found?.trim();
+  }
+
+  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (!dir) continue;
+    const candidate = path.join(dir, "pyright-langserver");
+    try {
+      accessSync(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep scanning PATH.
+    }
+  }
+  return undefined;
 }
 
 interface CallSite {

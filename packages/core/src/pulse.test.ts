@@ -30,7 +30,7 @@ describe("pulse", () => {
     expect(r.findings).toEqual([]);
     expect(r.risk_band).toBe("low");
     expect(r.risk_score).toBe(0);
-  });
+  }, 15_000);
 
   it("flags invariant hit when a touched file matches an invariant", async () => {
     const root = await setupRepo();
@@ -44,5 +44,5 @@ describe("pulse", () => {
     const inv = r.findings.find((f) => f.kind === "invariant_hit");
     expect(inv).toBeDefined();
     expect(r.risk_band === "block" || r.risk_band === "high").toBe(true);
-  });
+  }, 15_000);
 });

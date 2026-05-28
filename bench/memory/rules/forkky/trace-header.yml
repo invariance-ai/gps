@@ -1,0 +1,13 @@
+id: trace-header
+type: preference
+canonical: "Attach an `X-Veki-Trace: 1` header to every outgoing request by default."
+paraphrases:
+  - "from now on stamp every request with an X-Veki-Trace: 1 header"
+  - "we always send the X-Veki-Trace header set to 1 on outbound calls"
+  - "default in a trace header named X-Veki-Trace with value 1 on all requests"
+test_task: "Propose any default headers veki should attach to outgoing requests and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "The proposal adds an `X-Veki-Trace: 1` header by default. The fabricated header name X-Veki-Trace is the signal; generic headers (User-Agent, Accept) do not count."
+tension: "X-Veki-Trace is a fabricated, repo-specific header no model proposes unprompted; only memory supplies it."
+surface_markers: ["X-Veki-Trace"]

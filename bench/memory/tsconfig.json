@@ -4,5 +4,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts"],
+  "exclude": ["fixtures", "results"]
 }

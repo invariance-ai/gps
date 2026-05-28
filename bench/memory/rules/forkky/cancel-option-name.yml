@@ -1,0 +1,14 @@
+id: cancel-option-name
+type: directive
+symbol: signal
+canonical: "Expose request cancellation through an option named `cancelToken`, not `signal`."
+paraphrases:
+  - "wire up cancellation under a cancelToken option, not the usual signal name"
+  - "the public cancel knob should be called cancelToken in this repo"
+  - "don't call it signal — our cancellation option is named cancelToken"
+test_task: "Describe how request cancellation should be exposed in veki's public API and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "The proposed public option is named `cancelToken`. Naming it `signal`/`AbortSignal` (the web standard) violates the rule — the arbitrary name cancelToken is the signal."
+tension: "Every model names the option `signal` (the web standard). `cancelToken` is an arbitrary repo convention only memory would supply."
+surface_markers: ["cancelToken"]

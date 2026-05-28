@@ -18,6 +18,7 @@
     "bench:memory": "tsx bench/memory/run.ts",
     "bench:memory:plan": "tsx bench/memory/run.ts --plan-only --rules bench/memory/rules/ky",
     "bench:memory:test": "vitest run bench/memory",
+    "bench:memory:report": "tsx bench/memory/report.ts",
     "bench:memory:openai": "tsx bench/memory-loop/run-openai.ts",
     "perf:check": "tsx bench/perf/compare-thresholds.ts --baseline bench/baselines/perf-self.json --current bench/perf/results/current.json",
     "verify:check": "tsx bench/perf/compare-verify.ts --baseline bench/baselines/verify-index-self.json --current bench/perf/results/verify-current.json",

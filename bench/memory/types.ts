@@ -68,6 +68,17 @@ export interface SessionResult {
   grade?: SessionGrade;
   duration_sec: number;
   timed_out: boolean;
+  /**
+   * Honest end-to-end usage for this session, parsed from `claude -p --output-format json`.
+   * Cumulative across all turns/sub-models (summed from `modelUsage`), so the baseline's own
+   * exploration (greps/file reads to rediscover the rule) is counted — not just the final prompt.
+   * Zero when the agent command does not emit json usage. (E6 token accounting.)
+   */
+  tokens_in?: number;
+  tokens_out?: number;
+  cost_usd?: number;
+  /** Turns the agent took — a proxy for exploration effort (baseline rediscovers, so does more). */
+  num_turns?: number;
 }
 
 export interface TrialResult {
@@ -107,6 +118,17 @@ export interface RunOptions {
   timeoutSec: number;
   /** Number of blind judges in the adherence panel. */
   judges: number;
+  /**
+   * E4: number of synthetic decoy artifacts seeded into `.gps/` after teach+approve, before the
+   * test sessions, to test whether recall still surfaces the RIGHT rule as memory grows. Only the
+   * gps/unapproved arms (which have a `.gps/`) are affected; 0 = off.
+   */
+  distractors: number;
+  /**
+   * E6: request `--output-format json` from the agent so per-session token/cost usage is captured.
+   * Off keeps the legacy plain-text transcript path.
+   */
+  captureTokens: boolean;
 }
 
 export const DEFAULT_RUN_OPTIONS: RunOptions = {
@@ -116,4 +138,6 @@ export const DEFAULT_RUN_OPTIONS: RunOptions = {
   agentCommand: "claude -p",
   timeoutSec: 300,
   judges: 3,
+  distractors: 0,
+  captureTokens: false,
 };

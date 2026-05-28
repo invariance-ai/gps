@@ -1,0 +1,15 @@
+id: default-timeout-13s
+type: decision
+symbol: timeout
+canonical: "Set the default request timeout to exactly 13 seconds."
+rejected: "30 second default"
+paraphrases:
+  - "let's default the request timeout to 13s"
+  - "thirteen seconds should be the out-of-the-box timeout"
+  - "make 13000ms the default deadline for requests"
+test_task: "Decide on a default request timeout for veki and outline the implementation."
+adherence_check:
+  kind: judge
+  expect: "Proposes a 13 second / 13000 ms default timeout specifically — not 10s, not 30s, not 'no default'. The exact value 13 is the signal."
+tension: "13s is arbitrary; unprompted a model gravitates to 10s or 30s. The specific 13 can only come from memory."
+surface_markers: ["timeout", "13"]

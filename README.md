@@ -102,6 +102,8 @@ Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-
 
 Launching or evaluating the project? [`docs/launch-audit.md`](docs/launch-audit.md) has the MVP bar, benchmark claims that are safe to cite, X thread beats, and the npm smoke checklist. [`docs/product-hunt.md`](docs/product-hunt.md) has launch copy.
 
+Security/privacy review? [`SECURITY.md`](SECURITY.md) documents what GPS stores, what hooks/MCP can run, observation-mode boundaries, and how to disable integrations.
+
 ## Capture & promotion policy
 
 Every installer (`claude` / `codex` / `cursor`) takes governance flags that persist to `.gps/config.yml`:

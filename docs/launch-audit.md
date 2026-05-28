@@ -25,7 +25,7 @@ gps done
 
 | Area | Current status | Launch bar |
 |---|---|---|
-| npm install | Working package build and `npm pack --dry-run` for `@invariance/gps` | Publish all workspace packages in dependency order; verify `npx -y @invariance/gps --help` from a clean temp repo |
+| npm install | Working package build and `npm pack --dry-run` for `@invariance/gps` | Publish all workspace packages in dependency order; verify packed install for Claude/Codex/Cursor and `npx -y @invariance/gps@latest --help` from a clean temp repo after publish |
 | Claude Code | Skill, hooks, MCP server, CLAUDE.md block | `install claude --dry-run`, `install claude`, then verify `.claude/settings.json`, `.mcp.json`, and `CLAUDE.md` |
 | Codex CLI | AGENTS.md, notify hook, MCP server | Verify `.codex/config.toml` has top-level `notify` and `mcp_servers.gps` |
 | Cursor | Always-attached rule plus MCP server | Verify `.cursor/rules/gps.mdc` and `.cursor/mcp.json` |
@@ -108,6 +108,21 @@ pnpm -r typecheck
 pnpm -r test
 pnpm smoke:pack
 pnpm release:check
+```
+
+`pnpm smoke:pack` installs the packed workspace tarballs into clean temporary
+repos and verifies Claude-only, Codex-only, Cursor-only, and all-agent setup.
+After publishing, run one public-registry check so npm `latest` is not stale:
+
+```bash
+tmp="$(mktemp -d)"
+git init -q "$tmp"
+printf 'export function hello() { return "hi"; }\n' > "$tmp/hello.ts"
+npx -y @invariance/gps@latest setup --yes --with-codex --root "$tmp"
+npx -y @invariance/gps@latest doctor --json --root "$tmp"
+test -f "$tmp/AGENTS.md"
+test -f "$tmp/.codex/config.toml"
+test ! -e "$tmp/CLAUDE.md"
 ```
 
 When iterating on the doc/review feature specifically, use the narrow checks first:

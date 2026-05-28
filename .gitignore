@@ -15,3 +15,6 @@ coverage/
 # Local artifacts that must never be committed
 launch-video/
 bench/**/results/
+# Generated benchmark fixtures (reproducible: ky clone + make-fork.sh rebrand)
+bench/memory/fixtures/ky*/
+bench/memory/fixtures/forkky/

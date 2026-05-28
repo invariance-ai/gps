@@ -11,9 +11,10 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createHash } from "node:crypto";
 import { readFile, readdir, writeFile, rm, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { parseShellArgs, GPS_MCP_CONFIG } from "@invariance/gps-core";
 import {
   type Arm,
@@ -26,7 +27,7 @@ import {
   DEFAULT_RUN_OPTIONS,
 } from "./types.js";
 import { pickParaphrase, teachPrompt, testPrompt } from "./developer-sim.js";
-import { gradeSession, defaultJudge, isClaudeAvailable, type JudgeFn } from "./grader.js";
+import { gradeSession, defaultJudge, isClaudeAvailable, surfaceMarkers, type JudgeFn } from "./grader.js";
 import { resetCodeOnly, wipeMemory, resetAll } from "./reset.js";
 
 const exec = promisify(execFile);
@@ -130,6 +131,137 @@ export function validateRule(r: Partial<Rule>, source: string): asserts r is Rul
   if (r.type === "decision" && !r.rejected) throw new Error(`${r.id}: decision rules need a rejected alternative`);
 }
 
+// ───────────────────────── token accounting (E6) ─────────────────────────
+
+export interface AgentUsage {
+  out: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  numTurns: number;
+}
+
+/**
+ * Parse `claude -p --output-format json`. Token counts are summed across `modelUsage` (every
+ * model + sub-agent the session used) so the total is CUMULATIVE over all turns — the baseline's
+ * own exploration to rediscover the rule is therefore counted, not just the final prompt. Falls
+ * back to treating the raw text as the transcript with zero usage when it isn't json.
+ */
+export function parseAgentJson(stdout: string): AgentUsage {
+  const trimmed = stdout.trim();
+  try {
+    const obj = JSON.parse(trimmed) as {
+      result?: string;
+      total_cost_usd?: number;
+      num_turns?: number;
+      modelUsage?: Record<
+        string,
+        {
+          inputTokens?: number;
+          outputTokens?: number;
+          cacheReadInputTokens?: number;
+          cacheCreationInputTokens?: number;
+        }
+      >;
+    };
+    let tokensIn = 0;
+    let tokensOut = 0;
+    for (const u of Object.values(obj.modelUsage ?? {})) {
+      tokensIn += (u.inputTokens ?? 0) + (u.cacheReadInputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0);
+      tokensOut += u.outputTokens ?? 0;
+    }
+    return {
+      out: obj.result ?? trimmed,
+      tokensIn,
+      tokensOut,
+      costUsd: obj.total_cost_usd ?? 0,
+      numTurns: obj.num_turns ?? 0,
+    };
+  } catch {
+    return { out: stdout, tokensIn: 0, tokensOut: 0, costUsd: 0, numTurns: 0 };
+  }
+}
+
+// ───────────────────────── distractor seeding (E4) ─────────────────────────
+
+/** A pool of plausible-but-unrelated repo preferences used to grow memory with noise. */
+const DISTRACTOR_POOL: string[] = [
+  "prefer named exports over default exports across the codebase",
+  "log timing for any operation that exceeds 200 milliseconds",
+  "keep public functions under 40 lines where practical",
+  "use ISO 8601 strings for all serialized timestamps",
+  "validate external input with zod at module boundaries",
+  "avoid abbreviations in identifiers except well-known ones like id and url",
+  "co-locate unit tests next to the file they cover",
+  "prefer async/await over raw promise chains",
+  "wrap third-party clients behind a thin internal adapter",
+  "use kebab-case for new file names",
+  "emit structured json logs rather than free-form strings",
+  "guard every network call with an explicit timeout",
+  "keep configuration in one typed module, never scattered env reads",
+  "prefer composition over inheritance for new abstractions",
+  "document non-obvious invariants with a short comment, nothing more",
+  "use UTC everywhere internally and convert only at the edges",
+  "fail fast on programmer error, recover only at system boundaries",
+  "batch database writes when more than five rows change at once",
+  "never swallow errors silently; rethrow or log with context",
+  "prefer Map over plain objects for dynamic keyed collections",
+  "keep CLI flags long-form in scripts for readability",
+  "memoize pure functions that are hot on the render path",
+  "use early returns to keep nesting shallow",
+  "treat warnings as errors in CI builds",
+  "prefer immutable updates over in-place mutation of shared state",
+  "name booleans with an is/has/should prefix",
+  "keep PR descriptions focused on the why, not the what",
+  "pin exact versions for build-critical dependencies",
+  "prefer streaming over buffering for large payloads",
+  "centralize retry policy instead of re-implementing per call site",
+];
+
+function distractorId(text: string): string {
+  return createHash("sha1").update(text.trim().toLowerCase()).digest("hex").slice(0, 12);
+}
+
+/**
+ * Seed N synthetic approved preferences into `.gps/preferences.yml`, MERGING with whatever the
+ * teach step already captured (the real rule must survive). Only meaningful when the arm has a
+ * `.gps/` at all. Writes valid Preference records (source: manual = approved-equivalent).
+ */
+export async function seedDistractors(repo: string, n: number): Promise<void> {
+  if (n <= 0) return;
+  const file = path.join(repo, ".gps", "preferences.yml");
+  let existing: unknown[] = [];
+  try {
+    const parsed = parseYaml(await readFile(file, "utf8"));
+    if (Array.isArray(parsed)) existing = parsed;
+  } catch {
+    /* no preferences yet — the merge just becomes the distractor list */
+  }
+  const now = new Date().toISOString();
+  const seen = new Set(
+    existing.map((p) => (p as { id?: string }).id).filter((id): id is string => typeof id === "string"),
+  );
+  for (let i = 0; i < n; i++) {
+    const text = DISTRACTOR_POOL[i % DISTRACTOR_POOL.length]!;
+    // Disambiguate once the pool wraps so ids stay unique and the count is honest.
+    const unique = i < DISTRACTOR_POOL.length ? text : `${text} (variant ${Math.floor(i / DISTRACTOR_POOL.length)})`;
+    const id = distractorId(unique);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    existing.push({
+      id,
+      text: unique,
+      scope: "repo",
+      topic: "distractor",
+      source: "manual",
+      recorded_at: now,
+      hits: 0,
+    });
+  }
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, stringifyYaml(existing));
+}
+
 // ───────────────────────── live execution (operator-run) ─────────────────────────
 
 async function setMcp(repo: string, enabled: boolean): Promise<void> {
@@ -138,32 +270,60 @@ async function setMcp(repo: string, enabled: boolean): Promise<void> {
   else await rm(file, { force: true });
 }
 
-/** Best-effort capture of the gps context the agent would have seen (for Surface %). */
-async function captureContext(repo: string, mcpEnabled: boolean): Promise<string> {
+/**
+ * Best-effort capture of the gps context the agent would have seen this session (for Surface %).
+ * Concatenates `prime` (standing context), `preferences`, and a topic `recall` over the rule's
+ * surface markers — so a rule that landed as a note/decision/lesson (not just a preference) can
+ * still be detected as surfaced. Each query is independent best-effort; failures are skipped.
+ */
+async function captureContext(repo: string, mcpEnabled: boolean, rule: Rule): Promise<string> {
   if (!mcpEnabled) return "";
-  try {
-    const { stdout } = await exec("gps", ["preferences", "--root", repo, "--markdown"], {
-      timeout: 30_000,
-    });
-    return stdout;
-  } catch {
-    return "";
+  const query = surfaceMarkers(rule).join(" ") || rule.canonical;
+  const probes: string[][] = [
+    ["prime", "--root", repo],
+    ["preferences", "--root", repo, "--markdown"],
+    ["recall", query, "--root", repo],
+  ];
+  const parts: string[] = [];
+  for (const args of probes) {
+    try {
+      const { stdout } = await exec("gps", args, { timeout: 30_000 });
+      parts.push(stdout);
+    } catch {
+      /* command unavailable / nothing to show — skip */
+    }
   }
+  return parts.join("\n");
 }
 
-async function runAgent(repo: string, command: string, prompt: string, timeoutSec: number): Promise<{ out: string; timedOut: boolean }> {
+interface AgentRun extends AgentUsage {
+  timedOut: boolean;
+}
+
+async function runAgent(
+  repo: string,
+  command: string,
+  prompt: string,
+  timeoutSec: number,
+  captureTokens: boolean,
+): Promise<AgentRun> {
   const [bin, ...args] = parseShellArgs(command);
   if (!bin) throw new Error(`empty agent command: ${command}`);
+  // E6: request json so per-session usage (cumulative tokens + cost + turns) is recoverable.
+  const finalArgs = captureTokens ? [...args, "--output-format", "json", prompt] : [...args, prompt];
+  const noUsage = { tokensIn: 0, tokensOut: 0, costUsd: 0, numTurns: 0 };
   try {
-    const { stdout } = await exec(bin, [...args, prompt], {
+    const { stdout } = await exec(bin, finalArgs, {
       cwd: repo,
       timeout: timeoutSec * 1000,
       maxBuffer: 32 * 1024 * 1024,
     });
-    return { out: stdout, timedOut: false };
+    if (captureTokens) return { ...parseAgentJson(stdout), timedOut: false };
+    return { out: stdout, ...noUsage, timedOut: false };
   } catch (err) {
     const e = err as { stdout?: string; killed?: boolean };
-    return { out: e.stdout ?? "", timedOut: e.killed === true };
+    if (captureTokens) return { ...parseAgentJson(e.stdout ?? ""), timedOut: e.killed === true };
+    return { out: e.stdout ?? "", ...noUsage, timedOut: e.killed === true };
   }
 }
 
@@ -215,15 +375,18 @@ export async function runTrial(
           /* nothing queued / inbox unavailable — best effort */
         }
       }
+      // E4: grow memory with decoys AFTER approval but BEFORE the fresh test sessions, so the
+      // test measures whether recall still surfaces the right rule among the noise.
+      if (opts.distractors > 0) await seedDistractors(repo, opts.distractors);
       continue;
     }
 
     if (step.memoryWiped) await wipeMemory(repo);
     await setMcp(repo, step.mcpEnabled);
     const t0 = Date.now();
-    const { out, timedOut } = await runAgent(repo, opts.agentCommand, step.prompt!, opts.timeoutSec);
+    const run = await runAgent(repo, opts.agentCommand, step.prompt!, opts.timeoutSec, opts.captureTokens);
     const duration = (Date.now() - t0) / 1000;
-    const context = step.phase === "test" ? await captureContext(repo, step.mcpEnabled) : "";
+    const context = step.phase === "test" ? await captureContext(repo, step.mcpEnabled, rule) : "";
 
     const session: SessionResult = {
       arm,
@@ -231,16 +394,20 @@ export async function runTrial(
       trial,
       session_index: step.session_index,
       phase: step.phase,
-      transcript: out,
+      transcript: run.out,
       context,
       duration_sec: duration,
-      timed_out: timedOut,
+      timed_out: run.timedOut,
+      tokens_in: run.tokensIn,
+      tokens_out: run.tokensOut,
+      cost_usd: run.costUsd,
+      num_turns: run.numTurns,
     };
     if (step.phase === "test") {
       session.grade = await gradeSession({
         rule,
         repo,
-        transcript: out,
+        transcript: run.out,
         context: step.ruleInjected ? rule.canonical + "\n" + context : context,
         judges: opts.judges,
         judge,
@@ -262,6 +429,9 @@ interface CliArgs {
   arms: Arm[];
   planOnly: boolean;
   out: string;
+  distractors: number;
+  captureTokens: boolean;
+  judges: number;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -278,6 +448,9 @@ function parseArgs(argv: string[]): CliArgs {
     arms: armsRaw ? (armsRaw.split(",") as Arm[]) : [...ALL_ARMS],
     planOnly: argv.includes("--plan-only"),
     out: get("--out", `bench/memory/results/${new Date().toISOString().slice(0, 10)}`)!,
+    distractors: Number(get("--distractors", "0")),
+    captureTokens: argv.includes("--capture-tokens"),
+    judges: Number(get("--judges", String(DEFAULT_RUN_OPTIONS.judges))),
   };
 }
 
@@ -310,6 +483,9 @@ async function main(): Promise<void> {
     trials: args.trials,
     testSessions: args.sessions,
     arms: args.arms,
+    distractors: args.distractors,
+    captureTokens: args.captureTokens,
+    judges: args.judges,
   };
   const rules = await loadRules(args.rulesDir);
   console.error(`loaded ${rules.length} rule(s) from ${args.rulesDir}; arms: ${args.arms.join(", ")}`);

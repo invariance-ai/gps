@@ -1,6 +1,6 @@
 {
   "name": "@invariance/gps-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "MCP server for gps — exposes get_context/impact_of/tests_for/invariants_for/prepare_edit to coding agents.",
   "license": "MIT",
   "type": "module",

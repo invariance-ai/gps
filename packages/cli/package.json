@@ -1,6 +1,6 @@
 {
   "name": "@invariance/gps",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "gps CLI — codebase context for coding agents.",
   "license": "MIT",
   "type": "module",
