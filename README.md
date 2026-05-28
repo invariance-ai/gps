@@ -11,6 +11,8 @@ npx -y @invariance/gps setup --yes --with-claude   # or --with-codex
 
 That's it. `setup` initializes `.gps/`, builds the first symbol graph, lifts existing TODO/FIXME comments into notes, and wires your agent. Every non-trivial edit can start with a GPS brief: callers, likely tests, relevant invariants, prior decisions, notes from past edits, and preferences you have taught the agent. At turn end, supported integrations can capture durable lessons back into the memory layer.
 
+> **Pairs with [tars](https://github.com/invariance-ai/tars).** gps gives your agent memory of *your code*; [tars](https://github.com/invariance-ai/tars) teaches it *how to work* — it learns the orchestration method from your cleanest sessions (explore before editing, test before done) and feeds it back on the next prompt. Knowledge + method.
+
 ## vs. native Claude Code memory
 
 | | Claude Code native | gps |
