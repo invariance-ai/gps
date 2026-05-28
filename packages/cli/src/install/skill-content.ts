@@ -102,6 +102,40 @@ Use reminders for unfinished work, follow-up checks, or anything the next agent/
 **Aliases tie names to locations.** A human name like "home" can be bound to a directory and a linked feature with \`gps alias set home --file src/pages/home.tsx --feature homepage\` (gps also auto-learns this binding when you edit files after \`gps feature use\`). Once bound, mentioning "home" in a prompt surfaces that directory's directives *and* the linked feature's notes.`;
 }
 
+/**
+ * Lean block appended to CLAUDE.md (Claude Code only).
+ *
+ * CLAUDE.md is loaded into *every* session, so it pays a standing token cost on
+ * each turn. Claude Code — unlike Codex/Cursor — also gets a separate on-demand
+ * `.claude/skills/gps/SKILL.md` plus lifecycle hooks that capture memory
+ * automatically. So the always-loaded block stays minimal: what gps is, the
+ * core loop, and a pointer. The full surface (lessons, decisions, reminders,
+ * features, directives, aliases) lives in the skill and `gps --help`, pulled in
+ * on demand rather than carried on every turn.
+ *
+ * Codex/Cursor keep the fuller `sharedBlock` because that block *is* their only
+ * instruction surface — they have no separate skill file to defer detail to.
+ */
+function leanClaudeBlock(): string {
+  return `${CLAUDE_INTRO}
+
+## The 30-second loop
+
+For any non-trivial edit:
+
+1. **\`gps find <keyword>\`** — before writing new code, check whether a helper already exists.
+2. **\`mcp__gps__prepare_edit { symbol, intent }\`** (or \`gps prepare <symbol> --intent "<plan>"\`) — a decision-ready brief: invariants, callers, tests, prior decisions, notes. Treat it like a code-search call you make *before* exploration, not after. \`--intent\` alone infers the symbol; pass the symbol when you know it.
+3. **\`mcp__gps__brief\`** (or \`gps brief\`) — before declaring done. Flags blocking invariants and changed symbols with no test coverage; exit code 1 only on a blocking invariant.
+
+Respect invariants marked \`block\`. The MCP tool and \`gps prepare\` return the same brief — use the MCP tool in Claude Code, the CLI elsewhere; never both.
+
+## Memory is mostly automatic
+
+Lifecycle hooks capture preferences, directives, decisions, and failures for you, so you rarely call gps by hand. Treat \`gps preferences\` output as soft constraints. When you learn a hard-won fact the next agent would otherwise re-discover (where a test/config/entrypoint lives, a non-obvious workflow), persist it with \`gps remember "<fact>"\`.
+
+The full surface — lessons, decisions, reminders, features, directives, aliases — lives in the gps skill (\`.claude/skills/gps/SKILL.md\`) and \`gps --help\`. Pull it in when you need it.`;
+}
+
 /** Wrap a body in the managed CLAUDE.md / AGENTS.md block markers. */
 function wrapAgentBlock(body: string): string {
   return `<!-- gps:start -->
@@ -112,8 +146,8 @@ ${body}
 `;
 }
 
-/** Block appended to CLAUDE.md (Claude Code). */
-export const CLAUDE_AGENT_INSTRUCTIONS = wrapAgentBlock(sharedBlock(CLAUDE_INTRO));
+/** Block appended to CLAUDE.md (Claude Code). Lean — see leanClaudeBlock. */
+export const CLAUDE_AGENT_INSTRUCTIONS = wrapAgentBlock(leanClaudeBlock());
 
 /** Block appended to AGENTS.md (Codex CLI). */
 export const CODEX_AGENT_INSTRUCTIONS = wrapAgentBlock(sharedBlock(CODEX_INTRO));
@@ -205,6 +239,30 @@ save that finding with \`gps remember\` before you finish. If \`gps done\` or \`
 prints an agent-friction candidate — or the MCP \`brief\` tool returns \`memory_suggestions\` —
 run its \`remember_command\` unless the suggested fact is obvious or incorrect. Future agents
 should not repeat the same search.
+
+## Preferences and lessons
+
+Durable user instructions ("from now on…", "always…", "i prefer…", "don't ever…") are captured
+by lifecycle hooks automatically; when you need to capture one explicitly, call the MCP tool
+\`record_preference\` (or \`gps prefer "<rule>"\`). Captures honor the repo's policy — under
+\`capture=inbox\` they queue for \`gps inbox approve <id>\` rather than going live, and the response
+says where it landed. \`gps lessons record\` auto-classifies scope (global → CLAUDE.md's managed
+block, scoped → \`.gps/notes/\`); if it picks wrong, \`gps lessons reclassify <id> --to global\`.
+
+## Reminders, directives, and aliases
+
+\`\`\`bash
+# Unfinished work the next agent/human must not miss:
+gps remember "still need to update the payer denial fixture" --reminder --symbol routeToPayer
+\`\`\`
+
+- **Location-scoped directives** — an instruction tied to a *place* rather than a symbol
+  ("don't do X here", "always Y in this folder"): call the MCP tool \`record_directive\` (or
+  \`gps directive add "<text>"\`). gps resolves "here"/"this" to the active directory and resurfaces
+  the rule whenever you grep/read/edit files there.
+- **Aliases** — bind a human name to a location/feature once:
+  \`gps alias set home --file src/pages/home.tsx --feature homepage\`. Mentioning "home" in a prompt
+  then surfaces that directory's directives and the linked feature's notes.
 `;
 
 /**
