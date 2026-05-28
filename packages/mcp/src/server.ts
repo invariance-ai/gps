@@ -61,6 +61,7 @@ import {
   ALL_SOURCE_GLOBS,
   validateKnowledge,
   brief,
+  hardSearchSuggestionsForActiveSession,
   pruneNotes,
   resume,
 } from "@invariance/gps-core";
@@ -484,7 +485,11 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "brief": {
       const a = args as { base?: string; max_symbols?: number };
-      return brief(root, { base: a.base, max_symbols: a.max_symbols });
+      const result = await brief(root, { base: a.base, max_symbols: a.max_symbols });
+      // Surface the agent-friction "remember candidate" to MCP-only agents
+      // (e.g. Cursor) that never see the CLI `gps done` / `gps suggest` output.
+      const memory_suggestions = await hardSearchSuggestionsForActiveSession(root);
+      return { ...result, memory_suggestions };
     }
     case "seed_propose": {
       const a = args as { tier?: "safe" | "medium" | "aggressive"; limit?: number };
