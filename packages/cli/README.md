@@ -34,7 +34,7 @@ gps install claude --auto-suggest          # hook-safe authoring queue nudges; n
 gps setup --yes --with-claude                         # init + index + TODO lift + Claude wiring
 gps prepare <symbol> --intent "<one-liner>"           # decision-ready brief before edits
 gps remember "<one sentence>"                         # save hard-won repo facts
-gps done                                              # post-edit self-audit
+gps done                                              # post-edit self-audit + memory nudges
 ```
 
 ## Full reference
@@ -59,7 +59,7 @@ gps decisions <symbol>                                # choices recorded, with r
 # Server (MCP)
 gps serve                                             # MCP stdio server
 gps serve --observe                                   # opt-in: record per-symbol query counts only
-gps suggest                                           # surface symbols agents touch with no invariant
+gps suggest                                           # hot symbols, near-promotions, wasted-search memory nudges
 gps suggest --auto                                    # no-op unless auto_suggest=true
 ```
 
