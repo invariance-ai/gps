@@ -898,7 +898,7 @@ install claude [options]
 - `--force` — Overwrite existing gps-managed Claude files
 - `--skip-claude-md` — Do not append gps instructions to CLAUDE.md
 - `--use-global` — Generate hooks that call `gps` directly (requires global install)
-- `--use-local` — Generate hooks that call this CLI by absolute path (for dogfood/dev)
+- `--use-local` — Generate hooks that call this CLI by repo-relative path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
@@ -918,7 +918,7 @@ install codex [options]
 - `--force` — Overwrite existing gps-managed Codex files
 - `--skip-agents-md` — Do not append gps instructions to AGENTS.md
 - `--use-global` — Configure Codex to call `gps` directly (requires global install)
-- `--use-local` — Configure Codex to call this CLI by absolute path (for dogfood/dev)
+- `--use-local` — Configure Codex to call this CLI by repo-relative path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
@@ -938,7 +938,7 @@ install cursor [options]
 - `--force` — Overwrite existing gps-managed Cursor files
 - `--skip-mcp` — Do not write .cursor/mcp.json (rule file only)
 - `--use-global` — Configure MCP to call `gps` directly (requires global install)
-- `--use-local` — Configure MCP to call this CLI by absolute path (for dogfood/dev)
+- `--use-local` — Configure MCP to call this CLI by repo-relative path (for dogfood/dev)
 - `--dry-run` — Show what would be written without touching disk
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)

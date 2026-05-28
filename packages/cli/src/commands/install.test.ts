@@ -26,34 +26,57 @@ describe("resolveCmd", () => {
     expect(() => resolveCmd({ useLocal: true })).toThrow(/pnpm -r build/);
   });
 
-  it("respects CI=1 → default to npx mode regardless of workspace detection", () => {
+  it("defaults to npx mode with no flags (portable, no absolute path)", () => {
+    // npx is the only mode safe to commit: a published package reference, never
+    // a machine-specific path. This is the default regardless of where gps runs
+    // from — there is no longer a silent workspace→local auto-detect.
+    const spec = resolveCmd({});
+    expect(spec.mode).toBe("npx");
+    expect(spec.command).toBe("npx");
+    expect(spec.baseArgs).toEqual(["-y", "@invariance/gps"]);
+    expect(spec.shell).toBe("npx -y @invariance/gps");
+  });
+
+  it("ignores CI and an explicit root when defaulting to npx", () => {
+    // The default no longer keys off process.env.CI or workspace detection, and
+    // the root arg only matters for --use-local's relative path.
     const prev = process.env.CI;
-    process.env.CI = "1";
+    delete process.env.CI;
     try {
-      const spec = resolveCmd({});
-      expect(spec.mode).toBe("npx");
-      expect(spec.command).toBe("npx");
-      expect(spec.baseArgs).toEqual(["-y", "@invariance/gps"]);
-      expect(spec.shell).toBe("npx -y @invariance/gps");
+      expect(resolveCmd({}).mode).toBe("npx");
+      expect(resolveCmd({}, "/any/root").mode).toBe("npx");
+      process.env.CI = "1";
+      expect(resolveCmd({}).mode).toBe("npx");
     } finally {
       if (prev === undefined) delete process.env.CI;
       else process.env.CI = prev;
     }
   });
+});
 
-  it("falls back to npx in dev (no built dist to detect) when no flags given", () => {
-    const prev = process.env.CI;
-    delete process.env.CI;
-    try {
-      // Under vitest the running script is .ts, so workspace auto-detect can't
-      // resolve a built bin and we land on the npx default. Once dist exists
-      // and is outside node_modules, auto-detect would pick local instead.
-      const spec = resolveCmd({});
-      expect(spec.mode).toBe("npx");
-    } finally {
-      if (prev !== undefined) process.env.CI = prev;
-    }
-  });
+// Regression guard for the footgun this fixes: the generated, committed config
+// (.claude/settings.json + .mcp.json) must never embed an absolute, machine-
+// specific path. Default and --use-global modes are the only ones meant to be
+// committed, so both must stay path-free.
+describe("install claude: generated config is portable (no absolute paths)", () => {
+  const ABSOLUTE_PATH = /(?:^|["\s])(?:\/[^"\s]+|[A-Za-z]:\\)/m;
+
+  for (const spec of [resolveCmd({}), resolveCmd({ useGlobal: true })]) {
+    it(`${spec.mode} mode embeds no absolute path in settings.json or .mcp.json`, async () => {
+      const root = await mkdtemp(path.join(tmpdir(), `gps-portable-${spec.mode}-`));
+      await runInstallClaude(root, { force: true, skipClaudeMd: true, spec });
+      const settings = await readFile(path.join(root, ".claude/settings.json"), "utf8");
+      const mcp = await readFile(path.join(root, ".mcp.json"), "utf8");
+      // The hook/MCP command is the portable reference, not a filesystem path.
+      expect(settings).toContain(spec.shell);
+      expect(mcp).toContain(spec.command);
+      expect(settings).not.toMatch(ABSOLUTE_PATH);
+      expect(mcp).not.toMatch(ABSOLUTE_PATH);
+      // Belt-and-suspenders: no dist entrypoint leaked in either file.
+      expect(settings).not.toContain("dist/index.js");
+      expect(mcp).not.toContain("dist/index.js");
+    });
+  }
 });
 
 describe("resolvePolicy", () => {
