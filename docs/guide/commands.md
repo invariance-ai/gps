@@ -1690,6 +1690,7 @@ setup [options]
 - `--with-claude` — Install Claude Code hooks
 - `--with-codex` — Install Codex MCP + AGENTS.md block
 - `--with-cursor` — Install Cursor rules + MCP
+- `--no-agent` — CLI-only setup: skip all agent integrations (no .claude/, AGENTS.md, .cursor/, .mcp.json)
 - `--capture <mode>` — Capture mode: inbox | auto (default: auto)
 - `--promote <mode>` — Auto-promotion: never | safe | all (default: safe with --capture=auto; requires --capture=auto)
 - `--auto-suggest` — Let supported hooks print `gps suggest` authoring-queue nudges

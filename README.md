@@ -260,7 +260,13 @@ If you only want the portable Claude Code skill, the important file is `.claude/
 
 **Cursor** writes a `.cursor/rules/gps.mdc` always-attached rule and registers `gps serve` in `.cursor/mcp.json`. Because Cursor has no lifecycle hooks, the agent must call `record_preference` and `record_directive` MCP tools explicitly on durable and location-scoped instructions.
 
-For **any other shell-based agent**, add this to the repo instructions:
+For **any other shell-based agent** (or a CLI-only / MCP-only setup with no native agent files), run `setup --no-agent` to initialize `.gps/` and the index without writing `.claude/`, `AGENTS.md`, `.cursor/`, or `.mcp.json`:
+
+```bash
+npx -y @invariance/gps setup --yes --no-agent
+```
+
+Then add this to the repo instructions:
 
 ```text
 You have access to `gps`, a CLI that returns structured repo context.

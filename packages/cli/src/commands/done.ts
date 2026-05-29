@@ -60,7 +60,7 @@ export function registerDone(program: Command): void {
     const observations = await readObservations(root).catch(() => undefined);
     const symbol = opts.symbol ?? observations?.last_prepared_symbol;
     const [audit, hardSearch, patterns, commands, memorySuggestions] = await Promise.all([
-      auditSession(root),
+      auditSession(root, { base: opts.base }),
       hardSearchSuggestionsForActiveSession(root),
       repeatedMistakePatterns(root),
       symbol ? learnedTestCommandsForSymbol(root, symbol) : Promise.resolve([]),

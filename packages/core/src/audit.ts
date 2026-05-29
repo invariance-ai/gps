@@ -2,6 +2,15 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { gate } from "./gate.js";
 import { readTestRuns } from "./test_runs.js";
+import { diffSymbols } from "./diff_symbols.js";
+import { readObservations } from "./observer.js";
+import { loadNotes } from "./notes.js";
+import { loadDecisions } from "./decisions.js";
+
+export interface AuditOptions {
+  /** Diff base used to detect edited symbols when no session log exists. */
+  base?: string;
+}
 
 export interface AuditCheck {
   id: string;
@@ -50,7 +59,7 @@ async function readSessionEvents(root: string, id: string): Promise<SessionEvent
   }
 }
 
-export async function auditSession(root: string): Promise<AuditReport> {
+export async function auditSession(root: string, opts: AuditOptions = {}): Promise<AuditReport> {
   const id = await readActiveSessionId(root);
   const events = id ? await readSessionEvents(root, id) : [];
   const checks: AuditCheck[] = [];
@@ -62,6 +71,28 @@ export async function auditSession(root: string): Promise<AuditReport> {
   const editedSymbols = new Set<string>();
   for (const e of attributedLabels) {
     if (e.label) editedSymbols.add(e.label);
+  }
+
+  // CLI-only / `npx`-per-command usage has no hook-written session attribution
+  // log, so the event-based view above sees nothing. Fall back to the
+  // working-tree diff for edits and the passive observer for prepares, so the
+  // audit reflects what actually happened instead of always claiming "no edits".
+  if (editedSymbols.size === 0) {
+    try {
+      const diff = await diffSymbols(root, opts.base ?? "HEAD");
+      for (const s of diff.symbols) editedSymbols.add(s.name);
+    } catch {
+      /* no git or no index — leave editedSymbols empty */
+    }
+  }
+  if (preparedSymbols.size === 0) {
+    const obs = await readObservations(root).catch(() => undefined);
+    if (obs) {
+      if (obs.last_prepared_symbol) preparedSymbols.add(obs.last_prepared_symbol);
+      for (const [name, s] of Object.entries(obs.symbols)) {
+        if (s.tools?.prepare_edit) preparedSymbols.add(name);
+      }
+    }
   }
 
   // Check 1: prepare before edits
@@ -118,12 +149,26 @@ export async function auditSession(root: string): Promise<AuditReport> {
       detail: "no edits this session — no learnings expected",
     });
   } else {
+    // Session events only capture hook-driven flows. CLI users record durable
+    // memory directly (gps remember/learn/decide), so also count notes and
+    // decisions anchored to the edited symbols.
+    let learningCount = learnings.length;
+    if (learningCount === 0) {
+      for (const sym of editedSymbols) {
+        const [notes, decisions] = await Promise.all([
+          loadNotes(root, sym).catch(() => []),
+          loadDecisions(root, sym).catch(() => []),
+        ]);
+        learningCount += notes.length + decisions.length;
+        if (learningCount > 0) break;
+      }
+    }
     checks.push({
       id: "durable-lesson",
-      pass: learnings.length > 0,
+      pass: learningCount > 0,
       detail:
-        learnings.length > 0
-          ? `${learnings.length} durable record(s) written`
+        learningCount > 0
+          ? `${learningCount} durable record(s) for changed symbol(s)`
           : "no notes/decisions/lessons recorded — capture what was learned",
     });
   }

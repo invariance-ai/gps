@@ -24,6 +24,7 @@ import { runInstallClaude, runInstallCodex, runInstallCursor, resolveCmd, resolv
 
 interface Opts extends RootOption {
   yes?: boolean;
+  agent?: boolean;
   withClaude?: boolean;
   withCodex?: boolean;
   withCursor?: boolean;
@@ -74,6 +75,7 @@ export function registerWizard(program: Command): void {
       .option("--with-claude", "Install Claude Code hooks")
       .option("--with-codex", "Install Codex MCP + AGENTS.md block")
       .option("--with-cursor", "Install Cursor rules + MCP")
+      .option("--no-agent", "CLI-only setup: skip all agent integrations (no .claude/, AGENTS.md, .cursor/, .mcp.json)")
       .option("--capture <mode>", "Capture mode: inbox | auto (default: auto)")
       .option(
         "--promote <mode>",
@@ -157,8 +159,11 @@ export function registerWizard(program: Command): void {
 
       // 4. agent hooks
       header("4. wire coding agents");
+      const cliOnly = opts.agent === false;
       const wantClaude =
-        opts.withClaude ??
+        cliOnly
+        ? false
+        : opts.withClaude ??
         (explicitAgentSelection
           ? false
           : opts.yes
@@ -179,11 +184,13 @@ export function registerWizard(program: Command): void {
         });
         step("Claude Code", "hooks + skill + CLAUDE.md block written to .claude/");
       } else {
-        skipped("Claude Code", "declined");
+        skipped("Claude Code", cliOnly ? "--no-agent" : "declined");
       }
 
       const wantCodex =
-        opts.withCodex ??
+        cliOnly
+        ? false
+        : opts.withCodex ??
         (explicitAgentSelection
           ? false
           : opts.yes
@@ -203,12 +210,14 @@ export function registerWizard(program: Command): void {
         });
         step("Codex", "MCP server registered + AGENTS.md block written");
       } else {
-        skipped("Codex", "declined");
+        skipped("Codex", cliOnly ? "--no-agent" : "declined");
       }
 
       const cursorDetected = await isDir(path.join(root, ".cursor"));
       const wantCursor =
-        opts.withCursor ??
+        cliOnly
+        ? false
+        : opts.withCursor ??
         (explicitAgentSelection
           ? false
           : opts.yes
@@ -228,7 +237,12 @@ export function registerWizard(program: Command): void {
         });
         step("Cursor", "always-attached rule + MCP server registered");
       } else {
-        skipped("Cursor", "declined");
+        skipped("Cursor", cliOnly ? "--no-agent" : "declined");
+      }
+      if (cliOnly) {
+        console.log(
+          kleur.dim("  CLI-only setup — use `gps prepare`/`remember`/`done` directly, or `gps serve` for MCP."),
+        );
       }
 
       // 5. seed a preference so the user can see the loop
