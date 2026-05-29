@@ -38,4 +38,4 @@ for pkg in "${PKGS[@]}"; do
 done
 
 echo ""
-echo "done. install with: npx @invariance/gps wizard"
+echo "done. install with: npx -y @invariance/gps setup --yes --with-claude"

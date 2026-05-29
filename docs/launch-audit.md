@@ -112,6 +112,27 @@ pnpm release:check
 
 `pnpm smoke:pack` installs the packed workspace tarballs into clean temporary
 repos and verifies Claude-only, Codex-only, Cursor-only, and all-agent setup.
+If the repo packages are already versioned and committed but npm `latest` is
+behind, the credentialed handoff is:
+
+```bash
+npm whoami                                      # must succeed
+npm view @invariance/gps version               # should show the old latest
+pnpm -r publish --access public --no-git-checks
+npm view @invariance/gps version               # must show the repo version
+npm view @invariance/gps-core version
+npm view @invariance/gps-llm version
+npm view @invariance/gps-mcp version
+npm view @invariance/gps-schemas version
+```
+
+Only tag the release after the registry verifies the intended version:
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
 After publishing, run one public-registry check so npm `latest` is not stale:
 
 ```bash
