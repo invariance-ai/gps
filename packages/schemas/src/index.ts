@@ -1168,6 +1168,56 @@ export const ReviewDiffResult = z.object({
 });
 export type ReviewDiffResult = z.infer<typeof ReviewDiffResult>;
 
+export const ReviewMemoryInput = z.object({
+  days: z.number().int().min(1).default(90),
+  limit: z.number().int().positive().default(25),
+});
+export type ReviewMemoryInput = z.infer<typeof ReviewMemoryInput>;
+
+export const ReviewMemoryAction = z.discriminatedUnion("tool", [
+  z.object({
+    tool: z.literal("promotion_candidates"),
+    args: z.object({ symbol: z.string() }),
+  }),
+  z.object({
+    tool: z.literal("find_stale"),
+    args: z.object({ days: z.number().int().min(1) }),
+  }),
+  z.object({
+    tool: z.literal("questions_for"),
+    args: z.object({
+      symbol: z.string(),
+      status: z.literal("unresolved"),
+    }),
+  }),
+]);
+export type ReviewMemoryAction = z.infer<typeof ReviewMemoryAction>;
+
+export const ReviewMemoryItem = z.object({
+  kind: z.enum(["promote", "stale", "open_question"]),
+  priority: z.enum(["high", "medium", "low"]),
+  symbol: z.string(),
+  age_days: z.number().int().nonnegative().optional(),
+  reason: z.string(),
+  command: z.string(),
+  action: ReviewMemoryAction,
+});
+export type ReviewMemoryItem = z.infer<typeof ReviewMemoryItem>;
+
+export const ReviewMemoryResult = z.object({
+  promote: z.array(PromotionCandidateOut),
+  stale: z.array(StaleEntryOut),
+  open_questions: z.array(z.object({
+    id: z.string(),
+    symbol: z.string(),
+    question: z.string(),
+    age_days: z.number().int().nonnegative(),
+  })),
+  items: z.array(ReviewMemoryItem),
+  total: z.number().int().nonnegative(),
+});
+export type ReviewMemoryResult = z.infer<typeof ReviewMemoryResult>;
+
 /* ---------- verify_index (P0c) ---------- */
 
 export const VerifyIndexInput = z.object({
@@ -1222,6 +1272,18 @@ export const BriefSymbolEntry = z.object({
   questions: z.array(Question),
 });
 
+export const AgentFrictionSuggestion = z.object({
+  kind: z.enum(["hard_search"]),
+  symbol: z.string().optional(),
+  file: z.string().optional(),
+  command_count: z.number().int().nonnegative(),
+  why: z.string(),
+  remember_command: z.string(),
+  next_time_command: z.string().optional(),
+  suggestion: z.string(),
+});
+export type AgentFrictionSuggestion = z.infer<typeof AgentFrictionSuggestion>;
+
 export const BriefResult = z.object({
   base: z.string(),
   changed_files: z.array(z.string()),
@@ -1236,8 +1298,161 @@ export const BriefResult = z.object({
   truncated: z.boolean(),
   /** True when at least one indexed source symbol changed. False when only config/docs/non-indexed files changed. */
   source_changes: z.boolean(),
+  /** MCP-only closeout nudge for costly search loops observed in the active session. */
+  agent_friction_suggestions: z.array(AgentFrictionSuggestion).optional(),
 });
 export type BriefResult = z.infer<typeof BriefResult>;
+
+export const MemorySuggestionRememberAction = z.object({
+  tool: z.literal("record_learning"),
+  fact: z.string(),
+  scope: z.literal("symbol"),
+  target: z.string(),
+  evidence: z.string().optional(),
+});
+export type MemorySuggestionRememberAction = z.infer<typeof MemorySuggestionRememberAction>;
+
+export const MemorySuggestionAction = z.discriminatedUnion("tool", [
+  z.object({
+    tool: z.literal("record_lesson"),
+    args: z.object({
+      lesson: z.string(),
+      force_scope: z.literal("symbol"),
+      force_target: z.string(),
+      evidence: z.string().optional(),
+    }),
+  }),
+  z.object({
+    tool: z.literal("questions_for"),
+    args: z.object({
+      symbol: z.string(),
+      status: z.literal("unresolved"),
+    }),
+  }),
+  z.object({
+    tool: z.literal("assumptions_for"),
+    args: z.object({
+      symbol: z.string(),
+    }),
+  }),
+  z.object({
+    tool: z.literal("list_todos"),
+    args: z.object({
+      symbol: z.string(),
+      include_resolved: z.literal(false),
+    }),
+  }),
+]);
+export type MemorySuggestionAction = z.infer<typeof MemorySuggestionAction>;
+
+export const MemorySuggestion = z.object({
+  kind: z.enum(["record_symbol_memory", "answer_question", "verify_assumption", "resolve_todo"]),
+  symbol: z.string(),
+  file: z.string(),
+  priority: z.enum(["high", "medium", "low"]),
+  reason: z.string(),
+  command: z.string(),
+  action: MemorySuggestionAction.optional(),
+  remember: MemorySuggestionRememberAction.optional(),
+});
+export type MemorySuggestion = z.infer<typeof MemorySuggestion>;
+
+export const MemorySuggestionsInput = z.object({
+  base: z.string().optional(),
+  limit: z.number().int().positive().optional(),
+  evidence: z.string().optional(),
+  apply: z.boolean().optional(),
+});
+export type MemorySuggestionsInput = z.infer<typeof MemorySuggestionsInput>;
+
+export const AppliedMemorySuggestion = z.object({
+  suggestion: MemorySuggestion,
+  result: z.object({
+    id: z.string(),
+    scope: NoteScope,
+    target: z.string().optional(),
+    path: z.string(),
+    promoted: z.boolean().optional(),
+    pending_count: z.number().int().nonnegative().optional(),
+  }),
+});
+export type AppliedMemorySuggestion = z.infer<typeof AppliedMemorySuggestion>;
+
+export const ApplyMemorySuggestionsResult = z.object({
+  applied: z.array(AppliedMemorySuggestion),
+  skipped: z.array(MemorySuggestion),
+});
+export type ApplyMemorySuggestionsResult = z.infer<typeof ApplyMemorySuggestionsResult>;
+
+export const MemorySuggestionsResult = z.object({
+  base: z.string(),
+  changed_files: z.array(z.string()),
+  changed_symbol_count: z.number().int().nonnegative(),
+  changed_symbols: z.array(z.string()),
+  suggestions: z.array(MemorySuggestion),
+  application: ApplyMemorySuggestionsResult.optional(),
+});
+export type MemorySuggestionsResult = z.infer<typeof MemorySuggestionsResult>;
+
+export const MemoryHealthInput = z.object({
+  days: z.number().int().min(1).default(90),
+  limit: z.number().int().positive().default(10),
+  base: z.string().optional(),
+  include_diff: z.boolean().optional(),
+});
+export type MemoryHealthInput = z.infer<typeof MemoryHealthInput>;
+
+export const MemoryHealthCounts = z.object({
+  symbol_notes: z.number().int().nonnegative(),
+  scoped_notes: z.number().int().nonnegative(),
+  decisions: z.number().int().nonnegative(),
+  invariants: z.number().int().nonnegative(),
+  preferences: z.number().int().nonnegative(),
+  inbox_pending: z.number().int().nonnegative(),
+  review_items: z.number().int().nonnegative(),
+  validation_issues: z.number().int().nonnegative(),
+  prunable: z.number().int().nonnegative(),
+  diff_suggestions: z.number().int().nonnegative(),
+});
+export type MemoryHealthCounts = z.infer<typeof MemoryHealthCounts>;
+
+export const MemoryHealthAction = z.discriminatedUnion("tool", [
+  z.object({
+    tool: z.literal("review_memory"),
+    args: z.object({ days: z.number().int().min(1), limit: z.number().int().positive() }),
+  }),
+  z.object({
+    tool: z.literal("validate_knowledge"),
+    args: z.object({}),
+  }),
+  z.object({
+    tool: z.literal("prune"),
+    args: z.object({ days: z.number().int().min(1), dry_run: z.literal(true) }),
+  }),
+  z.object({
+    tool: z.literal("memory_suggestions"),
+    args: z.object({ base: z.string(), limit: z.number().int().positive() }),
+  }),
+]);
+export type MemoryHealthAction = z.infer<typeof MemoryHealthAction>;
+
+export const MemoryHealthRecommendation = z.object({
+  kind: z.enum(["review_memory", "validate_knowledge", "prune", "memory_suggestions"]),
+  priority: z.enum(["high", "medium", "low"]),
+  reason: z.string(),
+  command: z.string(),
+  action: MemoryHealthAction,
+});
+export type MemoryHealthRecommendation = z.infer<typeof MemoryHealthRecommendation>;
+
+export const MemoryHealthResult = z.object({
+  status: z.enum(["healthy", "watch", "needs_attention"]),
+  score: z.number().min(0).max(1),
+  counts: MemoryHealthCounts,
+  recommendations: z.array(MemoryHealthRecommendation),
+  review_items: z.array(ReviewMemoryItem),
+});
+export type MemoryHealthResult = z.infer<typeof MemoryHealthResult>;
 
 /**
  * Tool catalogue — referenced by CLI command registration and MCP server
@@ -1287,15 +1502,25 @@ export const ResumeResult = z.object({
 });
 export type ResumeResult = z.infer<typeof ResumeResult>;
 
-export const RecallKind = z.enum(["note", "decision", "invariant", "preference", "lesson"]);
+export const RecallKind = z.enum(["note", "decision", "invariant", "preference", "lesson", "question", "assumption", "todo"]);
 export type RecallKind = z.infer<typeof RecallKind>;
 
 export const RecallMemoryInput = z.object({
   query: z.string(),
   limit: z.number().int().positive().optional(),
   kinds: z.array(RecallKind).optional(),
+  related: z.boolean().optional(),
+  related_limit: z.number().int().positive().optional(),
 });
 export type RecallMemoryInput = z.infer<typeof RecallMemoryInput>;
+
+export const RecallRelatedSymbol = z.object({
+  symbol: z.string(),
+  file: z.string(),
+  line: z.number().int().nonnegative(),
+  relation: z.enum(["anchor", "caller", "callee"]),
+});
+export type RecallRelatedSymbol = z.infer<typeof RecallRelatedSymbol>;
 
 export const RecallHit = z.object({
   kind: RecallKind,
@@ -1304,6 +1529,7 @@ export const RecallHit = z.object({
   score: z.number(),
   severity: z.string().optional(),
   source: z.string().optional(),
+  related_symbols: z.array(RecallRelatedSymbol).optional(),
 });
 export type RecallHit = z.infer<typeof RecallHit>;
 
@@ -1312,6 +1538,133 @@ export const RecallMemoryResult = z.object({
   hits: z.array(RecallHit),
 });
 export type RecallMemoryResult = z.infer<typeof RecallMemoryResult>;
+
+export const MemoryGraphInput = z.object({
+  query: z.string(),
+  limit: z.number().int().positive().optional(),
+  kinds: z.array(RecallKind).optional(),
+  related_limit: z.number().int().positive().optional(),
+  include_symbols: z.boolean().optional(),
+  symbol_limit: z.number().int().positive().optional(),
+  include_issues: z.boolean().optional(),
+  stale_days: z.number().int().nonnegative().optional(),
+});
+export type MemoryGraphInput = z.infer<typeof MemoryGraphInput>;
+
+export const MemoryGraphNode = z.object({
+  id: z.string(),
+  type: z.enum(["memory", "symbol"]),
+  label: z.string(),
+  kind: z.string().optional(),
+  text: z.string().optional(),
+  anchor: z.string().optional(),
+  score: z.number().optional(),
+  file: z.string().optional(),
+  line: z.number().int().nonnegative().optional(),
+});
+export type MemoryGraphNode = z.infer<typeof MemoryGraphNode>;
+
+export const MemoryGraphEdge = z.object({
+  from: z.string(),
+  to: z.string(),
+  type: z.enum(["anchors", "calls", "related", "same_anchor", "shares_symbol"]),
+});
+export type MemoryGraphEdge = z.infer<typeof MemoryGraphEdge>;
+
+export const MemoryGraphIssue = z.object({
+  kind: z.enum(["conflict", "stale", "orphan_anchor", "promotion_candidate", "open_question", "unverified_assumption", "open_todo", "memory_gap"]),
+  symbol: z.string(),
+  summary: z.string(),
+  severity: z.enum(["info", "warn", "block"]),
+  command: z.string(),
+});
+export type MemoryGraphIssue = z.infer<typeof MemoryGraphIssue>;
+
+export const MemoryGraphCentralSymbol = z.object({
+  symbol: z.string(),
+  file: z.string().optional(),
+  line: z.number().int().nonnegative().optional(),
+  degree: z.number().int().nonnegative(),
+  memory_count: z.number().int().nonnegative(),
+  issue_count: z.number().int().nonnegative(),
+});
+export type MemoryGraphCentralSymbol = z.infer<typeof MemoryGraphCentralSymbol>;
+
+export const MemoryGraphSummary = z.object({
+  memory_nodes: z.number().int().nonnegative(),
+  symbol_nodes: z.number().int().nonnegative(),
+  edges: z.number().int().nonnegative(),
+  issues: z.object({
+    total: z.number().int().nonnegative(),
+    block: z.number().int().nonnegative(),
+    warn: z.number().int().nonnegative(),
+    info: z.number().int().nonnegative(),
+  }),
+  central_symbols: z.array(MemoryGraphCentralSymbol),
+});
+export type MemoryGraphSummary = z.infer<typeof MemoryGraphSummary>;
+
+export const MemoryGraphRecommendation = z.object({
+  kind: z.enum(["resolve_issue", "answer_question", "verify_assumption", "resolve_todo", "promote_memory", "inspect_symbol", "record_memory"]),
+  priority: z.enum(["high", "medium", "low"]),
+  command: z.string(),
+  reason: z.string(),
+  action: z.discriminatedUnion("tool", [
+    z.object({
+      tool: z.literal("prepare_edit"),
+      args: z.object({ symbol: z.string(), intent: z.string().optional() }),
+    }),
+    z.object({
+      tool: z.literal("record_lesson"),
+      args: z.object({
+        lesson: z.string(),
+        force_scope: z.literal("symbol").optional(),
+        force_target: z.string().optional(),
+        evidence: z.string().optional(),
+      }),
+    }),
+    z.object({
+      tool: z.literal("questions_for"),
+      args: z.object({ symbol: z.string(), status: z.literal("unresolved") }),
+    }),
+    z.object({
+      tool: z.literal("assumptions_for"),
+      args: z.object({ symbol: z.string() }),
+    }),
+    z.object({
+      tool: z.literal("list_todos"),
+      args: z.object({ symbol: z.string(), include_resolved: z.literal(false) }),
+    }),
+    z.object({
+      tool: z.literal("promotion_candidates"),
+      args: z.object({ symbol: z.string() }),
+    }),
+    z.object({
+      tool: z.literal("find_conflicts"),
+      args: z.object({ symbol: z.string() }),
+    }),
+    z.object({
+      tool: z.literal("find_stale"),
+      args: z.object({ days: z.number().int().min(1) }),
+    }),
+    z.object({
+      tool: z.literal("validate_knowledge"),
+      args: z.object({}),
+    }),
+  ]).optional(),
+});
+export type MemoryGraphRecommendation = z.infer<typeof MemoryGraphRecommendation>;
+
+export const MemoryGraphResult = z.object({
+  query: z.string(),
+  summary: MemoryGraphSummary,
+  nodes: z.array(MemoryGraphNode),
+  edges: z.array(MemoryGraphEdge),
+  issues: z.array(MemoryGraphIssue),
+  recommendations: z.array(MemoryGraphRecommendation),
+  hits: z.array(RecallHit),
+});
+export type MemoryGraphResult = z.infer<typeof MemoryGraphResult>;
 
 export const TOOLS = {
   prepare_edit: {
@@ -1352,9 +1705,27 @@ export const TOOLS = {
   },
   recall_memory: {
     description:
-      "Search ALL repo memory by topic — notes, decisions, invariants, preferences, and global lessons ranked against a free-text query. Use this to answer \"what do we already know about X?\" (e.g. refunds, auth, rate limiting) when you don't have a specific symbol in mind; prefer it over grepping docs or re-deriving conventions. For depth on one known symbol, use prepare_edit/get_context instead.",
+      "Search ALL repo memory by topic — notes, decisions, invariants, preferences, and global lessons ranked against a free-text query. Use this to answer \"what do we already know about X?\" (e.g. refunds, auth, rate limiting) when you don't have a specific symbol in mind; set related=true to attach nearby symbol-graph context (anchors, callers, callees). For depth on one known symbol, use prepare_edit/get_context instead.",
     input: RecallMemoryInput,
     output: RecallMemoryResult,
+  },
+  memory_graph: {
+    description:
+      "Build a small knowledge graph around a topic: recalled memory artifacts, anchored symbols, top matching code symbols, and one-hop caller/callee edges when the symbol index is available. Use this when planning broad work and you need to see how repo knowledge connects, including memory gaps to fill.",
+    input: MemoryGraphInput,
+    output: MemoryGraphResult,
+  },
+  memory_health: {
+    description:
+      "Repo-wide memory health score and maintenance actions. Combines active memory counts, review queue debt, validation drift, prunable stale memories, and changed-symbol memory suggestions into one agent-readable dashboard.",
+    input: MemoryHealthInput,
+    output: MemoryHealthResult,
+  },
+  memory_suggestions: {
+    description:
+      "Closeout memory queue for the current diff. Lists changed symbols that need durable memory, unresolved questions, unverified assumptions, or open TODOs before an agent declares work done.",
+    input: MemorySuggestionsInput,
+    output: MemorySuggestionsResult,
   },
   record_learning: {
     description:
@@ -1544,6 +1915,12 @@ export const TOOLS = {
       "Final-call invariant check against the current dirty diff. Maps changed hunks to changed symbols and runs the gate. Call before declaring an edit done.",
     input: ReviewDiffInput,
     output: ReviewDiffResult,
+  },
+  review_memory: {
+    description:
+      "Maintainer queue for GPS memory. Returns promotion candidates, stale entries, open questions, and a prioritized action list with MCP-invokable follow-up actions. Use periodically to keep the repo knowledge graph healthy.",
+    input: ReviewMemoryInput,
+    output: ReviewMemoryResult,
   },
   seed_propose: {
     description:

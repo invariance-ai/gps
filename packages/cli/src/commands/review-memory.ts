@@ -49,6 +49,16 @@ export function registerReviewMemory(program: Command): void {
     }
     console.log(kleur.bold(`memory review queue (${q.total} items)`));
 
+    if (q.items.length > 0) {
+      console.log(kleur.cyan(`\nNext actions (${q.items.length})`));
+      for (const item of q.items.slice(0, opts.limit)) {
+        const color = item.priority === "high" ? kleur.red : item.priority === "medium" ? kleur.yellow : kleur.dim;
+        console.log(`  ${color(`[${item.priority}]`)} ${kleur.bold(item.symbol)} ${kleur.dim(item.kind)}`);
+        console.log(`    ${item.reason}`);
+        console.log(`    ${kleur.cyan(item.command)}`);
+      }
+    }
+
     if (q.promote.length > 0) {
       console.log(kleur.cyan(`\nPromote (${q.promote.length}) — repeated notes ready to become invariants:`));
       for (const p of q.promote.slice(0, opts.limit)) {

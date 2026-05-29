@@ -1,9 +1,11 @@
 import type { Command } from "commander";
 import kleur from "kleur";
 import {
+  applyMemorySuggestions,
   auditSession,
   hardSearchSuggestionsForActiveSession,
   learnedTestCommandsForSymbol,
+  memorySuggestionsForDiff,
   readObservations,
   repeatedMistakePatterns,
 } from "@invariance/gps-core";
@@ -11,6 +13,9 @@ import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   symbol?: string;
+  base?: string;
+  evidence?: string;
+  applyMemory?: boolean;
   json?: boolean;
 }
 
@@ -46,18 +51,32 @@ export function registerDone(program: Command): void {
       .command("done")
       .description("Post-edit self-audit: tests, invariants, durable memory, learned commands")
       .option("--symbol <name>", "Symbol to include learned commands for")
+      .option("--base <ref>", "Diff base for memory suggestions", "HEAD")
+      .option("--evidence <ref>", "Evidence tag for generated remember commands (default: diff:<base>)")
+      .option("--apply-memory", "Persist safe record-memory suggestions")
       .option("--json", "Emit JSON"),
   ).action(async (opts: Opts) => {
     const root = resolveRoot(opts);
     const observations = await readObservations(root).catch(() => undefined);
     const symbol = opts.symbol ?? observations?.last_prepared_symbol;
-    const [audit, hardSearch, patterns, commands] = await Promise.all([
+    const [audit, hardSearch, patterns, commands, memorySuggestions] = await Promise.all([
       auditSession(root),
       hardSearchSuggestionsForActiveSession(root),
       repeatedMistakePatterns(root),
       symbol ? learnedTestCommandsForSymbol(root, symbol) : Promise.resolve([]),
+      memorySuggestionsForDiff(root, { base: opts.base, limit: 10, evidence: opts.evidence }),
     ]);
-    const result = { audit, hard_search: hardSearch, mistake_patterns: patterns.slice(0, 10), learned_test_commands: commands };
+    const memoryApplication = opts.applyMemory
+      ? await applyMemorySuggestions(root, memorySuggestions.suggestions)
+      : undefined;
+    const result = {
+      audit,
+      hard_search: hardSearch,
+      mistake_patterns: patterns.slice(0, 10),
+      learned_test_commands: commands,
+      memory_suggestions: memorySuggestions,
+      memory_application: memoryApplication,
+    };
     if (opts.json) {
       console.log(JSON.stringify(result, null, 2));
       process.exitCode = audit.checks.every((c) => c.pass) ? 0 : 1;
@@ -86,6 +105,23 @@ export function registerDone(program: Command): void {
         console.log(`  ${kleur.yellow("!")} ${detail.why}`);
         if (detail.nextTime) console.log(`    next time: ${kleur.cyan(detail.nextTime)}`);
         console.log(`    remember:  ${kleur.cyan(detail.remember)}`);
+      }
+    }
+    if (memorySuggestions.suggestions.length > 0) {
+      console.log("\nMemory suggestions for changed symbols:");
+      for (const s of memorySuggestions.suggestions.slice(0, 10)) {
+        const color = s.priority === "high" ? kleur.red : s.priority === "medium" ? kleur.yellow : kleur.dim;
+        console.log(`  ${color(`[${s.priority}]`)} ${s.symbol}: ${s.reason}`);
+        console.log(`    ${kleur.cyan(s.command)}`);
+      }
+    }
+    if (memoryApplication) {
+      console.log(kleur.green(`\nApplied ${memoryApplication.applied.length} memory suggestion(s).`));
+      for (const item of memoryApplication.applied) {
+        console.log(`  ${kleur.green("✓")} ${item.suggestion.symbol} ${kleur.dim(item.result.path)}`);
+      }
+      if (memoryApplication.skipped.length > 0) {
+        console.log(kleur.dim(`Skipped ${memoryApplication.skipped.length} non-record suggestion(s).`));
       }
     }
     const failed = audit.checks.filter((c) => !c.pass).length;

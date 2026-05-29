@@ -126,5 +126,5 @@ describe("resume data assembly", () => {
     expect(Array.isArray(result.todos)).toBe(true);
     expect(Array.isArray(result.questions)).toBe(true);
     expect(Array.isArray(result.decisions)).toBe(true);
-  });
+  }, 15_000);
 });

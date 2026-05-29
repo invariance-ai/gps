@@ -489,6 +489,9 @@ done [options]
 **Options:**
 
 - `--symbol <name>` — Symbol to include learned commands for
+- `--base <ref>` — Diff base for memory suggestions *(default: "HEAD")*
+- `--evidence <ref>` — Evidence tag for generated remember commands (default: diff:<base>)
+- `--apply-memory` — Persist safe record-memory suggestions
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1075,6 +1078,60 @@ lessons reclassify [options] <id>
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `memory-graph`
+
+Build a topic-centered graph of recalled memory and related symbols
+
+```
+memory-graph [options] <query>
+```
+
+**Options:**
+
+- `--limit <n>` — Max memory hits *(default: 20)*
+- `--kind <list>` — Restrict to comma-separated kinds (note,decision,invariant,preference,lesson,question,assumption,todo)
+- `--related-limit <n>` — Max related symbols per memory hit *(default: 8)*
+- `--symbol-limit <n>` — Max topic-matching symbols to seed when an index exists *(default: 5)*
+- `--no-symbols` — Only include symbols reached from recalled memory
+- `--no-issues` — Skip stale/conflict checks for graph symbols
+- `--stale-days <n>` — Age threshold for stale memory issues *(default: 90)*
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `memory-health`
+
+Repo memory health score and maintenance actions
+
+```
+memory-health [options]
+```
+
+**Options:**
+
+- `--days <n>` — Staleness threshold in days *(default: 90)*
+- `--limit <n>` — Max recommendations *(default: 10)*
+- `--base <ref>` — Diff base for changed-symbol memory suggestions *(default: "HEAD")*
+- `--no-diff` — Skip changed-symbol memory suggestions
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `memory-suggestions`
+
+Closeout memory queue for changed symbols
+
+```
+memory-suggestions [options]
+```
+
+**Options:**
+
+- `--base <ref>` — Diff base *(default: "HEAD")*
+- `--limit <n>` — Max suggestions *(default: 20)*
+- `--evidence <ref>` — Evidence tag for generated remember commands (default: diff:<base>)
+- `--apply` — Persist safe record-memory suggestions
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `notes`
 
 List notes attached to a symbol (or all)
@@ -1325,7 +1382,9 @@ recall [options] <query>
 
 - `--limit <n>` — Max results *(default: 20)*
 - `--budget <tokens>` — Approximate token budget for the rendered output
-- `--kind <list>` — Restrict to comma-separated kinds (note,decision,invariant,preference,lesson)
+- `--kind <list>` — Restrict to comma-separated kinds (note,decision,invariant,preference,lesson,question,assumption,todo)
+- `--related` — Attach one-hop symbol graph context to matching memory
+- `--related-limit <n>` — Max related symbols per memory hit *(default: 6)*
 - `--tokens` — Print estimated token cost of the output
 - `--cost` — Alias for --tokens
 - `--json` — Emit JSON instead of markdown
@@ -1680,6 +1739,34 @@ tests [options] [symbol]
 - `--json` — Emit JSON instead of pretty output
 - `--diff` — List tests for every symbol in the working-tree diff
 - `--base <ref>` — Diff base (default HEAD) *(default: "HEAD")*
+- `--root <path>` — Repo root (default: cwd)
+
+## `todo-resolve`
+
+Mark a GPS TODO as resolved
+
+```
+todo-resolve [options] <id>
+```
+
+**Options:**
+
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `todos`
+
+List unresolved GPS TODOs by symbol or file
+
+```
+todos [options] [symbol]
+```
+
+**Options:**
+
+- `--file <path>` — Restrict to a repo-relative file
+- `--include-resolved` — Include resolved TODOs
+- `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
 ## `trace`

@@ -54,6 +54,10 @@ import {
   findPromotionCandidates,
   readIndex,
   recallMemory,
+  memoryGraph,
+  memoryHealth,
+  memorySuggestionsForDiff,
+  applyMemorySuggestions,
   type RecallKind as RecallKindT,
   verifyIndex,
   readGateStream,
@@ -66,6 +70,7 @@ import {
   hardSearchSuggestionsForActiveSession,
   pruneNotes,
   resume,
+  buildReviewQueue,
 } from "@invariance/gps-core";
 import { llmClassify } from "@invariance/gps-llm";
 
@@ -334,9 +339,61 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       return { candidates: cands };
     }
     case "recall_memory": {
-      const a = args as { query: string; limit?: number; kinds?: RecallKindT[] };
-      const hits = await recallMemory(root, a.query, { limit: a.limit, kinds: a.kinds });
+      const a = args as {
+        query: string;
+        limit?: number;
+        kinds?: RecallKindT[];
+        related?: boolean;
+        related_limit?: number;
+      };
+      const hits = await recallMemory(root, a.query, {
+        limit: a.limit,
+        kinds: a.kinds,
+        related: !!a.related,
+        relatedLimit: a.related_limit,
+      });
       return { query: a.query, hits };
+    }
+    case "memory_graph": {
+      const a = args as {
+        query: string;
+        limit?: number;
+        kinds?: RecallKindT[];
+        related_limit?: number;
+        include_symbols?: boolean;
+        symbol_limit?: number;
+        include_issues?: boolean;
+        stale_days?: number;
+      };
+      return memoryGraph(root, a.query, {
+        limit: a.limit,
+        kinds: a.kinds,
+        relatedLimit: a.related_limit,
+        includeSymbols: a.include_symbols,
+        symbolLimit: a.symbol_limit,
+        includeIssues: a.include_issues,
+        staleDays: a.stale_days,
+      });
+    }
+    case "memory_health": {
+      const a = args as { days?: number; limit?: number; base?: string; include_diff?: boolean };
+      return memoryHealth(root, {
+        days: a.days,
+        limit: a.limit,
+        base: a.base,
+        includeDiff: a.include_diff,
+      });
+    }
+    case "memory_suggestions": {
+      const a = args as { base?: string; limit?: number; evidence?: string; apply?: boolean };
+      const result = await memorySuggestionsForDiff(root, {
+        base: a.base,
+        limit: a.limit,
+        evidence: a.evidence,
+      });
+      if (!a.apply) return result;
+      const application = await applyMemorySuggestions(root, result.suggestions);
+      return { ...result, application };
     }
     case "list_todos": {
       const a = args as { file?: string; symbol?: string; include_resolved?: boolean };
@@ -492,6 +549,10 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       const a = args as { base?: string };
       return gateChanged(root, { base: a.base });
     }
+    case "review_memory": {
+      const a = args as { days?: number; limit?: number };
+      return buildReviewQueue(root, { days: a.days, limit: a.limit });
+    }
     case "validate_knowledge": {
       return validateKnowledge(root);
     }
@@ -500,8 +561,8 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       const result = await brief(root, { base: a.base, max_symbols: a.max_symbols });
       // Surface the agent-friction "remember candidate" to MCP-only agents
       // (e.g. Cursor) that never see the CLI `gps done` / `gps suggest` output.
-      const memory_suggestions = await hardSearchSuggestionsForActiveSession(root);
-      return { ...result, memory_suggestions };
+      const agent_friction_suggestions = await hardSearchSuggestionsForActiveSession(root);
+      return { ...result, agent_friction_suggestions };
     }
     case "seed_propose": {
       const a = args as { tier?: "safe" | "medium" | "aggressive"; limit?: number };

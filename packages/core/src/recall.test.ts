@@ -7,6 +7,10 @@ import { appendNote } from "./notes.js";
 import { appendInvariants } from "./invariants.js";
 import { appendDecision } from "./decisions.js";
 import { addPreference } from "./preferences.js";
+import { writeIndex } from "./index_store.js";
+import { appendQuestion } from "./questions.js";
+import { appendAssumption } from "./assumptions.js";
+import { addTodo } from "./todos.js";
 
 const roots: string[] = [];
 async function tempRepo(): Promise<string> {
@@ -80,6 +84,61 @@ describe("recallMemory", () => {
     expect(onlyInvariants[0]!.kind).toBe("invariant");
   });
 
+  it("recalls unresolved questions by topic", async () => {
+    const root = await tempRepo();
+    await appendQuestion(root, {
+      symbol: "createRefund",
+      question: "Should refund cap failures route to manual review?",
+      asked_by: "agent",
+    });
+    const hits = await recallMemory(root, "manual review", { kinds: ["question"] });
+    expect(hits).toEqual([
+      expect.objectContaining({
+        kind: "question",
+        anchor: "createRefund",
+        text: "Should refund cap failures route to manual review?",
+      }),
+    ]);
+  });
+
+  it("recalls unverified assumptions by topic", async () => {
+    const root = await tempRepo();
+    await appendAssumption(root, {
+      symbol: "createRefund",
+      statement: "refund inputs are pre-validated before cap checks",
+      confidence: "high",
+      source: "agent",
+    });
+    const hits = await recallMemory(root, "pre validated", { kinds: ["assumption"] });
+    expect(hits).toEqual([
+      expect.objectContaining({
+        kind: "assumption",
+        anchor: "createRefund",
+        text: "refund inputs are pre-validated before cap checks",
+        severity: "high",
+      }),
+    ]);
+  });
+
+  it("recalls unresolved todos by topic", async () => {
+    const root = await tempRepo();
+    await addTodo(root, {
+      file: "src/refunds.ts",
+      line: 12,
+      symbol: "createRefund",
+      text: "Add manual review coverage for refund cap failures",
+      source: "manual",
+    });
+    const hits = await recallMemory(root, "manual review coverage", { kinds: ["todo"] });
+    expect(hits).toEqual([
+      expect.objectContaining({
+        kind: "todo",
+        anchor: "createRefund",
+        text: "Add manual review coverage for refund cap failures (src/refunds.ts:12)",
+      }),
+    ]);
+  });
+
   it("honors the limit", async () => {
     const root = await tempRepo();
     for (let i = 0; i < 5; i++) {
@@ -92,5 +151,52 @@ describe("recallMemory", () => {
   it("returns nothing for an empty repo", async () => {
     const root = await tempRepo();
     expect(await recallMemory(root, "anything")).toEqual([]);
+  });
+
+  it("can attach related symbol graph context to memory hits", async () => {
+    const root = await tempRepo();
+    await appendNote(root, {
+      symbol: "createRefund",
+      lesson: "refund cap is enforced before issuing",
+      severity: "high",
+    });
+    await writeIndex(root, {
+      version: 2,
+      built_at: new Date().toISOString(),
+      root,
+      files: ["src/refunds.ts"],
+      symbols: [
+        { id: "caller-id", name: "handleRefund", file: "src/refunds.ts", line: 1, kind: "function" },
+        { id: "refund-id", name: "createRefund", file: "src/refunds.ts", line: 5, kind: "function" },
+        { id: "cap-id", name: "checkRefundCap", file: "src/refunds.ts", line: 9, kind: "function" },
+      ],
+      edges: [
+        { from: "handleRefund", to: "createRefund", from_id: "caller-id", to_id: "refund-id", type: "calls" },
+        { from: "createRefund", to: "checkRefundCap", from_id: "refund-id", to_id: "cap-id", type: "calls" },
+      ],
+    });
+
+    const hits = await recallMemory(root, "refund cap", { related: true });
+    const related = hits.find((h) => h.kind === "note")?.related_symbols ?? [];
+    expect(related).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ symbol: "createRefund", relation: "anchor" }),
+        expect.objectContaining({ symbol: "handleRefund", relation: "caller" }),
+        expect.objectContaining({ symbol: "checkRefundCap", relation: "callee" }),
+      ]),
+    );
+  });
+
+  it("keeps plain recall working when related symbols are requested without an index", async () => {
+    const root = await tempRepo();
+    await appendNote(root, {
+      symbol: "createRefund",
+      lesson: "refund cap is enforced before issuing",
+      severity: "high",
+    });
+
+    const hits = await recallMemory(root, "refund cap", { related: true });
+    expect(hits).toHaveLength(1);
+    expect(hits[0]!.related_symbols).toBeUndefined();
   });
 });

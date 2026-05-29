@@ -13,6 +13,9 @@ import { registerInit } from "./commands/init.js";
 import { registerIndex } from "./commands/index.js";
 import { registerFind } from "./commands/find.js";
 import { registerRecall } from "./commands/recall.js";
+import { registerMemoryGraph } from "./commands/memory-graph.js";
+import { registerMemoryHealth } from "./commands/memory-health.js";
+import { registerMemorySuggestions } from "./commands/memory-suggestions.js";
 import { registerPrime } from "./commands/prime.js";
 import { registerTrace } from "./commands/trace.js";
 import { registerServe } from "./commands/serve.js";
@@ -75,6 +78,7 @@ import { registerResume } from "./commands/resume.js";
 import { registerRemember } from "./commands/remember.js";
 import { registerPacket } from "./commands/packet.js";
 import { registerDone } from "./commands/done.js";
+import { registerTodos } from "./commands/todos.js";
 
 type CommandRegistrar = (program: Command) => void;
 
@@ -116,6 +120,9 @@ const COMMANDS: CommandRegistration[] = [
   { name: "invariant", register: registerInvariant },
   { name: "find", register: registerFind, primary: true },
   { name: "recall", register: registerRecall, primary: true },
+  { name: "memory-graph", register: registerMemoryGraph },
+  { name: "memory-health", register: registerMemoryHealth },
+  { name: "memory-suggestions", register: registerMemorySuggestions },
   { name: "prime", register: registerPrime, primary: true },
   { name: "trace", register: registerTrace, primary: true },
   { name: "serve", register: registerServe, primary: true },
@@ -152,6 +159,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "verify", register: registerVerify },
   { name: "packet", register: registerPacket },
   { name: "done", register: registerDone, primary: true },
+  { name: "todos", register: registerTodos },
   { name: "sync", register: registerSync },
   { name: "doc", register: registerDoc, primary: true },
   { name: "prune", register: registerPrune },

@@ -13,7 +13,7 @@
  * with the rest of gps. Scoring mirrors the tier philosophy of `search.ts`:
  * exact phrase > all query tokens present > fraction present > weak containment.
  */
-import type { Note, Decision, Preference } from "@invariance/gps-schemas";
+import type { Note, Decision, Preference, Question, Assumption, TodoItem } from "@invariance/gps-schemas";
 import { extractTokens } from "./tokens.js";
 import {
   loadAllNotes,
@@ -26,8 +26,19 @@ import { loadInvariants } from "./invariants.js";
 import { loadAllDecisions, filterExpiredDecisions } from "./decisions.js";
 import { loadPreferences } from "./preferences.js";
 import { readGlobalLessons } from "./claude_md.js";
+import { readIndex, type GpsIndex } from "./index_store.js";
+import { filterByStatus, loadAllQuestions } from "./questions.js";
+import { loadAllAssumptions } from "./assumptions.js";
+import { listTodos } from "./todos.js";
 
-export type RecallKind = "note" | "decision" | "invariant" | "preference" | "lesson";
+export type RecallKind = "note" | "decision" | "invariant" | "preference" | "lesson" | "question" | "assumption" | "todo";
+
+export interface RecallRelatedSymbol {
+  symbol: string;
+  file: string;
+  line: number;
+  relation: "anchor" | "caller" | "callee";
+}
 
 export interface RecallHit {
   kind: RecallKind;
@@ -38,12 +49,18 @@ export interface RecallHit {
   score: number;
   severity?: string;
   source?: string;
+  /** Optional symbol-graph expansion for agents that need nearby code context. */
+  related_symbols?: RecallRelatedSymbol[];
 }
 
 export interface RecallOptions {
   limit?: number;
   /** Restrict to a subset of artifact kinds. */
   kinds?: RecallKind[];
+  /** Attach one-hop symbol graph context to memory hits when .gps/index exists. */
+  related?: boolean;
+  /** Max related symbols per hit. */
+  relatedLimit?: number;
 }
 
 /** Query tokens are few; widen the cap for artifact text so long rules tokenize fully. */
@@ -90,6 +107,19 @@ function decisionText(d: Decision): string {
 
 function prefText(p: Preference): string {
   return p.topic ? `${p.text} [${p.topic}]` : p.text;
+}
+
+function questionText(q: Question): string {
+  return q.resolution ? `${q.question} — resolved: ${q.resolution}` : q.question;
+}
+
+function assumptionText(a: Assumption): string {
+  return a.evidence ? `${a.statement} (${a.evidence})` : a.statement;
+}
+
+function todoText(t: TodoItem): string {
+  const loc = t.line !== undefined ? `${t.file}:${t.line}` : t.file;
+  return `${t.text} (${loc})`;
 }
 
 /**
@@ -171,14 +201,174 @@ export async function recallMemory(
     }
   }
 
+  if (want("question")) {
+    for (const q of filterByStatus(await loadAllQuestions(root), "unresolved")) {
+      consider({
+        kind: "question",
+        text: questionText(q),
+        anchor: q.symbol,
+        severity: "open",
+        source: q.asked_by,
+      }, 6);
+    }
+  }
+
+  if (want("assumption")) {
+    for (const a of (await loadAllAssumptions(root)).filter((item) => !item.verified)) {
+      consider({
+        kind: "assumption",
+        text: assumptionText(a),
+        anchor: a.symbol,
+        severity: a.confidence,
+        source: a.source,
+      }, a.confidence === "high" ? 6 : a.confidence === "medium" ? 3 : 0);
+    }
+  }
+
+  if (want("todo")) {
+    for (const t of await listTodos(root)) {
+      consider({
+        kind: "todo",
+        text: todoText(t),
+        anchor: t.symbol ?? `file:${t.file}`,
+        severity: t.source,
+        source: t.source,
+      }, t.source === "failure" ? 6 : t.source === "manual" ? 3 : 0);
+    }
+  }
+
   hits.sort(
     (a, b) => b.score - a.score || a.text.length - b.text.length || a.kind.localeCompare(b.kind),
   );
-  return hits.slice(0, opts.limit ?? 20);
+  const limited = hits.slice(0, opts.limit ?? 20);
+  if (opts.related) await attachRelatedSymbols(root, limited, opts.relatedLimit ?? 6);
+  return limited;
 }
 
 /** Markdown line for one hit, used by the CLI renderer and packByBudget. */
 export function formatRecallHit(h: RecallHit): string {
   const meta = [h.kind, h.anchor].filter(Boolean).join(" · ");
-  return `- ${h.text} _(${meta})_`;
+  const related = h.related_symbols?.length
+    ? ` — related: ${h.related_symbols.map((s) => `${s.relation}:${s.symbol} ${s.file}:${s.line}`).join("; ")}`
+    : "";
+  return `- ${h.text} _(${meta})_${related}`;
+}
+
+async function attachRelatedSymbols(root: string, hits: RecallHit[], limit: number): Promise<void> {
+  let index: GpsIndex;
+  try {
+    index = await readIndex(root);
+  } catch {
+    return;
+  }
+  const graph = buildGraphLookup(index);
+  for (const h of hits) {
+    const related = relatedForHit(h, graph, limit);
+    if (related.length) h.related_symbols = related;
+  }
+}
+
+interface GraphLookup {
+  index: GpsIndex;
+  byName: Map<string, GpsIndex["symbols"][number]>;
+  byFile: Map<string, GpsIndex["symbols"]>;
+  callers: Map<string, Set<string>>;
+  callees: Map<string, Set<string>>;
+}
+
+function buildGraphLookup(index: GpsIndex): GraphLookup {
+  const byName = new Map<string, GpsIndex["symbols"][number]>();
+  const byFile = new Map<string, GpsIndex["symbols"]>();
+  const callers = new Map<string, Set<string>>();
+  const callees = new Map<string, Set<string>>();
+  const addName = (key: string | undefined, sym: GpsIndex["symbols"][number]) => {
+    if (!key) return;
+    const lower = key.toLowerCase();
+    if (!byName.has(lower)) byName.set(lower, sym);
+  };
+  for (const s of index.symbols) {
+    addName(s.id, s);
+    addName(s.qualified_name, s);
+    addName(s.name, s);
+    const inFile = byFile.get(s.file) ?? [];
+    inFile.push(s);
+    byFile.set(s.file, inFile);
+  }
+  for (const symbols of byFile.values()) symbols.sort((a, b) => a.line - b.line);
+  for (const e of index.edges) {
+    const from = e.from_id ?? e.from;
+    const to = e.to_id ?? e.to;
+    if (!from || !to) continue;
+    pushSet(callers, to, from);
+    pushSet(callees, from, to);
+  }
+  return { index, byName, byFile, callers, callees };
+}
+
+function relatedForHit(hit: RecallHit, graph: GraphLookup, limit: number): RecallRelatedSymbol[] {
+  if (!hit.anchor || limit <= 0) return [];
+  const anchors = anchorSymbols(hit.anchor, graph).slice(0, Math.max(1, Math.min(limit, 3)));
+  const out: RecallRelatedSymbol[] = [];
+  const seen = new Set<string>();
+  const add = (sym: GpsIndex["symbols"][number] | undefined, relation: RecallRelatedSymbol["relation"]) => {
+    if (!sym || out.length >= limit) return;
+    const key = `${relation}:${sym.id ?? sym.qualified_name ?? sym.name}:${sym.file}:${sym.line}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      symbol: sym.qualified_name ?? sym.name,
+      file: sym.file,
+      line: sym.line,
+      relation,
+    });
+  };
+  for (const sym of anchors) add(sym, "anchor");
+  for (const sym of anchors) {
+    for (const symKey of graphKeys(sym)) {
+      for (const key of graph.callers.get(symKey) ?? []) add(resolveGraphKey(key, graph), "caller");
+      for (const key of graph.callees.get(symKey) ?? []) add(resolveGraphKey(key, graph), "callee");
+    }
+  }
+  return out;
+}
+
+function anchorSymbols(anchor: string, graph: GraphLookup): GpsIndex["symbols"] {
+  const fileMatch = /^(?:file|area):(.+)$/.exec(anchor);
+  if (fileMatch) {
+    const target = fileMatch[1]!;
+    const exact = graph.byFile.get(target);
+    if (exact) return exact;
+    return graph.index.symbols.filter((s) => s.file.startsWith(`${target}/`)).slice(0, 3);
+  }
+  const out: GpsIndex["symbols"] = [];
+  const seen = new Set<string>();
+  for (const raw of anchor.split(",")) {
+    const key = raw.trim().toLowerCase();
+    if (!key) continue;
+    const sym = graph.byName.get(key);
+    const id = sym ? symbolKey(sym) : "";
+    if (sym && !seen.has(id)) {
+      seen.add(id);
+      out.push(sym);
+    }
+  }
+  return out;
+}
+
+function resolveGraphKey(key: string, graph: GraphLookup): GpsIndex["symbols"][number] | undefined {
+  return graph.byName.get(key.toLowerCase());
+}
+
+function symbolKey(sym: GpsIndex["symbols"][number]): string {
+  return sym.id ?? sym.qualified_name ?? sym.name;
+}
+
+function graphKeys(sym: GpsIndex["symbols"][number]): string[] {
+  return [sym.id, sym.qualified_name, sym.name].filter((k): k is string => !!k);
+}
+
+function pushSet<K, V>(map: Map<K, Set<V>>, key: K, value: V): void {
+  const set = map.get(key);
+  if (set) set.add(value);
+  else map.set(key, new Set([value]));
 }

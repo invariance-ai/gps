@@ -50,12 +50,16 @@ Useful manual calls:
 \`\`\`bash
 gps find "<keyword>"                  # locate existing helpers before writing new ones
 gps context <symbol> --markdown       # plan a multi-file change
+gps recall "<topic>" --related        # search repo memory by topic, with nearby symbols
+gps memory-graph "<topic>" --json     # inspect connected memory + symbol graph
+gps memory-health                     # repo memory score + maintenance actions
 gps decisions <symbol>                # check prior choices before re-litigating
 gps preferences                       # see the user's captured standing rules
 gps prepare --intent "<plan>"         # decision-ready brief; symbol inferred from intent
 gps prepare <symbol> --intent "<…>"   # same, with explicit symbol
 gps brief                             # pre-finalize: changed symbols, invariants, notes, tests, no-test warnings
-gps done                              # final self-audit plus memory nudges from wasted search/failure loops
+gps memory-suggestions                # closeout queue: memory gaps/questions/assumptions/TODOs for changed symbols
+gps done                              # final self-audit plus memory nudges for changed symbols/search/failure loops
 gps suggest                           # authoring queue: hot symbols, repeated lessons, agent-friction candidates
 \`\`\`
 
@@ -71,10 +75,9 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`\`\`
 
 Save hard-won findings. If you spent real time locating code, tests, config, owners, fixtures,
-or a non-obvious workflow, record the answer before you finish. When \`gps done\` or
-\`gps suggest\` prints an agent-friction candidate — or the MCP \`brief\` tool returns a
-non-empty \`memory_suggestions\` array — run the shown \`remember_command\` (a ready-to-run
-\`gps remember …\`) unless the fact is obvious or wrong:
+or a non-obvious workflow, record the answer before you finish. When \`gps done\`,
+\`gps suggest\`, or MCP \`memory_suggestions\` returns a memory candidate, run the shown
+command unless the fact is obvious or wrong:
 
 \`\`\`bash
 gps remember "Refund approval tests live in apps/api/src/refund-approval.test.ts"
@@ -213,6 +216,25 @@ Search for reusable code first:
 gps find "<keyword>" --json
 \`\`\`
 
+## When you know the topic but not the symbol
+
+Use topic memory before re-deriving conventions from scratch:
+
+\`\`\`text
+mcp__gps__recall_memory { "query": "<topic>", "related": true }
+mcp__gps__memory_graph { "query": "<topic>" }
+mcp__gps__memory_health {}
+mcp__gps__memory_suggestions { "base": "HEAD" }
+\`\`\`
+
+CLI equivalents:
+
+\`\`\`bash
+gps recall "<topic>" --related
+gps memory-graph "<topic>" --json
+gps memory-health --json
+\`\`\`
+
 ## Tag the session early
 
 When you understand what the user is working on, tag once so gps learns which symbols belong to
@@ -235,10 +257,9 @@ gps decide <symbol> --decision "<choice>" --rejected "<alternative>"
 \`gps lessons record\`.
 
 If you had to search around to find the right file, test, config, fixture, owner, or entrypoint,
-save that finding with \`gps remember\` before you finish. If \`gps done\` or \`gps suggest --auto\`
-prints an agent-friction candidate — or the MCP \`brief\` tool returns \`memory_suggestions\` —
-run its \`remember_command\` unless the suggested fact is obvious or incorrect. Future agents
-should not repeat the same search.
+save that finding with \`gps remember\` before you finish. If \`gps done\` prints a
+\`memory_suggestions\` entry or agent-friction candidate, run its suggested command unless the
+fact is obvious or incorrect. Future agents should not repeat the same search.
 
 ## Preferences and lessons
 
@@ -293,7 +314,9 @@ gps tests <symbol> --json                        # tests that protect a specific
 After a successful edit:
 
 \`\`\`bash
-gps done                                        # self-audit plus memory nudges from wasted search/failure loops
+gps done                                        # self-audit plus memory nudges for changed symbols/search/failure loops
+gps memory-suggestions                          # memory-only closeout queue without audit exit code
+gps memory-health                               # check review/validation/prune debt in repo memory
 gps remember "<hard-won repo fact>"             # save findings future agents should not rediscover
 gps lessons record "<one sentence>"              # persist what you learned
 gps decide <symbol> --decision "<choice>" --rejected "<alternative>"

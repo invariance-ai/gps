@@ -13,11 +13,13 @@ interface RecallOpts extends RootOption {
   limit: number;
   budget?: string;
   kind?: string;
+  related?: boolean;
+  relatedLimit?: number;
   json?: boolean;
   tokens?: boolean;
 }
 
-const KINDS: RecallKind[] = ["note", "decision", "invariant", "preference", "lesson"];
+const KINDS: RecallKind[] = ["note", "decision", "invariant", "preference", "lesson", "question", "assumption", "todo"];
 
 function parseKinds(raw?: string): RecallKind[] | undefined {
   if (!raw) return undefined;
@@ -39,6 +41,8 @@ export function registerRecall(program: Command): void {
       .option("--limit <n>", "Max results", (v) => parseInt(v, 10), 20)
       .option("--budget <tokens>", "Approximate token budget for the rendered output")
       .option("--kind <list>", `Restrict to comma-separated kinds (${KINDS.join(",")})`)
+      .option("--related", "Attach one-hop symbol graph context to matching memory")
+      .option("--related-limit <n>", "Max related symbols per memory hit", (v) => parseInt(v, 10), 6)
       .option("--tokens", "Print estimated token cost of the output")
       .option("--cost", "Alias for --tokens")
       .option("--json", "Emit JSON instead of markdown"),
@@ -51,7 +55,12 @@ export function registerRecall(program: Command): void {
       }
       const showTokens = !!(opts.tokens || opts.cost);
       const kinds = parseKinds(opts.kind);
-      const hits = await recallMemory(root, query, { limit: opts.limit, kinds });
+      const hits = await recallMemory(root, query, {
+        limit: opts.limit,
+        kinds,
+        related: !!opts.related,
+        relatedLimit: opts.relatedLimit,
+      });
 
       if (opts.json) {
         const out: Record<string, unknown> = { query, hits };
