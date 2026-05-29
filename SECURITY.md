@@ -30,6 +30,18 @@ Some optional commands can process transcripts or call an LLM if you explicitly
 configure an API key and run those commands. Those commands write extracted
 memory back to `.gps/` according to the repo capture policy.
 
+Two commands send portions of your **source** to Anthropic's API, but only when
+`ANTHROPIC_API_KEY` is set and you run them explicitly:
+
+- `gps doc` — when LLM gap-fill is enabled (the default if a key is present), it
+  sends changed diff hunks to fill documentation gaps. Pass `--no-llm` to keep it
+  fully local.
+- `gps postmortem --pr <n> --call-api` — sends the PR diff for analysis. Omit
+  `--call-api` to stay local.
+
+No code is sent without an API key, and never from the default `setup`, `index`,
+`find`, `recall`, or MCP workflows.
+
 ## Agent integrations
 
 `gps setup` can write integration files for the agent you choose:
@@ -90,8 +102,21 @@ To stop agent automation, remove the generated integration files for your agent:
 To keep the integration but disable automatic suggestions, set
 `auto_suggest: false` in `.gps/config.yml`.
 
+## Supported versions
+
+| Version | Supported |
+| ------- | --------- |
+| 0.2.x   | ✅        |
+| < 0.2   | ❌        |
+
+`gps` is alpha software; security fixes land on the latest 0.2.x release.
+
 ## Reporting vulnerabilities
 
-Please report security issues privately through the maintainer contact listed in
-the repository profile, or open a minimal GitHub issue if no private route is
-available. Do not include secrets or private code in public reports.
+Please report security issues **privately** using GitHub's private vulnerability
+reporting: open the repository's **Security** tab → **Report a vulnerability**
+(<https://github.com/invariance-ai/gps/security/advisories/new>). If that route is
+unavailable, email **security@invariance.ai**.
+
+Do not open a public issue for a vulnerability, and do not include secrets or
+private code in any report. We aim to acknowledge reports within 72 hours.
