@@ -353,16 +353,13 @@ export interface RunInstallClaudeOpts {
 }
 
 export async function runInstallClaude(root: string, opts: RunInstallClaudeOpts): Promise<void> {
-  const writes: Array<[string, string]> = [
-    [path.join(root, ".claude/skills/gps/SKILL.md"), CLAUDE_SKILL],
-    [
-      path.join(root, ".claude/settings.json"),
-      JSON.stringify(claudeSettings(opts.spec.shell), null, 2) + "\n",
-    ],
-  ];
-  for (const [file, content] of writes) {
-    await writeManagedFile(root, file, content, opts.force);
-  }
+  await writeManagedFile(
+    root,
+    path.join(root, ".claude/skills/gps/SKILL.md"),
+    CLAUDE_SKILL,
+    opts.force,
+  );
+  await upsertClaudeSettings(root, opts.spec);
   await upsertClaudeMcp(root, opts.spec, !!opts.autoSuggest);
   if (!opts.skipClaudeMd) await upsertAgentMd(root, "CLAUDE.md", CLAUDE_AGENT_INSTRUCTIONS);
 }
@@ -561,6 +558,62 @@ function claudeSettings(cmd: string): unknown {
       ],
     },
   };
+}
+
+interface HookEntry { type?: string; command?: string }
+interface HookGroup { matcher?: string; hooks?: HookEntry[] }
+
+/** A hook group is gps-owned if any of its commands invokes the gps CLI. */
+function isGpsHookGroup(group: HookGroup): boolean {
+  const cmds = (group.hooks ?? []).map((h) => h.command ?? "");
+  const gpsSub =
+    /\bgps\s+(index|learn-todos|prune|feature|session|preferences|capture-preference|capture-directive|context-from-prompt|record-failure|attach|validate|brief|suggest)\b/;
+  return cmds.some((c) => c.includes("@invariance/gps") || gpsSub.test(c));
+}
+
+/**
+ * Merge gps hooks into an existing Claude `settings.json` object. For every hook
+ * event gps owns, drop any prior gps-authored groups (idempotent re-install) and
+ * append gps groups AFTER the user's own groups. User hooks, other events, and
+ * all non-hook settings keys are preserved untouched.
+ */
+export function mergeClaudeSettings(
+  existing: Record<string, unknown>,
+  gps: { hooks: Record<string, HookGroup[]> },
+): Record<string, unknown> {
+  const existingHooks = (existing.hooks as Record<string, HookGroup[]> | undefined) ?? {};
+  const mergedHooks: Record<string, HookGroup[]> = { ...existingHooks };
+  for (const [event, gpsGroups] of Object.entries(gps.hooks)) {
+    const userGroups = (existingHooks[event] ?? []).filter((g) => !isGpsHookGroup(g));
+    mergedHooks[event] = [...userGroups, ...gpsGroups];
+  }
+  return { ...existing, hooks: mergedHooks };
+}
+
+/**
+ * Write/merge `.claude/settings.json`. Unlike a managed whole-file write, this
+ * MUST merge: a user with any pre-existing settings.json would otherwise get the
+ * file skipped and end up with zero gps hooks (the integration silently inert).
+ */
+async function upsertClaudeSettings(root: string, spec: CmdSpec): Promise<void> {
+  const file = path.join(root, ".claude/settings.json");
+  let existing: Record<string, unknown> = {};
+  let hadFile = false;
+  try {
+    existing = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    hadFile = true;
+  } catch {
+    // create / overwrite below (missing or unparseable)
+  }
+  const gps = claudeSettings(spec.shell) as { hooks: Record<string, HookGroup[]> };
+  const next = mergeClaudeSettings(existing, gps);
+  if (DRY_RUN) {
+    console.log(kleur.yellow(`${hadFile ? "would merge gps hooks into" : "would write"}  `) + path.relative(root, file));
+    return;
+  }
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, JSON.stringify(next, null, 2) + "\n");
+  console.log(kleur.green(`${hadFile ? "merged  " : "wrote   "}${path.relative(root, file)}`));
 }
 
 /**

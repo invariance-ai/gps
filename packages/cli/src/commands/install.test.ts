@@ -2,7 +2,51 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex, placeCodexBlock } from "./install.js";
+import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex, placeCodexBlock, mergeClaudeSettings } from "./install.js";
+
+describe("mergeClaudeSettings: never clobber or skip a user's settings.json", () => {
+  const gps = {
+    hooks: {
+      SessionStart: [{ matcher: "startup|resume", hooks: [{ type: "command", command: 'npx -y @invariance/gps index --root "$PWD"' }] }],
+      Stop: [{ hooks: [{ type: "command", command: 'npx -y @invariance/gps brief --root "$PWD"' }] }],
+    },
+  };
+
+  it("adds gps hooks while preserving a user's existing hooks and other keys", () => {
+    const existing = {
+      env: { MY_VAR: "1" },
+      hooks: { SessionStart: [{ hooks: [{ type: "command", command: "echo user-hook" }] }] },
+    };
+    const out = mergeClaudeSettings(existing, gps) as any;
+    expect(out.env.MY_VAR).toBe("1"); // unrelated key untouched
+    expect(JSON.stringify(out)).toContain("echo user-hook"); // user hook kept
+    expect(JSON.stringify(out)).toContain("@invariance/gps"); // gps hooks added (the bug: were skipped)
+    expect(out.hooks.SessionStart).toHaveLength(2); // user group + gps group
+    expect(out.hooks.Stop).toHaveLength(1);
+  });
+
+  it("is idempotent: re-merging does not duplicate gps hook groups", () => {
+    const once = mergeClaudeSettings({}, gps);
+    const twice = mergeClaudeSettings(once, gps) as any;
+    expect(twice.hooks.SessionStart).toHaveLength(1);
+    expect(twice.hooks.Stop).toHaveLength(1);
+  });
+
+  it("refreshes gps hooks (drops the old gps group) without touching user groups", () => {
+    const stale = {
+      hooks: {
+        SessionStart: [
+          { hooks: [{ type: "command", command: "echo user-hook" }] },
+          { hooks: [{ type: "command", command: 'npx -y @invariance/gps index --root "$PWD" --OLD' }] },
+        ],
+      },
+    };
+    const out = mergeClaudeSettings(stale, gps) as any;
+    expect(out.hooks.SessionStart).toHaveLength(2); // user + single fresh gps
+    expect(JSON.stringify(out)).toContain("echo user-hook");
+    expect(JSON.stringify(out)).not.toContain("--OLD"); // stale gps group dropped
+  });
+});
 
 const CODEX_BLOCK =
   "# gps:start — managed by `gps install codex`. Edit outside markers freely.\n" +
