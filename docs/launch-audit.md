@@ -16,7 +16,7 @@ The default loop should stay boring:
 
 ```bash
 npx -y @invariance/gps setup --yes --with-claude    # or --with-codex / --with-cursor
-gps prepare --intent "what I am about to change"
+gps prepare <symbol> --intent "what I am about to change"
 gps remember "hard-won repo fact"
 gps done
 ```

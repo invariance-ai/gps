@@ -17,7 +17,7 @@ GPS fixes that by adding a local memory layer beside your code. It indexes symbo
 The default loop is deliberately small:
 
 ```bash
-gps prepare --intent "what I am about to change"
+gps prepare <symbol> --intent "what I am about to change"
 gps remember "hard-won repo fact"
 gps done
 ```
@@ -97,7 +97,7 @@ That writes:
 GPS is local-first and CLI-first. MCP is available where the agent supports it, but the basic workflow is just:
 
 ```bash
-gps prepare --intent "what I am about to change"
+gps prepare <symbol> --intent "what I am about to change"
 gps remember "hard-won repo fact"
 gps done
 ```
