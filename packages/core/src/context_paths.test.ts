@@ -64,6 +64,44 @@ describe("getContext path/area note retrieval", () => {
     expect(c.notes.some((n) => (n.scope ?? "symbol") === "area")).toBe(true);
   });
 
+  it("surfaces symbol memory anchored on the qualified name, not just the bare name", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "gps-ctxqn-"));
+    roots.push(root);
+    await mkdir(path.join(root, "src"), { recursive: true });
+    const index: GpsIndex = {
+      version: 2,
+      built_at: new Date().toISOString(),
+      root,
+      files: ["src/refunds.ts"],
+      symbols: [
+        {
+          id: "src/refunds.ts#create",
+          name: "create",
+          qualified_name: "Stripe.refunds.create",
+          kind: "function",
+          file: "src/refunds.ts",
+          line: 5,
+          end_line: 5,
+        },
+      ],
+      edges: [],
+    };
+    await writeIndex(root, index);
+    // brief.ts / memory_suggestions.ts anchor notes on the qualified name; the
+    // old getContext only loaded by bare name and silently dropped these.
+    await appendNote(root, { symbol: "Stripe.refunds.create", lesson: "qualified-name note", severity: "high" });
+    await appendNote(root, { symbol: "create", lesson: "bare-name note", severity: "high" });
+
+    const ctx = await open(root);
+    const c = await getContext(
+      { symbol: "Stripe.refunds.create", strands: [...STRANDS], mode: "full", budget: 0 },
+      ctx,
+    );
+    const lessons = c.notes.map((n) => n.lesson);
+    expect(lessons).toContain("qualified-name note");
+    expect(lessons).toContain("bare-name note");
+  });
+
   it("drops an expired area note", async () => {
     const root = await fixtureRepo();
     await appendAreaNote(root, { id: "a2", target: "src", lesson: "expired directive" });
