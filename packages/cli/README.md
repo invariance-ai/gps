@@ -32,8 +32,10 @@ gps install claude --auto-suggest          # hook-safe authoring queue nudges; n
 
 ```bash
 gps setup --yes --with-claude                         # init + index + TODO lift + Claude wiring
+gps next                                              # first useful commands and sample prepare targets
 gps prepare <symbol> --intent "<one-liner>"           # decision-ready brief before edits
 gps remember "<one sentence>"                         # save hard-won repo facts
+gps save-this "<one sentence>"                        # preview a save command; add --yes to persist
 gps done                                              # post-edit self-audit + memory nudges
 ```
 
@@ -50,6 +52,7 @@ gps find "<query>"                                    # fuzzy symbol search
 gps trace <symbol>                                    # git provenance
 
 # Writing — anchored memory
+gps save-this "..."                                   # preview "save this?" capture
 gps lessons record "..."                              # record a lesson; auto-classified global/scoped
 gps notes <symbol>                                    # what previous edits left behind
 gps learn-todos                                       # one-shot: lift TODO/FIXME into notes
@@ -61,6 +64,7 @@ gps serve                                             # MCP stdio server
 gps serve --observe                                   # opt-in: record per-symbol query counts only
 gps suggest                                           # hot symbols, near-promotions, wasted-search memory nudges
 gps suggest --auto                                    # no-op unless auto_suggest=true
+gps review-memory --html                              # local visual memory review
 ```
 
 All read commands accept `--json` (stable contract) or `--markdown` (LLM-optimal).

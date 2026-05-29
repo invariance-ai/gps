@@ -1,4 +1,6 @@
 import type { Command } from "commander";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import kleur from "kleur";
 import { buildReviewQueue, removeNoteById, updateNoteById, reclassifyLesson } from "@invariance/gps-core";
 import type { NoteScope } from "@invariance/gps-schemas";
@@ -7,6 +9,8 @@ import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 interface Opts extends RootOption {
   days: number;
   limit: number;
+  html?: boolean;
+  out?: string;
   json?: boolean;
 }
 
@@ -24,6 +28,70 @@ function validScope(scope: string): NoteScope | undefined {
   return undefined;
 }
 
+function esc(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderReviewHtml(q: Awaited<ReturnType<typeof buildReviewQueue>>): string {
+  const rows = q.items.map((item) => `
+      <tr>
+        <td><span class="pill ${esc(item.priority)}">${esc(item.priority)}</span></td>
+        <td>${esc(item.symbol)}</td>
+        <td>${esc(item.kind)}</td>
+        <td>${esc(item.reason)}</td>
+        <td><code>${esc(item.command)}</code></td>
+      </tr>`).join("");
+  const promote = q.promote.map((p) => `
+      <li><strong>${esc(p.symbol)}</strong> <span class="muted">${esc(p.severity_hint)}</span><br>${esc(p.representative_lesson)}</li>`).join("");
+  const stale = q.stale.map((s) => `
+      <li><strong>${esc(s.symbol)}</strong> <span class="muted">${s.age_days}d ${esc(s.kind)}</span><br>${esc(s.text)}</li>`).join("");
+  const questions = q.open_questions.map((oq) => `
+      <li><strong>${esc(oq.symbol)}</strong> <span class="muted">${oq.age_days}d</span><br>${esc(oq.question)}</li>`).join("");
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS memory review</title>
+  <style>
+    body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 32px; color: #172026; background: #f7f8f9; }
+    main { max-width: 1120px; margin: 0 auto; }
+    h1, h2 { margin: 0 0 12px; }
+    section { margin: 24px 0; }
+    table { width: 100%; border-collapse: collapse; background: white; border: 1px solid #d9dee3; }
+    th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid #e8ecef; }
+    th { font-size: 12px; text-transform: uppercase; color: #52616b; background: #f0f3f5; }
+    code { white-space: pre-wrap; color: #0b5cad; }
+    ul { background: white; border: 1px solid #d9dee3; padding: 14px 22px; }
+    li { margin: 10px 0; }
+    .muted { color: #697782; }
+    .pill { display: inline-block; min-width: 52px; padding: 2px 6px; border-radius: 4px; color: white; text-align: center; font-size: 12px; }
+    .high { background: #b42318; }
+    .medium { background: #b54708; }
+    .low { background: #475467; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>GPS memory review</h1>
+  <p class="muted">${q.total} review item${q.total === 1 ? "" : "s"} generated ${esc(new Date().toISOString())}</p>
+  <section>
+    <h2>Next actions</h2>
+    ${rows ? `<table><thead><tr><th>Priority</th><th>Symbol</th><th>Kind</th><th>Reason</th><th>Command</th></tr></thead><tbody>${rows}</tbody></table>` : "<p>No next actions.</p>"}
+  </section>
+  <section><h2>Promotions</h2>${promote ? `<ul>${promote}</ul>` : "<p>No promotion candidates.</p>"}</section>
+  <section><h2>Stale memory</h2>${stale ? `<ul>${stale}</ul>` : "<p>No stale memory.</p>"}</section>
+  <section><h2>Open questions</h2>${questions ? `<ul>${questions}</ul>` : "<p>No open questions.</p>"}</section>
+</main>
+</body>
+</html>
+`;
+}
+
 export function registerReviewMemory(program: Command): void {
   const cmd = program
       .command("review-memory")
@@ -35,12 +103,21 @@ export function registerReviewMemory(program: Command): void {
       .description("List promotions, stale entries, and open questions")
       .option("--days <n>", "Staleness threshold in days", (v) => parseInt(v, 10), 90)
       .option("--limit <n>", "Cap per section", (v) => parseInt(v, 10), 25)
+      .option("--html", "Write a local HTML memory review")
+      .option("--out <path>", "HTML output path (default: .gps/review/memory.html)")
       .option("--json", "Emit JSON"),
   ).action(async (opts: Opts) => {
     const root = resolveRoot(opts);
     const q = await buildReviewQueue(root, { days: opts.days, limit: opts.limit });
     if (opts.json) {
       console.log(JSON.stringify(q, null, 2));
+      return;
+    }
+    if (opts.html) {
+      const out = path.resolve(root, opts.out ?? ".gps/review/memory.html");
+      await mkdir(path.dirname(out), { recursive: true });
+      await writeFile(out, renderReviewHtml(q));
+      console.log(kleur.green("memory review written: ") + path.relative(root, out));
       return;
     }
     if (q.total === 0) {

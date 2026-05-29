@@ -34,7 +34,7 @@ gps done
 | Live docs | Experimental local HTML docs via `gps doc --experimental-live-docs` | Must stay explicitly feature-flagged; server binds localhost by default and must not be represented as stable launch surface |
 | Benchmarks | Measured perf and dogfood docs exist | Market claims must cite the exact benchmark file and caveats |
 | Package hygiene | Build excludes compiled tests from dist | Keep `npm pack --dry-run` clean before publishing |
-| Help surface | Curated top-level commands | `gps --help` should show setup/prepare/remember/done/doc/find/doctor, while advanced commands remain callable |
+| Help surface | Curated top-level commands | `gps --help` should show setup/next/prepare/remember/done/doc/find/doctor, while advanced commands remain callable |
 
 ## MVP install surface
 
@@ -112,8 +112,20 @@ pnpm release:check
 
 `pnpm smoke:pack` installs the packed workspace tarballs into clean temporary
 repos and verifies Claude-only, Codex-only, Cursor-only, and all-agent setup.
-If the repo packages are already versioned and committed but npm `latest` is
-behind, the credentialed handoff is:
+If the repo has the `NPM_TOKEN` GitHub secret, publish by pushing the matching
+release tag. `.github/workflows/publish.yml` verifies build, typecheck, tests,
+lockstep package versions, and that the tag matches `packages/cli/package.json`
+before publishing:
+
+```bash
+VERSION="$(node -p "require('./packages/cli/package.json').version")"
+git tag "v$VERSION"
+git push origin "v$VERSION"
+gh run watch "$(gh run list --workflow publish.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+```
+
+If publishing from a locally authenticated shell instead, the credentialed
+handoff is:
 
 ```bash
 npm whoami                                      # must succeed
@@ -126,11 +138,12 @@ npm view @invariance/gps-mcp version
 npm view @invariance/gps-schemas version
 ```
 
-Only tag the release after the registry verifies the intended version:
+For the local publish path only, tag the release after the registry verifies the
+intended version:
 
 ```bash
-git tag v0.2.1
-git push origin v0.2.1
+git tag "v$VERSION"
+git push origin "v$VERSION"
 ```
 
 After publishing, run one public-registry check so npm `latest` is not stale:

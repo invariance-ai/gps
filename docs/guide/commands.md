@@ -1132,6 +1132,20 @@ memory-suggestions [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `next`
+
+Show the fastest useful GPS commands for this repo
+
+```
+next [options]
+```
+
+**Options:**
+
+- `--limit <n>` — How many sample symbols to suggest *(default: 3)*
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `notes`
 
 List notes attached to a symbol (or all)
@@ -1475,6 +1489,8 @@ review-memory list [options]
 
 - `--days <n>` — Staleness threshold in days *(default: 90)*
 - `--limit <n>` — Cap per section *(default: 25)*
+- `--html` — Write a local HTML memory review
+- `--out <path>` — HTML output path (default: .gps/review/memory.html)
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
@@ -1547,6 +1563,27 @@ runtime show [options] <symbol>
 
 **Options:**
 
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `save-this`
+
+Preview or save a reusable correction/finding as GPS memory
+
+```
+save-this [options] <fact>
+```
+
+**Options:**
+
+- `--symbol <name>` — Attach to a symbol
+- `--file <path>` — Attach to a file
+- `--feature <label>` — Attach to a feature
+- `--area <dir>` — Attach to an area/directory
+- `--global` — Record as a repo-wide lesson
+- `--evidence <ref>` — PR/commit/doc backing this fact
+- `--severity <level>` — low | medium | high
+- `--yes` — Persist immediately instead of printing the save command
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 

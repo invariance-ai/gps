@@ -79,6 +79,8 @@ import { registerRemember } from "./commands/remember.js";
 import { registerPacket } from "./commands/packet.js";
 import { registerDone } from "./commands/done.js";
 import { registerTodos } from "./commands/todos.js";
+import { registerNext } from "./commands/next.js";
+import { registerSaveThis } from "./commands/save-this.js";
 
 type CommandRegistrar = (program: Command) => void;
 
@@ -91,6 +93,7 @@ interface CommandRegistration {
 const COMMANDS: CommandRegistration[] = [
   { name: "init", register: registerInit, primary: true },
   { name: "setup", register: registerWizard, primary: true },
+  { name: "next", register: registerNext, primary: true },
   { name: "install", register: registerInstall, primary: true },
   { name: "prefer", register: registerPrefer },
   { name: "preferences", register: registerPreferences },
@@ -105,6 +108,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "context", register: registerContext },
   { name: "learn", register: registerLearn },
   { name: "remember", register: registerRemember, primary: true },
+  { name: "save-this", register: registerSaveThis },
   { name: "notes", register: registerNotes },
   { name: "learn-todos", register: registerLearnTodos },
   { name: "decide", register: registerDecide },
@@ -170,7 +174,7 @@ export function buildProgram(): Command {
   const program = new Command()
     .name("gps")
     .description("Codebase context for coding agents.")
-    .version("0.2.1");
+    .version("0.3.0");
 
   program.addHelpText(
     "beforeAll",
@@ -178,6 +182,7 @@ export function buildProgram(): Command {
       "Happy path:",
       "  gps setup --yes --with-claude         init .gps, index, lift TODOs, wire Claude Code",
       "  gps setup --yes --with-codex          init .gps, index, lift TODOs, wire Codex CLI",
+      "  gps next                              first useful commands for this repo",
       "  gps prepare <symbol> --intent <...>   decision-ready brief before edits",
       "  gps remember <fact>                   save a hard-won repo fact",
       "  gps done                              post-edit self-audit",

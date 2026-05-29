@@ -7,6 +7,7 @@ build/
 .env.local
 .gps/index/
 .gps/cache/
+.gps/review/
 .gps/observations.json
 coverage/
 *.log

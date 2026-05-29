@@ -41,8 +41,10 @@ Install several integrations at once: `npx -y @invariance/gps setup --yes --with
 Then it's normal agent usage. **This is the core loop to remember:**
 
 ```bash
+gps next                                                  # first useful commands after install
 gps prepare <symbol> --intent "what I am about to change"   # decision-ready brief before edits
 gps remember "hard-won fact worth reusing"                  # save a durable lesson
+gps save-this "use the shared errors module here" --symbol createRefund   # preview a save command
 gps remember "still need to update the fixture" --reminder --symbol createRefund
 gps done                                                    # post-edit self-audit: changed symbols, tests, invariants
 gps doc --base HEAD                                         # optional shareable review doc for the diff
@@ -163,6 +165,7 @@ The whole happy path is `setup` once, then the core loop above. Everything below
 
 ```bash
 gps setup --yes --with-claude   # init + index + TODO lift + agent wiring (see Quickstart)
+gps next                        # first useful commands and sample prepare targets
 gps install claude              # (re)wire a single agent integration
 gps init                        # write .gps/ config + invariants only
 gps doctor                      # verify gps is installed, indexed, and wired
@@ -186,6 +189,7 @@ gps prime                                             # compact session-start st
 
 ```bash
 gps remember "<one sentence>"                         # save a hard-won fact; auto-classified scope
+gps save-this "<one sentence>"                         # preview "save this?" command; add --yes to persist
 gps remember "still need to update the fixture" --reminder --symbol createRefund   # agent/human reminder
 gps lessons record "..."                              # record a lesson; auto-classified global/scoped
 gps learn <symbol> --lesson "..." [--severity low|medium|high] [--evidence <ref>]  # legacy: always symbol-scoped
@@ -200,6 +204,7 @@ gps learn-todos                                       # one-shot: lift TODO/FIXM
 gps memory-health                                     # repo memory health score and maintenance actions
 gps memory-graph "<query>"                            # topic-centered graph of recalled memory and related symbols
 gps memory-suggestions                                # closeout memory queue for changed symbols
+gps review-memory --html                              # local visual review at .gps/review/memory.html
 gps todos [symbol]                                    # list unresolved GPS TODOs by symbol or file
 ```
 
@@ -439,7 +444,7 @@ To opt in persistently for a repo, set `experimental.live_docs: true` in `.gps/c
 
 ## Status & limitations
 
-v0.2.1 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback. Single-file JSON index — SQLite when repos push past ~500k LOC.
+v0.3.0 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Adoption helpers include `gps next`, `gps save-this`, richer `gps doctor` value summaries, and local HTML memory review. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback. Single-file JSON index — SQLite when repos push past ~500k LOC.
 
 Also shipping: passive metadata observer (`gps serve --observe` — symbol query frequencies only, never conversation content), `gps suggest` for the authoring queue (now also surfaces lessons near promotion), and LLM-assisted postmortem promotion.
 

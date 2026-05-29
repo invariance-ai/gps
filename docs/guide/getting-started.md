@@ -34,6 +34,14 @@ gps tests <symbol>               # tests that protect this symbol
 
 Pick a real symbol from your repo and try each one. Every command accepts `--json` (machine-readable) or `--markdown` (LLM-readable).
 
+If you want the shortest first win, run:
+
+```bash
+gps next
+```
+
+It reports how much GPS indexed, what memory already exists, and a few concrete `gps prepare ...` commands to try in this repo.
+
 In Claude Code the same surface is also exposed as MCP tools — `mcp__gps__prepare_edit` returns a decision-ready brief in one structured call and is the preferred entry point for agents over fanning out to Glob/Read/Grep.
 
 ## 3. Ask an agent something (3 min)
@@ -58,6 +66,15 @@ gps auto-classifies the lesson:
 - **symbol-scoped** lessons land in `.gps/notes/symbol/<name>.json` (loaded only when that symbol is in context)
 
 Wrong classification? `gps lessons reclassify <id> --to global`.
+
+For a correction you are not sure how to scope yet, use the "save this?" preview:
+
+```bash
+gps save-this "Use the shared errors module in apps/api" --area apps/api
+gps save-this "Use the shared errors module in apps/api" --area apps/api --yes
+```
+
+The first command shows the exact `gps remember ...` command GPS would use; `--yes` persists it.
 
 For invariants that should *block* future edits (e.g. policy rules), hand-edit `.gps/invariants.yml`:
 

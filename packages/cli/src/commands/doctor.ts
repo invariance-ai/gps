@@ -16,11 +16,20 @@ import {
   loadAllDecisions,
   findStale,
   loadConfig,
+  testFilesIn,
 } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   json?: boolean;
+}
+
+interface ValueSummary {
+  symbols: number;
+  files: number;
+  tests: number;
+  memory: string;
+  try_now?: string;
 }
 
 export interface Check {
@@ -328,6 +337,25 @@ function nextAction(checks: Check[]): string {
   return "run `gps index`";
 }
 
+async function valueSummary(root: string, checks: Check[]): Promise<ValueSummary | undefined> {
+  const active = checks.find((c) => c.name === "active memory")?.detail;
+  try {
+    const index = await readIndex(root);
+    const sample = index.symbols.find((s) => !/[.]test[.]/.test(s.file) && !/[.]spec[.]/.test(s.file)) ?? index.symbols[0];
+    return {
+      symbols: index.symbols.length,
+      files: index.files.length,
+      tests: testFilesIn(index).length,
+      memory: active ?? "n/a",
+      try_now: sample
+        ? `gps prepare ${JSON.stringify(sample.qualified_name ?? sample.name)} --intent "understand this path"`
+        : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export function registerDoctor(program: Command): void {
   addRootOption(
     program
@@ -338,9 +366,10 @@ export function registerDoctor(program: Command): void {
     const root = resolveRoot(opts);
     const checks = await runChecks(root);
     const failed = checks.filter((c) => !c.ok);
+    const value = await valueSummary(root, checks);
 
     if (opts.json) {
-      console.log(JSON.stringify({ root, ok: failed.length === 0, checks, next_action: nextAction(checks) }, null, 2));
+      console.log(JSON.stringify({ root, ok: failed.length === 0, checks, value, next_action: nextAction(checks) }, null, 2));
       process.exitCode = failed.length === 0 ? 0 : 1;
       return;
     }
@@ -358,6 +387,13 @@ export function registerDoctor(program: Command): void {
     } else {
       console.log(kleur.red(`${failed.length} check(s) failed.`));
       process.exitCode = 1;
+    }
+    if (value) {
+      console.log(
+        kleur.bold("Value: ") +
+          `${value.symbols} symbols, ${value.files} files, ${value.tests} test files; ${value.memory}`,
+      );
+      if (value.try_now) console.log(kleur.bold("Try: ") + value.try_now);
     }
     console.log(kleur.bold("Next: ") + nextAction(checks));
   });

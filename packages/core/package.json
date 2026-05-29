@@ -1,6 +1,6 @@
 {
   "name": "@invariance/gps-core",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Parser, resolver, graph store, and query layer for gps.",
   "license": "MIT",
   "type": "module",
