@@ -49,6 +49,15 @@ export function registerRecall(program: Command): void {
   ).action(async (query: string, opts: RecallOpts & { cost?: boolean }) => {
     try {
       const root = resolveRoot(opts);
+      if (!Number.isInteger(opts.limit) || opts.limit <= 0) {
+        throw new Error("--limit must be a positive integer");
+      }
+      if (
+        opts.relatedLimit !== undefined &&
+        (!Number.isInteger(opts.relatedLimit) || opts.relatedLimit <= 0)
+      ) {
+        throw new Error("--related-limit must be a positive integer");
+      }
       const budget = opts.budget ? Number(opts.budget) : undefined;
       if (budget !== undefined && (!Number.isFinite(budget) || budget <= 0)) {
         throw new Error("--budget must be a positive integer");
