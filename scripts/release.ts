@@ -36,6 +36,15 @@ function run(cmd: string): void {
   execSync(cmd, { cwd: ROOT, stdio: "inherit" });
 }
 
+function requireNpmAuth(): void {
+  try {
+    execSync("npm whoami", { cwd: ROOT, stdio: "ignore" });
+  } catch {
+    console.error("npm is not authenticated. Run `npm adduser` or set a valid npm auth token before publishing.");
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const check = args.includes("--check");
@@ -63,6 +72,9 @@ async function main(): Promise<void> {
   if (!isSemver(version)) {
     console.error(`Not a semver: ${version}`);
     process.exit(1);
+  }
+  if (doPublish) {
+    requireNpmAuth();
   }
 
   // Refuse if working tree is dirty.
