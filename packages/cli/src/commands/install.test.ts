@@ -2,7 +2,66 @@ import { describe, expect, it } from "vitest";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex } from "./install.js";
+import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex, placeCodexBlock } from "./install.js";
+
+const CODEX_BLOCK =
+  "# gps:start — managed by `gps install codex`. Edit outside markers freely.\n" +
+  'notify = ["npx", "-y", "@invariance/gps", "attach", "--transcript", "-", "--capture-prefs"]\n\n' +
+  "[mcp_servers.gps]\n" +
+  'command = "npx"\n' +
+  'args = ["-y", "@invariance/gps", "serve"]\n' +
+  "# gps:end\n";
+
+// The line index of a bare key is meaningful in TOML: it belongs to whatever
+// `[table]` header precedes it. `notify` must come before ANY table header or
+// Codex silently never runs the hook.
+function notifyIsTopLevel(toml: string): boolean {
+  const lines = toml.split("\n");
+  const notify = lines.findIndex((l) => /^notify\s*=/.test(l));
+  if (notify === -1) return false;
+  const tableBefore = lines.slice(0, notify).some((l) => /^\s*\[/.test(l));
+  return !tableBefore;
+}
+
+describe("placeCodexBlock: notify stays a top-level TOML key", () => {
+  it("inserts the block before a pre-existing table so notify is not absorbed into it", () => {
+    const existing = 'model = "o3"\napproval_policy = "untrusted"\n\n[mcp_servers.other]\ncommand = "foo"\n';
+    const out = placeCodexBlock(existing, CODEX_BLOCK);
+    expect(notifyIsTopLevel(out)).toBe(true);
+    // user content preserved
+    expect(out).toContain('model = "o3"');
+    expect(out).toContain("[mcp_servers.other]");
+    // leading top-level keys stay above the block
+    expect(out.indexOf('model = "o3"')).toBeLessThan(out.indexOf("# gps:start"));
+  });
+
+  it("is idempotent: re-running keeps exactly one block, still top-level", () => {
+    const existing = "[mcp_servers.other]\ncommand = \"foo\"\n";
+    const once = placeCodexBlock(existing, CODEX_BLOCK);
+    const twice = placeCodexBlock(once, CODEX_BLOCK);
+    expect((twice.match(/gps:start/g) || []).length).toBe(1);
+    expect(notifyIsTopLevel(twice)).toBe(true);
+    expect(twice).toContain("[mcp_servers.other]");
+  });
+
+  it("relocates a previously misplaced block (block appended after a table) to top-level", () => {
+    // Simulates the old buggy output: block sits AFTER a table.
+    const buggy = `[mcp_servers.other]\ncommand = "foo"\n\n${CODEX_BLOCK}`;
+    const fixed = placeCodexBlock(buggy, CODEX_BLOCK);
+    expect(notifyIsTopLevel(fixed)).toBe(true);
+  });
+
+  it("appends when there are no tables at all", () => {
+    const existing = 'model = "o3"\n';
+    const out = placeCodexBlock(existing, CODEX_BLOCK);
+    expect(notifyIsTopLevel(out)).toBe(true);
+    expect(out).toContain('model = "o3"');
+  });
+
+  it("returns just the block for an empty config", () => {
+    expect(placeCodexBlock("", CODEX_BLOCK)).toBe(CODEX_BLOCK);
+  });
+});
 
 describe("resolveCmd", () => {
   it("errors when both --use-global and --use-local are passed", () => {
