@@ -441,7 +441,7 @@ export const TodoItem = z.object({
   line: z.number().int().nonnegative().optional(),
   symbol: z.string().optional(),
   text: z.string(),
-  source: z.enum(["failure", "note", "manual"]),
+  source: z.enum(["failure", "note", "manual", "todo"]),
   created_at: z.string(),
   resolved_at: z.string().optional(),
 });

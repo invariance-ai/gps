@@ -28,7 +28,7 @@ import {
   listLessons,
   reclassifyLesson,
   recordDirective,
-  listTodos,
+  listTodosWithNotes,
   resolveTodo,
   gate,
   auditSession,
@@ -397,7 +397,7 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "list_todos": {
       const a = args as { file?: string; symbol?: string; include_resolved?: boolean };
-      const todos = await listTodos(root, {
+      const todos = await listTodosWithNotes(root, {
         file: a.file,
         symbol: a.symbol,
         includeResolved: !!a.include_resolved,
