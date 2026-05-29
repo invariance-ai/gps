@@ -564,7 +564,30 @@ function claudeSettings(cmd: string): unknown {
 }
 
 /**
- * Merge gps entries into .codex/config.toml without parsing TOML. We append a
+ * Insert/replace the managed gps block in a TOML config. The block contains a
+ * top-level key (`notify`), which in TOML must appear before any `[table]`
+ * header — otherwise it is silently parsed as a key of the preceding table and
+ * Codex never runs the hook. So we strip any prior block, then insert the new
+ * one immediately before the first table header (after any leading top-level
+ * keys), appending only when the file has no tables. User content is preserved.
+ */
+export function placeCodexBlock(existing: string, block: string): string {
+  const base = existing
+    .replace(/# gps:start[\s\S]*?# gps:end\n?/m, "")
+    .replace(/\n{3,}/g, "\n\n");
+  if (!base.trim()) return block;
+  const lines = base.split("\n");
+  const firstTable = lines.findIndex((l) => /^\s*\[/.test(l));
+  if (firstTable === -1) {
+    return `${base.trimEnd()}\n\n${block}`;
+  }
+  const before = lines.slice(0, firstTable).join("\n").trimEnd();
+  const after = lines.slice(firstTable).join("\n").trim();
+  return `${before ? `${before}\n\n` : ""}${block}\n${after}\n`;
+}
+
+/**
+ * Merge gps entries into .codex/config.toml without parsing TOML. We write a
  * managed block delimited by `# gps:start` / `# gps:end` and rewrite that span
  * on subsequent installs. Anything outside the markers is preserved verbatim.
  */
@@ -591,9 +614,7 @@ async function upsertCodexConfig(root: string, spec: CmdSpec, observe: boolean):
     `${mcpEntry}` +
     `# gps:end\n`;
 
-  const next = existing.includes("# gps:start")
-    ? existing.replace(/# gps:start[\s\S]*?# gps:end\n?/m, block)
-    : `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${block}`;
+  const next = placeCodexBlock(existing, block);
   if (DRY_RUN) {
     const verb = existing.includes("# gps:start") ? "would refresh gps block in" : existing ? "would append gps block to" : "would create";
     console.log(kleur.yellow(`${verb}  `) + path.relative(root, file));
