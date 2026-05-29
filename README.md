@@ -396,47 +396,6 @@ Semgrep and CodeQL can match patterns, but they're security-first and not PM-aut
 
 See [docs/competitive-landscape.md](docs/competitive-landscape.md) for the full survey. Measured quality results live in [`bench/dogfood/2026-05-12-invariance-platform.md`](bench/dogfood/2026-05-12-invariance-platform.md); [`docs/simulated-benchmark.md`](docs/simulated-benchmark.md) contains earlier pre-dogfood simulated estimates and is now superseded.
 
-<<<<<<< HEAD
-## Native-agent prompt commands
-
-`gps` does not need to own the LLM runtime. For Claude Code and Codex, commands that need reasoning print a prompt package by default; the native agent answers using its own model/session, and `gps` records the resulting YAML or command.
-
-```bash
-# Propose an invariant from a regression PR (prints a native-agent prompt)
-gps postmortem --pr 1287
-gps postmortem --diff-file my.diff --symbol createRefund   # offline alternative
-
-# Find clusters of similar notes that should become invariants
-gps promote createRefund                            # rule-based, no API key needed
-
-# Distill a conversation transcript into Decision records
-gps attach --transcript path/to/transcript.txt --symbol createRefund --session "PR-1287"
-
-# Extract Decision records from a PR's description, reviews, and comments
-gps pr-intent --pr 1287
-```
-
-API execution is an explicit opt-in for automation: pass `--call-api` plus `ANTHROPIC_API_KEY` or `--api-key`. The default path is native Claude/Codex.
-
-## Status
-
-v0.2.1 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback (see [What gps is not (yet)](#what-gps-is-not-yet)). Single-file JSON index — SQLite when repos push past ~500k LOC.
-
-Also shipping: passive metadata observer (`gps serve --observe` — symbol query frequencies only, never conversation content), `gps suggest` for the authoring queue (now also surfaces lessons near promotion), and LLM-assisted postmortem promotion.
-
-Next: native `gps attach --session <id>` lookup (the Stop hook already auto-distills via the transcript path), LSP-backed reference resolution, and cross-repo / monorepo symbol IDs.
-
-## What gps is not (yet)
-
-Honest, up-front:
-
-- **Parser precision is ~90% on typical code**, lower on decorators-as-factories, dynamic dispatch, and heavy macros. The default backend is tree-sitter (WASM, zero native deps) for TS/JS/Python with body/`end_line` tracking; a regex backend (8 languages) is the fallback. Trade-off documented in [`packages/core/src/parser.ts:5`](packages/core/src/parser.ts). LSP-backed reference resolution is the next accuracy step.
-- **No semantic import resolution.** Re-exports and barrel files may miss call edges.
-- **No cross-repo / monorepo-aware symbol IDs** yet — each repo is its own graph.
-- **Proof base is n=1.** The dogfood quality result above is one repo, 10 prompts. We're running this against more repos next; see [`docs/dogfood-runbook.md`](docs/dogfood-runbook.md) and contribute a result.
-
-=======
->>>>>>> docs/readme-reorg
 ## Benchmarks
 
 ### Token efficiency (architectural result)
@@ -480,7 +439,7 @@ To opt in persistently for a repo, set `experimental.live_docs: true` in `.gps/c
 
 ## Status & limitations
 
-v0.1.0 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback. Single-file JSON index — SQLite when repos push past ~500k LOC.
+v0.2.1 (alpha). Working CLI + MCP. Ships structural context plus tests, provenance, invariants, notes, and decisions — and the **closed feedback loop**: on session end the Stop hook distills the transcript into `Decision` records; `TODO(symbol):` comments sync into notes (and prune when removed) on every SessionStart; recurring lessons fold across rewordings and auto-promote to standing rules once gates pass; captured preferences persist into a managed CLAUDE.md block. The index is a scoped symbol graph with stable symbol IDs, qualified names, file-aware call edges, and test-file tracking. Default parser is tree-sitter (WASM) for TS/JS/Python with a zero-dep regex fallback. Single-file JSON index — SQLite when repos push past ~500k LOC.
 
 Also shipping: passive metadata observer (`gps serve --observe` — symbol query frequencies only, never conversation content), `gps suggest` for the authoring queue (now also surfaces lessons near promotion), and LLM-assisted postmortem promotion.
 
