@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import kleur from "kleur";
-import { listTodos, resolveTodo } from "@invariance/gps-core";
+import { listTodosWithNotes, resolveTodo } from "@invariance/gps-core";
 import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface ListOpts extends RootOption {
@@ -23,7 +23,7 @@ export function registerTodos(program: Command): void {
       .option("--json", "Emit JSON"),
   ).action(async (symbol: string | undefined, opts: ListOpts) => {
     const root = resolveRoot(opts);
-    const todos = await listTodos(root, {
+    const todos = await listTodosWithNotes(root, {
       symbol,
       file: opts.file,
       includeResolved: !!opts.includeResolved,
