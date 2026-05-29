@@ -119,6 +119,39 @@ function symKey(s: SymbolRef): string {
 }
 
 /**
+ * Whether a symbol carries a distinct qualified name worth a second memory
+ * lookup. `bare` is the extra key to load (the qualified name) when it differs
+ * from the bare name; undefined when there's nothing extra to look up.
+ */
+function symbolMemoryKeys(s: SymbolRef): { bare?: string } {
+  return s.qualified_name && s.qualified_name !== s.name ? { bare: s.qualified_name } : {};
+}
+
+function dedupeNotes(notes: Note[]): Note[] {
+  const seen = new Set<string>();
+  const out: Note[] = [];
+  for (const n of notes) {
+    const key = n.id ?? `${n.symbol}\0${n.lesson}\0${n.recorded_at}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(n);
+  }
+  return out;
+}
+
+function dedupeDecisions(decisions: Decision[]): Decision[] {
+  const seen = new Set<string>();
+  const out: Decision[] = [];
+  for (const d of decisions) {
+    const key = d.id ?? `${d.symbol}\0${d.decision}\0${d.recorded_at}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+  }
+  return out;
+}
+
+/**
  * Repo-relative ancestor directories of a file, deepest first (excluding "."),
  * so an area directive recorded on `src/` still covers `src/api/refunds.ts`.
  * Each lookup that misses is a cheap empty read.
@@ -380,8 +413,23 @@ export async function getContext(
   const invariants = wants.has("invariants")
     ? invariantsFor(sym.qualified_name ?? sym.name, ctx.invariants)
     : [];
-  const notesAll = await loadNotes(ctx.root, sym.name);
-  const decisionsAll = await loadDecisions(ctx.root, sym.name);
+  // Memory is anchored under either the bare name or the qualified name
+  // depending on the recording path (brief/memory_suggestions use the qualified
+  // name; legacy/symbol-classified writes use the bare name). Load both keys so
+  // a note anchored on `Stripe.refunds.create` still surfaces when the resolved
+  // symbol's `name` is `create`, and vice-versa.
+  const notesAll = dedupeNotes([
+    ...(await loadNotes(ctx.root, sym.name)),
+    ...(symbolMemoryKeys(sym).bare
+      ? await loadNotes(ctx.root, sym.qualified_name!)
+      : []),
+  ]);
+  const decisionsAll = dedupeDecisions([
+    ...(await loadDecisions(ctx.root, sym.name)),
+    ...(symbolMemoryKeys(sym).bare
+      ? await loadDecisions(ctx.root, sym.qualified_name!)
+      : []),
+  ]);
   // Path-scoped memory: file notes for sym.file + area notes for every ancestor
   // dir. Approved inbox directives land here (recordDirective → appendAreaNote),
   // so they must surface independently of the symbol-note cap.
