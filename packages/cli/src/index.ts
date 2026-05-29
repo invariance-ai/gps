@@ -183,7 +183,7 @@ export function buildProgram(): Command {
       "  gps done                              post-edit self-audit",
       "",
       "Also useful: gps doc (PR/local diff doc), gps find (symbol search), gps brief (pre-final check).",
-      "Advanced commands still work — run `gps <command> --help` or see https://github.com/invariance-ai/gps#cli.",
+      "Advanced commands still work — run `gps <command> --help` or see https://github.com/invariance-ai/gps#commands.",
       "",
     ].join("\n"),
   );

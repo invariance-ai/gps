@@ -63,7 +63,7 @@ If it's over a second consistently, narrow `config.yml` `exclude:` to skip gener
 
 ## Observations file growing fast
 
-`gps serve --observe` writes to `.gps/observations.json` on every tool call. Add it to `.gitignore` and `gps observations rotate` (TODO — file an issue if this lands first) or just `rm` it occasionally; it rebuilds.
+`gps serve --observe` writes symbol query metadata to `.gps/observations.json` on every tool call. Add `.gps/observations.json` to `.gitignore` if your repo tracks `.gps/`, and delete the file occasionally if it gets noisy; it rebuilds from future observations.
 
 ## Where to file issues
 
