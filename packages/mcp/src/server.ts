@@ -71,8 +71,12 @@ import {
   pruneNotes,
   resume,
   buildReviewQueue,
+  captureDocHistory,
+  fetchPr,
+  loadDocConfig,
+  resolveDefaultBase,
 } from "@invariance/gps-core";
-import { llmClassify } from "@invariance/gps-llm";
+import { llmClassify, GpsLlm, annotateDiff } from "@invariance/gps-llm";
 
 const OBSERVE = process.env.GPS_OBSERVE === "1";
 
@@ -595,6 +599,55 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "resume": {
       return resume(root);
+    }
+    case "doc_history": {
+      const a = args as {
+        pr?: number;
+        branch?: string;
+        base?: string;
+        event?: "commit" | "pr-regen" | "pr-merge";
+        out?: string;
+        llm?: boolean;
+        full_snapshots?: number;
+        max_diff_bytes?: number;
+      };
+      const head = a.branch ?? "HEAD";
+      let prTitle: string | undefined;
+      if (a.pr) {
+        const snap = await fetchPr(a.pr);
+        prTitle = snap?.title;
+      }
+      const cfg = await loadDocConfig(root);
+      const base = a.base ?? (await resolveDefaultBase(root, head));
+      if (!base) {
+        throw new Error(
+          "doc_history: could not determine a base ref. Pass `base` (e.g. \"origin/main\").",
+        );
+      }
+      const llmFill = a.llm !== false && cfg.llm_fill;
+      const haveKey = !!process.env.ANTHROPIC_API_KEY;
+      const llm = new GpsLlm({ dryRun: !llmFill || !haveKey });
+      const annotate = async (reqs: Parameters<typeof annotateDiff>[1]) =>
+        (await annotateDiff(llm, reqs)).annotations;
+      const result = await captureDocHistory(root, {
+        out_dir: a.out ?? cfg.out_dir,
+        base,
+        head,
+        pr: a.pr,
+        prTitle,
+        event: a.event,
+        annotate,
+        llmFill,
+        maxDiffBytes: a.max_diff_bytes,
+        fullSnapshots: a.full_snapshots,
+      });
+      return {
+        id: result.id,
+        added: result.added,
+        total: result.total,
+        history_dir: result.historyDir,
+        html_path: result.htmlPath,
+      };
     }
     default:
       throw new Error(`Tool ${name} dispatch not implemented`);

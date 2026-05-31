@@ -465,6 +465,29 @@ doc [options]
 - `--json` — Emit the generated model as JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `doc-history`
+
+Capture a time-scrubbable history doc: a snapshot of code + annotations + PR comments/labels at each commit, PR regen, and PR merge
+
+```
+doc-history [options]
+```
+
+**Options:**
+
+- `--pr <number>` — Document a PR's history (pulls comments + labels via gh)
+- `--branch <name>` — Tip ref of the commit walk (default: current branch / HEAD)
+- `--base <ref>` — Base ref the walk starts from (default: merge-base with origin/HEAD)
+- `--event <kind>` — Tag the tip snapshot: commit | pr-regen | pr-merge (default: commit)
+- `--out <path>` — Output directory (default: doc out_dir, .gps/docs)
+- `--no-llm` — Skip LLM gap-fill (only the tip snapshot is ever gap-filled)
+- `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
+- `--model <id>` — Anthropic model ID
+- `--max-diff-bytes <n>` — Omit per-file bodies when a snapshot diff exceeds this
+- `--full-snapshots <k>` — Keep full diff bodies for only the latest K snapshots
+- `--json` — Emit the resulting DocHistory as JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `doctor`
 
 Check that gps is installed, indexed, and wired into your agent
