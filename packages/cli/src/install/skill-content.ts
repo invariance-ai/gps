@@ -244,6 +244,21 @@ that feature:
 gps feature use <short-kebab-label>
 \`\`\`
 
+## Record the goal of the work
+
+When you know what this PR/branch is for, set a durable goal once. It is anchored to the branch
+and persists across session resets and context compaction, so a later session (yours or another
+agent's) can recover the intent instead of guessing from the diff:
+
+\`\`\`bash
+gps goal "<what this PR/branch is trying to accomplish>"   # set/replace the branch goal
+gps goal todo "<follow-up you don't want to lose>"           # park an open item on the goal
+gps goal done                                                # mark it complete before handoff
+\`\`\`
+
+After a reset or at the start of a session on an in-progress branch, run \`gps resume\` — it leads
+with the goal, then changed files, open TODOs, questions, and recent decisions.
+
 ## After a successful edit — record what you learned
 
 \`\`\`bash

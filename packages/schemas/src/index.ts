@@ -447,6 +447,33 @@ export const TodoItem = z.object({
 });
 export type TodoItem = z.infer<typeof TodoItem>;
 
+/* ---------- Goal (durable PR/branch intent) ---------- */
+// Kept in its own region so additive edits git-auto-merge cleanly.
+
+/**
+ * The goal of the current unit of work (a PR or a branch). Captures the intent
+ * the `--intent` string throws away today, so it survives session resets and
+ * context compaction. Anchored to a git ref (branch name) rather than a symbol.
+ */
+export const Goal = z.object({
+  /** Stable identifier: sha1(ref)[0:12]. One active goal per ref. */
+  id: z.string(),
+  /** Git ref this goal belongs to — typically the branch name. */
+  ref: z.string(),
+  /** One-line statement of what this PR/branch is trying to accomplish. */
+  goal: z.string(),
+  /** Optional longer context: why, constraints, acceptance criteria. */
+  detail: z.string().optional(),
+  /** Open follow-ups captured alongside the goal (lightweight, ref-scoped). */
+  todos: z.array(z.string()).default([]),
+  status: z.enum(["active", "done"]).default("active"),
+  source: z.enum(["manual", "prepare", "agent"]).default("manual"),
+  created_at: z.string(),
+  updated_at: z.string(),
+  completed_at: z.string().optional(),
+});
+export type Goal = z.infer<typeof Goal>;
+
 /* ---------- Resolution signals (Fix 2: empty-callers confidence) ---------- */
 // Kept in its own region so additive edits git-auto-merge cleanly.
 

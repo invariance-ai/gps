@@ -42,6 +42,7 @@ Then it's normal agent usage. **This is the core loop to remember:**
 
 ```bash
 gps next                                                  # first useful commands after install
+gps goal "what this PR/branch is trying to accomplish"      # durable goal; survives compaction, resurfaces on resume
 gps prepare <symbol> --intent "what I am about to change"   # decision-ready brief before edits
 gps remember "hard-won fact worth reusing"                  # save a durable lesson
 gps save-this "use the shared errors module here" --symbol createRefund   # preview a save command
@@ -66,6 +67,7 @@ Want the long version? See [`docs/guide/getting-started.md`](docs/guide/getting-
 
 | | Claude Code native | gps |
 |---|---|---|
+| **Goal / intent** | Ephemeral — lost on compaction or session reset | Persisted per branch; re-surfaces on `gps resume` |
 | **Todos** | Ephemeral — gone at session end | Persisted as notes, anchored to symbols |
 | **CLAUDE.md** | Manual — you write and maintain it | Auto-managed block; global lessons land here automatically |
 | **Memory feature** | Claude-only | Works identically on Claude Code, Codex, and Cursor |

@@ -75,6 +75,7 @@ import { registerVerify } from "./commands/verify.js";
 import { registerSync } from "./commands/sync.js";
 import { registerPrune } from "./commands/prune.js";
 import { registerResume } from "./commands/resume.js";
+import { registerGoal } from "./commands/goal.js";
 import { registerRemember } from "./commands/remember.js";
 import { registerPacket } from "./commands/packet.js";
 import { registerDone } from "./commands/done.js";
@@ -168,6 +169,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "doc", register: registerDoc, primary: true },
   { name: "prune", register: registerPrune },
   { name: "resume", register: registerResume },
+  { name: "goal", register: registerGoal, primary: true },
 ];
 
 export function buildProgram(): Command {

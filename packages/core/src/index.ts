@@ -62,6 +62,7 @@ export * from "./gate_stream.js";
 export * from "./validate_knowledge.js";
 export * from "./prune.js";
 export * from "./resume.js";
+export * from "./goals.js";
 export * from "./risk_topics.js";
 export * from "./inbox.js";
 export * from "./auto_promote.js";

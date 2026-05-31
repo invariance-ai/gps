@@ -103,6 +103,18 @@ describe("resume data assembly", () => {
     expect(unresolved).toHaveLength(0);
   });
 
+  it("surfaces the active goal at the top of the resume brief", async () => {
+    const root = await tempRepo();
+    const { setGoal } = await import("./goals.js");
+    // Non-git dir → currentRef() falls back to "HEAD"; anchor the goal there.
+    await setGoal(root, { goal: "Add a $5000 refund cap", detail: "non-enterprise only", ref: "HEAD" });
+    const { resume } = await import("./resume.js");
+    const result = await resume(root);
+    expect(result.goal?.goal).toBe("Add a $5000 refund cap");
+    expect(result.markdown).toContain("## Goal");
+    expect(result.markdown).toContain("Add a $5000 refund cap");
+  }, 15_000);
+
   it("resume() returns structured result without crashing in a non-git dir", async () => {
     const root = await tempRepo();
     // Add a todo so there's something to surface.

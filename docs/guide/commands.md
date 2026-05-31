@@ -736,6 +736,72 @@ gate [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `goal`
+
+Durable goal for the current PR/branch — what this unit of work is trying to accomplish. Survives session resets and context compaction; surfaced by `gps resume`.
+
+```
+goal [options] [command]
+```
+
+### `goal set`
+
+Set (or replace) the active goal for the current branch
+
+```
+goal set [options] <goal>
+```
+
+**Options:**
+
+- `--detail <text>` — Longer context: why, constraints, acceptance criteria
+- `--ref <name>` — Anchor to a specific git ref instead of the current branch
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `goal show`
+
+Show the active goal for the current branch
+
+```
+goal show [options]
+```
+
+**Options:**
+
+- `--ref <name>` — Show the goal for a specific git ref
+- `--all` — List every recorded goal (active and done)
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `goal todo`
+
+Add a follow-up to the active goal for the current branch
+
+```
+goal todo [options] <text>
+```
+
+**Options:**
+
+- `--ref <name>` — Anchor to a specific git ref
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+### `goal done`
+
+Mark the active goal for the current branch complete
+
+```
+goal done [options]
+```
+
+**Options:**
+
+- `--ref <name>` — Anchor to a specific git ref
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `health`
 
 Knowledge-layer health for one feature or all features

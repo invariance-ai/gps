@@ -1,5 +1,6 @@
-import { type TodoItem as TodoItemT, type Question as QuestionT, type Decision as DecisionT } from "@invariance/gps-schemas";
+import { type TodoItem as TodoItemT, type Question as QuestionT, type Decision as DecisionT, type Goal as GoalT } from "@invariance/gps-schemas";
 import { changedFiles } from "./git_diff.js";
+import { activeGoal } from "./goals.js";
 import { listTodos } from "./todos.js";
 import { loadAllQuestions, filterByStatus } from "./questions.js";
 import { loadDecisions, rankDecisions } from "./decisions.js";
@@ -9,6 +10,7 @@ import { loadNotes } from "./notes.js";
 import { symbolsInHunks, changedHunks } from "./diff_to_symbols.js";
 
 export interface ResumeResult {
+  goal: GoalT | null;
   todos: TodoItemT[];
   questions: QuestionT[];
   decisions: DecisionT[];
@@ -30,6 +32,9 @@ export interface ResumeResult {
  */
 export async function resume(root: string): Promise<ResumeResult> {
   const { files: changed_files } = await changedFiles(root);
+
+  // The durable goal for this branch — the first thing to re-read after a reset.
+  const goal = (await activeGoal(root).catch(() => undefined)) ?? null;
 
   // Map changed hunks to symbol names.
   let changedSymbolNames: string[] = [];
@@ -74,6 +79,18 @@ export async function resume(root: string): Promise<ResumeResult> {
   lines.push("# Session Resume Brief");
   lines.push("");
 
+  if (goal) {
+    lines.push("## Goal");
+    lines.push(`**${goal.goal}**`);
+    if (goal.detail) lines.push(`\n${goal.detail}`);
+    if (goal.todos.length > 0) {
+      lines.push("");
+      lines.push("Open follow-ups:");
+      for (const t of goal.todos) lines.push(`- ${t}`);
+    }
+    lines.push("");
+  }
+
   if (changed_files.length > 0) {
     lines.push(`## Changed files (${changed_files.length})`);
     for (const f of changed_files.slice(0, 20)) lines.push(`- \`${f}\``);
@@ -110,10 +127,10 @@ export async function resume(root: string): Promise<ResumeResult> {
     lines.push("");
   }
 
-  if (todos.length === 0 && questions.length === 0 && decisions.length === 0) {
-    lines.push("_No open TODOs, questions, or decisions found for changed files._");
+  if (!goal && todos.length === 0 && questions.length === 0 && decisions.length === 0) {
+    lines.push("_No goal, open TODOs, questions, or decisions found for changed files._");
   }
 
   const markdown = lines.join("\n");
-  return { todos, questions, decisions, changed_files, markdown };
+  return { goal, todos, questions, decisions, changed_files, markdown };
 }
