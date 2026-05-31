@@ -77,3 +77,5 @@ export * from "./doc/md_render.js";
 export * from "./doc/html_render.js";
 export * from "./doc/doc_store.js";
 export * from "./doc/doc_model.js";
+export * from "./doc/doc_history.js";
+export * from "./doc/history_html_render.js";

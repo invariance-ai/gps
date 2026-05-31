@@ -68,6 +68,7 @@ import { registerVerifyIndex } from "./commands/verify-index.js";
 import { registerReviewDiff } from "./commands/review-diff.js";
 import { registerBrief } from "./commands/brief.js";
 import { registerDoc } from "./commands/doc.js";
+import { registerDocHistory } from "./commands/doc-history.js";
 import { registerValidateKnowledge } from "./commands/validate-knowledge.js";
 import { registerPulse } from "./commands/pulse.js";
 import { registerSeed } from "./commands/seed.js";
@@ -166,6 +167,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "todos", register: registerTodos },
   { name: "sync", register: registerSync },
   { name: "doc", register: registerDoc, primary: true },
+  { name: "doc-history", register: registerDocHistory },
   { name: "prune", register: registerPrune },
   { name: "resume", register: registerResume },
 ];

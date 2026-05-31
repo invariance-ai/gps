@@ -1666,6 +1666,31 @@ export const MemoryGraphResult = z.object({
 });
 export type MemoryGraphResult = z.infer<typeof MemoryGraphResult>;
 
+/** Input for the `doc_history` MCP tool / `gps doc-history` command. */
+export const DocHistoryToolInput = z.object({
+  pr: z.number().int().positive().optional().describe("PR number to document (pulls comments + labels via gh)"),
+  branch: z.string().optional().describe("Tip ref of the commit walk (default: HEAD)"),
+  base: z.string().optional().describe("Base ref the walk starts from (default: merge-base with origin/HEAD)"),
+  event: z
+    .enum(["commit", "pr-regen", "pr-merge"])
+    .optional()
+    .describe("Tag the tip snapshot (default: commit)"),
+  out: z.string().optional().describe("Output directory (default: doc out_dir)"),
+  llm: z.boolean().optional().describe("Enable LLM gap-fill on the tip snapshot (default: config)"),
+  full_snapshots: z.number().int().positive().optional().describe("Keep full diff bodies for only the latest K snapshots"),
+  max_diff_bytes: z.number().int().positive().optional().describe("Omit per-file bodies when a snapshot diff exceeds this"),
+});
+export type DocHistoryToolInput = z.infer<typeof DocHistoryToolInput>;
+
+export const DocHistoryToolResult = z.object({
+  id: z.string(),
+  added: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  history_dir: z.string(),
+  html_path: z.string(),
+});
+export type DocHistoryToolResult = z.infer<typeof DocHistoryToolResult>;
+
 export const TOOLS = {
   prepare_edit: {
     description:
@@ -1952,6 +1977,12 @@ export const TOOLS = {
     input: ResumeInput,
     output: ResumeResult,
   },
+  doc_history: {
+    description:
+      "Capture or refresh a time-scrubbable history doc for a PR or branch: snapshots the code + annotations + PR comments/labels at each commit (and optionally a pr-regen/pr-merge event), writing a single self-contained HTML scrubber plus per-snapshot JSON under .gps/docs/history. Read-only on git — never touches the working tree. Use to review how a change and its rationale evolved over time, or to keep a living history doc for a PR.",
+    input: DocHistoryToolInput,
+    output: DocHistoryToolResult,
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOLS;
@@ -2097,6 +2128,75 @@ export const DocManifest = z.object({
     .default([]),
 });
 export type DocManifest = z.infer<typeof DocManifest>;
+
+/** What caused a snapshot to be captured in a doc's history. */
+export const DocSnapshotEvent = z.enum(["commit", "pr-regen", "pr-merge"]);
+export type DocSnapshotEvent = z.infer<typeof DocSnapshotEvent>;
+
+/** One PR review or thread comment, captured alongside a snapshot. */
+export const DocPrComment = z.object({
+  author: z.string(),
+  body: z.string(),
+  /** "review" carries a state (APPROVED/…); "comment" is a plain thread comment. */
+  kind: z.enum(["review", "comment"]),
+  state: z.string().optional(),
+});
+export type DocPrComment = z.infer<typeof DocPrComment>;
+
+/**
+ * A single point in a doc's life: the full DocModel state at a commit/event,
+ * plus the PR-side context (comments, labels) as of that moment.
+ */
+export const DocSnapshot = z.object({
+  schema_version: z.literal(1).default(1),
+  /** Commit SHA for "commit" events; the tip SHA for regen/merge (best-effort). */
+  sha: z.string().optional(),
+  /** Short SHA / human label shown on the scrubber tick. */
+  ref: z.string().optional(),
+  event: DocSnapshotEvent,
+  captured_at: z.string(),
+  /** Commit metadata, present for "commit" events. */
+  commit: z
+    .object({ author: z.string(), date: z.string(), message: z.string() })
+    .optional(),
+  /** The full doc state at this point in time. */
+  model: DocModel,
+  /** PR comments/reviews as of this snapshot (empty for pure local commits). */
+  pr_comments: z.array(DocPrComment).default([]),
+  /** PR labels as of this snapshot. */
+  labels: z.array(z.string()).default([]),
+});
+export type DocSnapshot = z.infer<typeof DocSnapshot>;
+
+/** Ordered (oldest → newest) series of snapshots for one doc id. */
+export const DocHistory = z.object({
+  schema_version: z.literal(1).default(1),
+  id: z.string(),
+  kind: z.enum(["pr", "repo"]),
+  title: z.string(),
+  pr_number: z.number().optional(),
+  snapshots: z.array(DocSnapshot).default([]),
+});
+export type DocHistory = z.infer<typeof DocHistory>;
+
+/** Index of generated doc histories, at `<out_dir>/history/manifest.json`. */
+export const DocHistoryManifest = z.object({
+  version: z.literal(1).default(1),
+  histories: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(["pr", "repo"]),
+        title: z.string(),
+        html_path: z.string(),
+        snapshot_count: z.number().int().nonnegative(),
+        updated_at: z.string(),
+        pr_number: z.number().optional(),
+      }),
+    )
+    .default([]),
+});
+export type DocHistoryManifest = z.infer<typeof DocHistoryManifest>;
 
 /** One un-annotated changed hunk handed to the LLM for a plain-english gloss. */
 export const DocAnnotateRequest = z.object({
