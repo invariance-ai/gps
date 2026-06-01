@@ -26,6 +26,7 @@ export * from "./budget.js";
 export * from "./time.js";
 export * from "./stale.js";
 export * from "./neighborhood.js";
+export * from "./resolve.js";
 export * from "./intent.js";
 export * from "./contributors.js";
 export * from "./conflicts.js";

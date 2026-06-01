@@ -1465,6 +1465,30 @@ remember [options] <fact>
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `resolve`
+
+Bug-resolution packet for a target (symbol | file | commit | PR | working-tree diff): blast radius, tests, invariants, prior notes/decisions, and git/PR history in one payload
+
+```
+resolve [options] [target]
+```
+
+**Options:**
+
+- `--json` — Emit JSON (best for tool chaining)
+- `--markdown` — Emit budgeted markdown (best for piping into an LLM)
+- `--tokens <n>` — Markdown token budget (<=0 = unlimited) *(default: 6000)*
+- `--budget <n>` — Alias for --tokens
+- `--hops <n>` — Reverse caller depth *(default: 3)*
+- `--depth <n>` — Forward dependency depth *(default: 2)*
+- `--history <n>` — Git log entries per affected file *(default: 3)*
+- `--kind <k>` — Force target kind: symbol|file|commit|pr|diff
+- `--pr <n>` — Shortcut: target a PR number
+- `--commit <ref>` — Shortcut: target a commit
+- `--diff` — Shortcut: target the working-tree change set
+- `--base <ref>` — Diff base for --diff (default HEAD) *(default: "HEAD")*
+- `--root <path>` — Repo root (default: cwd)
+
 ## `resume`
 
 "Where was I?" — surface TODOs, open questions, and recent decisions for files in the current git diff. Prints a concise markdown brief by default.

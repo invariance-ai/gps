@@ -18,7 +18,7 @@
 const CLAUDE_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. Hooks auto-fire gps on session start, on prompts, before/after edits, and on failures — you usually don't need to call gps by hand.`;
 
 /** Codex: a turn-end hook captures + distills; no pre-edit hook, index refreshes lazily. */
-const CODEX_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. A turn-end hook captures preferences/directives and distills the session automatically; there is no pre-edit hook, so the index refreshes when you call \`gps prepare\`. Run the loop below yourself before non-trivial edits.`;
+const CODEX_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. A turn-end hook captures preferences/directives and distills the session automatically, but **there is no pre-edit hook** — so on any bug fix or non-trivial change your FIRST action is the \`resolve\` tool (MCP \`resolve\`, or \`gps resolve <symbol|file|PR>\`): one call returns the full blast radius, tests, invariants, and prior decisions. Edit only after reading it, then run \`gps brief\` before finishing. Run the loop below yourself every time.`;
 
 /** Cursor: no lifecycle hooks — the agent must run gps and capture memory explicitly. */
 const CURSOR_INTRO = `\`gps\` is local repo memory: symbol graph, tests, invariants, lessons, decisions, and personal preferences. Cursor has no lifecycle hooks — run the loop below yourself before non-trivial edits, and capture preferences/directives via the MCP tools described at the bottom of this rule.`;
@@ -33,11 +33,12 @@ function sharedBlock(intro: string): string {
 
 ## The 30-second loop
 
-For any non-trivial edit, do these three:
+For any bug fix or non-trivial edit, do these:
 
-1. **\`gps find <keyword>\`** — before writing new code, check if a helper already exists.
-2. **\`gps prepare --intent "<what you plan to do>"\`** (or MCP \`prepare_edit\`) — get a decision-ready brief: invariants, callers, tests, prior decisions, notes. \`--intent\` infers the symbol from natural language; you don't need to know the exact name.
-3. **\`gps brief\`** (or MCP \`brief\`) — before declaring done. Reports changed symbols, invariants that touch them, notes attached to them, tests likely to run, and warns about changed symbols with no test coverage. Exit code 1 only on blocking invariants.
+1. **\`resolve\`** (MCP \`resolve\`, or \`gps resolve <symbol|file|PR|commit>\`) — your FIRST step. One call returns the whole blast radius: callers AND callees, the tests to run, every applicable invariant (blocking first), prior notes/decisions, and recent git/PR history. Run it before reading or editing code — it replaces a manual hunt through callers, tests, and git blame. Pass a symbol to scope to one function, a file path for a whole file, or a commit/PR to understand a change set.
+2. **\`gps find <keyword>\`** — before writing *new* code, check if a helper already exists.
+3. **\`gps prepare --intent "<what you plan to do>"\`** (or MCP \`prepare_edit\`) — only when you need a deeper single-symbol brief than \`resolve\` gave; \`--intent\` infers the symbol from natural language.
+4. **\`gps brief\`** (or MCP \`brief\`) — before declaring done. Reports changed symbols, invariants that touch them, notes attached to them, tests likely to run, and warns about changed symbols with no test coverage. Exit code 1 only on blocking invariants.
 
 That loop catches the most expensive failure modes (re-implementing something, breaking an invariant, leaving an untested change) before they leave your machine.
 
@@ -124,11 +125,12 @@ function leanClaudeBlock(): string {
 
 ## The 30-second loop
 
-For any non-trivial edit:
+For any bug fix or non-trivial edit:
 
-1. **\`gps find <keyword>\`** — before writing new code, check whether a helper already exists.
-2. **\`mcp__gps__prepare_edit { symbol, intent }\`** (or \`gps prepare <symbol> --intent "<plan>"\`) — a decision-ready brief: invariants, callers, tests, prior decisions, notes. Treat it like a code-search call you make *before* exploration, not after. \`--intent\` alone infers the symbol; pass the symbol when you know it.
-3. **\`mcp__gps__brief\`** (or \`gps brief\`) — before declaring done. Flags blocking invariants and changed symbols with no test coverage; exit code 1 only on a blocking invariant.
+1. **\`mcp__gps__resolve { target }\`** (or \`gps resolve <symbol|file|PR|commit>\`) — your first step. One call returns the whole blast radius: callers AND callees, the tests to run, every applicable invariant (blocking first), prior notes/decisions, and recent git/PR history. Run it before reading or editing code.
+2. **\`gps find <keyword>\`** — before writing *new* code, check whether a helper already exists.
+3. **\`mcp__gps__prepare_edit { symbol, intent }\`** (or \`gps prepare <symbol> --intent "<plan>"\`) — for a deeper single-symbol brief when \`resolve\` wasn't enough. \`--intent\` alone infers the symbol; pass the symbol when you know it.
+4. **\`mcp__gps__brief\`** (or \`gps brief\`) — before declaring done. Flags blocking invariants and changed symbols with no test coverage; exit code 1 only on a blocking invariant.
 
 Respect invariants marked \`block\`. The MCP tool and \`gps prepare\` return the same brief — use the MCP tool in Claude Code, the CLI elsewhere; never both.
 
@@ -171,9 +173,27 @@ description: >
 gps gives you durable, automatic, symbol-anchored repo memory: notes, decisions, preferences, and
 invariants captured by lifecycle hooks and surfaced only when the relevant code is touched.
 
+## Start any bug fix or edit with \`resolve\`
+
+For a bug fix, refactor, or any change where you need the blast radius, call \`resolve\` first — it
+folds callers, callees, tests, applicable invariants, prior notes/decisions, and git/PR history into
+one payload, for a symbol, file path, commit, or PR:
+
+\`\`\`text
+mcp__gps__resolve { "target": "<symbol|file|PR#|commit>" }
+\`\`\`
+
+\`\`\`bash
+gps resolve <symbol>            # whole blast radius for one function
+gps resolve src/auth/login.ts   # everything touching a file
+gps resolve 1234                # a PR's change set + review thread
+gps resolve --diff              # the current working-tree change set
+\`\`\`
+
 ## Before any non-trivial edit
 
-Prefer the MCP tool (one structured call, no fan-out to Glob/Read/Grep needed):
+For a deeper single-symbol brief (when \`resolve\` wasn't enough), prefer the MCP tool (one
+structured call, no fan-out to Glob/Read/Grep needed):
 
 \`\`\`text
 mcp__gps__prepare_edit { "symbol": "<symbol>", "intent": "<short intent>" }

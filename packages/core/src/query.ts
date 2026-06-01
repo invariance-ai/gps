@@ -242,7 +242,7 @@ function resolveByKey(key: string, L: IndexLookups): SymbolRef | undefined {
  * (`calculateDelay` for `#calculateDelay`, a typo, the wrong casing) errors with
  * no help. Use the fuzzy search to suggest what they probably meant.
  */
-function symbolNotFound(query: string, ctx: QueryContext): Error {
+export function symbolNotFound(query: string, ctx: QueryContext): Error {
   const suggestions = searchSymbols(ctx.index, query, 3).map(
     (m) => m.symbol.qualified_name ?? m.symbol.name,
   );
@@ -495,23 +495,53 @@ export async function getContext(
   return trimToBudget(result, args.budget ?? 1500);
 }
 
-export async function impactOf(
-  args: ImpactInput,
-  ctxOrRoot: QueryContext | string,
-): Promise<ImpactResult> {
-  const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
-  const sym = resolveSymbol(args.symbol, ctx);
-  if (!sym) throw symbolNotFound(args.symbol, ctx);
+/**
+ * Find the test files that mention any of `names`. Reads each candidate test
+ * file at most once and scans it for any affected symbol name — O(F_tests)
+ * rather than O(N_symbols × F_tests). Shared by `impactOf` and the resolve
+ * packet so a multi-seed target only scans the test corpus once.
+ */
+export async function affectedTests(
+  ctx: QueryContext,
+  names: Set<string>,
+): Promise<TestRef[]> {
+  if (names.size === 0) return [];
+  const candidates = testFilesIn(ctx.index);
+  const out: TestRef[] = [];
+  await Promise.all(
+    candidates.map(async (t) => {
+      try {
+        const src = await readFile(path.join(ctx.root, t), "utf8");
+        for (const n of names) {
+          if (src.includes(n)) {
+            out.push({ file: t, framework: frameworkFor(t), symbols_covered: [n] });
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }),
+  );
+  return out;
+}
 
+/**
+ * Reverse caller closure: every symbol that transitively calls `seed` within
+ * `hops`. Pure graph walk, no IO — `seed` itself is excluded. Shared by
+ * `impactOf` and the resolve packet so a multi-seed target can union closures
+ * cheaply and scan the test corpus only once.
+ */
+export function reverseClosure(ctx: QueryContext, seed: SymbolRef, hops: number): SymbolRef[] {
+  const keyOf = (s: SymbolRef) => s.id ?? s.qualified_name ?? s.name;
   const visited = new Set<string>();
-  const frontier: SymbolRef[] = [sym];
-  for (let hop = 0; hop < args.hops; hop++) {
+  const frontier: SymbolRef[] = [seed];
+  for (let hop = 0; hop < hops; hop++) {
     const next: SymbolRef[] = [];
     for (const current of frontier) {
-      const key = current.id ?? current.qualified_name ?? current.name;
-      visited.add(key);
+      visited.add(keyOf(current));
       for (const c of callersOf(current, ctx)) {
-        const callerKey = c.id ?? c.qualified_name ?? c.name;
+        const callerKey = keyOf(c);
         if (!visited.has(callerKey)) {
           visited.add(callerKey);
           next.push(c);
@@ -521,34 +551,24 @@ export async function impactOf(
     frontier.length = 0;
     frontier.push(...next);
   }
-  visited.delete(sym.id ?? sym.qualified_name ?? sym.name);
-
+  visited.delete(keyOf(seed));
   const L = lookups(ctx);
-  const affected_symbols = [...visited]
-    .map((id) => resolveByKey(id, L))
-    .filter((s): s is SymbolRef => !!s);
+  return [...visited].map((id) => resolveByKey(id, L)).filter((s): s is SymbolRef => !!s);
+}
+
+export async function impactOf(
+  args: ImpactInput,
+  ctxOrRoot: QueryContext | string,
+): Promise<ImpactResult> {
+  const ctx = typeof ctxOrRoot === "string" ? await open(ctxOrRoot) : ctxOrRoot;
+  const sym = resolveSymbol(args.symbol, ctx);
+  if (!sym) throw symbolNotFound(args.symbol, ctx);
+
+  const affected_symbols = reverseClosure(ctx, sym, args.hops);
   const affected_files = [...new Set(affected_symbols.map((s) => s.file))];
 
-  // Batch test discovery: read each test file at most once, scan once for any
-  // of the affected symbol names. Cuts O(N_symbols × F_tests) to O(F_tests).
   const names = new Set(affected_symbols.map((a) => a.name).filter((n) => n.length > 2));
-  const candidates = testFilesIn(ctx.index);
-  const affected_tests: TestRef[] = [];
-  await Promise.all(
-    candidates.map(async (t) => {
-      try {
-        const src = await readFile(path.join(ctx.root, t), "utf8");
-        for (const n of names) {
-          if (src.includes(n)) {
-            affected_tests.push({ file: t, framework: frameworkFor(t), symbols_covered: [n] });
-            return;
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }),
-  );
+  const affected_tests = await affectedTests(ctx, names);
 
   return {
     symbol: sym,

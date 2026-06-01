@@ -66,6 +66,29 @@ export function parseUnifiedDiff(diff: string): HunkRange[] {
   return hunks;
 }
 
+/**
+ * Hunks for a historical commit range (`git diff <from> <to>`). Use this to map
+ * a specific commit's change set to symbols — pass `from = "<sha>^"`, `to =
+ * "<sha>"` for a single commit. Unlike `changedHunks` (working tree vs base),
+ * both ends are explicit refs. Returns [] on any git error (bad ref, etc.).
+ */
+export async function changedHunksRange(
+  root: string,
+  from: string,
+  to: string,
+): Promise<HunkRange[]> {
+  try {
+    const { stdout } = await execFile(
+      "git",
+      ["diff", "--unified=0", from, to],
+      { cwd: root, maxBuffer: 8 * 1024 * 1024 },
+    );
+    return parseUnifiedDiff(stdout);
+  } catch {
+    return [];
+  }
+}
+
 export interface SymbolHit {
   qualified_name: string;
   file: string;

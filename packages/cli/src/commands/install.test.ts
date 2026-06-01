@@ -3,6 +3,20 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { resolveCmd, resolvePolicy, runInstallClaude, runInstallCodex, placeCodexBlock, mergeClaudeSettings } from "./install.js";
+import { CODEX_AGENT_INSTRUCTIONS, CLAUDE_AGENT_INSTRUCTIONS, CURSOR_RULE } from "../install/skill-content.js";
+
+describe("agent instructions lead the loop with resolve (the hookless-agent reliability lever)", () => {
+  it("Codex AGENTS.md tells the agent resolve is the FIRST action", () => {
+    expect(CODEX_AGENT_INSTRUCTIONS).toContain("resolve");
+    expect(CODEX_AGENT_INSTRUCTIONS).toMatch(/FIRST action is the `resolve`/);
+  });
+  it("Cursor rule surfaces resolve in the loop", () => {
+    expect(CURSOR_RULE).toContain("gps resolve");
+  });
+  it("Claude block leads step 1 with the resolve MCP tool", () => {
+    expect(CLAUDE_AGENT_INSTRUCTIONS).toContain("mcp__gps__resolve");
+  });
+});
 
 describe("mergeClaudeSettings: never clobber or skip a user's settings.json", () => {
   const gps = {

@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { resolveRoot } from "./root.js";
 import { registerContext } from "./commands/context.js";
 import { registerImpact } from "./commands/impact.js";
+import { registerResolve } from "./commands/resolve.js";
 import { registerTests } from "./commands/tests.js";
 import { registerInvariants } from "./commands/invariants.js";
 import { registerInvariant } from "./commands/invariant.js";
@@ -120,6 +121,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "attach", register: registerAttach },
   { name: "pr-intent", register: registerPrIntent },
   { name: "impact", register: registerImpact },
+  { name: "resolve", register: registerResolve, primary: true },
   { name: "tests", register: registerTests },
   { name: "invariants", register: registerInvariants },
   { name: "invariant", register: registerInvariant },
