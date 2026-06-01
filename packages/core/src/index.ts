@@ -43,6 +43,7 @@ export * from "./seed.js";
 export * from "./sync.js";
 export * from "./symbol_infer.js";
 export * from "./diff_symbols.js";
+export * from "./changes.js";
 export * from "./test_runs.js";
 export * from "./runtime.js";
 export * from "./audit.js";

@@ -6,6 +6,15 @@ function baseResult(overrides: Partial<BriefResult> = {}): BriefResult {
     base: "HEAD",
     changed_files: [],
     changed_symbols: [],
+    changes: {
+      base: "HEAD",
+      source: "diff",
+      changed_files: [],
+      changed_symbols: [],
+      files: [],
+      commits: [],
+      prs: [],
+    },
     invariants: { hits: [], blocking_count: 0 },
     notes: [],
     per_symbol: [],
@@ -48,6 +57,40 @@ describe("formatBriefMarkdown: no-source-change branch", () => {
           kind: "function",
         },
       ],
+      changes: {
+        base: "HEAD",
+        source: "diff",
+        changed_files: ["src/a.ts"],
+        changed_symbols: [
+          {
+            id: "src/a.ts#foo:1",
+            name: "foo",
+            qualified_name: "foo",
+            file: "src/a.ts",
+            line: 1,
+            end_line: 5,
+            kind: "function",
+          },
+        ],
+        files: [
+          {
+            file: "src/a.ts",
+            symbols: [
+              {
+                id: "src/a.ts#foo:1",
+                name: "foo",
+                qualified_name: "foo",
+                file: "src/a.ts",
+                line: 1,
+                end_line: 5,
+                kind: "function",
+              },
+            ],
+          },
+        ],
+        commits: [{ sha: "abcdef123", author: "A", date: "2026-05-31T00:00:00Z", message: "Add foo (#42)", pr: 42 }],
+        prs: [42],
+      },
       per_symbol: [
         {
           symbol: {
@@ -69,6 +112,8 @@ describe("formatBriefMarkdown: no-source-change branch", () => {
     const out = formatBriefMarkdown(r);
     expect(out).toContain("# Brief — 1 symbol(s) across 1 file(s)");
     expect(out).toContain("## Changed symbols");
+    expect(out).toContain("## Change summary");
+    expect(out).toContain("PR references: #42");
     expect(out).toContain("## Invariants");
     expect(out).toContain("## Tests");
     expect(out).not.toContain("No source-file changes detected");

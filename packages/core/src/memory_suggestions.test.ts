@@ -1,13 +1,16 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SymbolRef } from "@invariance/gps-schemas";
 import { appendAssumption } from "./assumptions.js";
 import { appendQuestion } from "./questions.js";
 import { addTodo } from "./todos.js";
 import { appendAreaNote, appendFileNote, appendNote, loadNotes } from "./notes.js";
-import { applyMemorySuggestions, memorySuggestionsForSymbols } from "./memory_suggestions.js";
+import { writeIndex } from "./index_store.js";
+import { symbolsForPrSnapshot } from "./changes.js";
+import * as gh from "./gh.js";
+import { applyMemorySuggestions, memorySuggestionsForSymbols, memorySuggestionsForPr } from "./memory_suggestions.js";
 
 const roots: string[] = [];
 async function tempRepo(): Promise<string> {
@@ -194,5 +197,68 @@ describe("memorySuggestionsForSymbols", () => {
       }),
     ]);
     expect(await memorySuggestionsForSymbols(root, [symbol("createRefund")])).toEqual([]);
+  });
+});
+
+describe("symbolsForPrSnapshot", () => {
+  it("maps PR diff hunks to indexed symbols without touching the working tree", async () => {
+    const root = await tempRepo();
+    await writeIndex(root, {
+      version: 2,
+      built_at: new Date().toISOString(),
+      root,
+      files: ["src/refunds.ts"],
+      symbols: [symbol("createRefund"), { ...symbol("refundReport"), line: 80, end_line: 120 }],
+      edges: [],
+    });
+
+    const hits = await symbolsForPrSnapshot(root, {
+      number: 17,
+      title: "Update refunds",
+      body: "",
+      files: ["src/refunds.ts"],
+      diff: [
+        "diff --git a/src/refunds.ts b/src/refunds.ts",
+        "--- a/src/refunds.ts",
+        "+++ b/src/refunds.ts",
+        "@@ -85,0 +85,2 @@",
+        "+  return report;",
+      ].join("\n"),
+    });
+
+    expect(hits.map((s) => s.name)).toEqual(["refundReport"]);
+  });
+});
+
+describe("memorySuggestionsForPr", () => {
+  it("builds a pr-sourced closeout queue from a fetched PR snapshot", async () => {
+    const root = await tempRepo();
+    await writeIndex(root, {
+      version: 2,
+      built_at: new Date().toISOString(),
+      root,
+      files: ["src/refunds.ts"],
+      symbols: [symbol("createRefund")],
+      edges: [],
+    });
+    vi.spyOn(gh, "fetchPr").mockResolvedValue({
+      number: 21,
+      title: "Refund cap",
+      body: "",
+      files: ["src/refunds.ts"],
+      diff: [
+        "--- a/src/refunds.ts",
+        "+++ b/src/refunds.ts",
+        "@@ -1,0 +1,1 @@",
+        "+// cap",
+      ].join("\n"),
+    });
+
+    const result = await memorySuggestionsForPr(root, 21);
+    expect(result.source).toBe("pr");
+    expect(result.pr).toEqual({ number: 21, title: "Refund cap", files: ["src/refunds.ts"] });
+    expect(result.base).toBe("PR-21");
+    expect(result.changed_symbols).toContain("createRefund");
+    vi.restoreAllMocks();
   });
 });

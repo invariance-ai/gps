@@ -67,6 +67,7 @@ import { registerDoctor } from "./commands/doctor.js";
 import { registerVerifyIndex } from "./commands/verify-index.js";
 import { registerReviewDiff } from "./commands/review-diff.js";
 import { registerBrief } from "./commands/brief.js";
+import { registerChanges } from "./commands/changes.js";
 import { registerDoc } from "./commands/doc.js";
 import { registerDocHistory } from "./commands/doc-history.js";
 import { registerValidateKnowledge } from "./commands/validate-knowledge.js";
@@ -158,6 +159,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "verify-index", register: registerVerifyIndex },
   { name: "review-diff", register: registerReviewDiff },
   { name: "brief", register: registerBrief },
+  { name: "changes", register: registerChanges },
   { name: "validate-knowledge", register: registerValidateKnowledge },
   { name: "pulse", register: registerPulse },
   { name: "seed", register: registerSeed },
