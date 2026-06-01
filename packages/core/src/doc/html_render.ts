@@ -23,33 +23,57 @@ export interface BrandPalette {
   bg: string;
 }
 
-const DEFAULT_BRAND: BrandPalette = { saffron: "#f4a020", bg: "#0e0d0a" };
+export const DEFAULT_BRAND: BrandPalette = { saffron: "#f4a020", bg: "#0e0d0a" };
 
-interface RenderCtx {
+export interface RenderCtx {
   usedMermaid: boolean;
 }
 
-export function renderDocHtml(model: DocModel, brand: BrandPalette = DEFAULT_BRAND): string {
-  const ctx: RenderCtx = { usedMermaid: false };
+/**
+ * Render the inner `<main>` content for a single DocModel: the stats tiles, the
+ * code view (file sidebar + diff bodies) and the notes view. Element ids are
+ * namespaced by `idPrefix` so multiple models can be embedded in one document
+ * (the doc-history scrubber relies on this); the default empty prefix keeps the
+ * single-doc output byte-identical to the original.
+ */
+export function renderDocBody(model: DocModel, ctx: RenderCtx, idPrefix = ""): string {
   const proseHtml = model.sections.length
     ? model.sections.map((s) => renderSection(s, ctx)).join("\n")
     : `<p class="empty">No prose notes for this doc.</p>`;
   const filesHtml = model.files.length
-    ? model.files.map((f, i) => renderFileBlock(f, i)).join("\n")
+    ? model.files.map((f, i) => renderFileBlock(f, i, idPrefix)).join("\n")
     : `<p class="empty">No file changes.</p>`;
   const fileList = model.files
     .map(
       (f, i) =>
-        `<li><a href="#file-${i}" data-target="file-${i}">${escapeHtml(f.path)}` +
+        `<li><a href="#${idPrefix}file-${i}" data-target="${idPrefix}file-${i}">${escapeHtml(f.path)}` +
         `<span class="badge badge-${f.status}">${f.status}</span></a></li>`,
     )
     .join("");
+  const statsHtml = model.stats ? renderStats(model.stats) : "";
+
+  return `${statsHtml}
+  <section id="${idPrefix}view-code" class="view view-code active">
+    <aside class="sidebar">
+      <h2>Files</h2>
+      <ul class="filelist">${fileList || "<li class=\"empty\">none</li>"}</ul>
+    </aside>
+    <div class="filebodies">${filesHtml}</div>
+  </section>
+
+  <section id="${idPrefix}view-notes" class="view view-notes">
+    <article class="prose">${proseHtml}</article>
+  </section>`;
+}
+
+export function renderDocHtml(model: DocModel, brand: BrandPalette = DEFAULT_BRAND): string {
+  const ctx: RenderCtx = { usedMermaid: false };
+  const body = renderDocBody(model, ctx);
 
   const meta: string[] = [];
   if (model.pr) meta.push(`PR #${model.pr.number}`);
   if (model.base) meta.push(`base: ${escapeHtml(model.base)}`);
   meta.push(`generated ${escapeHtml(model.generated_at)}`);
-  const statsHtml = model.stats ? renderStats(model.stats) : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -74,18 +98,7 @@ export function renderDocHtml(model: DocModel, brand: BrandPalette = DEFAULT_BRA
 </header>
 
 <main>
-  ${statsHtml}
-  <section id="view-code" class="view active">
-    <aside class="sidebar">
-      <h2>Files</h2>
-      <ul class="filelist">${fileList || "<li class=\"empty\">none</li>"}</ul>
-    </aside>
-    <div class="filebodies">${filesHtml}</div>
-  </section>
-
-  <section id="view-notes" class="view">
-    <article class="prose">${proseHtml}</article>
-  </section>
+  ${body}
 </main>
 
 <script>${clientJs()}</script>
@@ -109,9 +122,9 @@ function renderStats(stats: NonNullable<DocModel["stats"]>): string {
     .join("")}</section>`;
 }
 
-function renderFileBlock(f: DocFileEntry, idx: number): string {
+function renderFileBlock(f: DocFileEntry, idx: number, idPrefix = ""): string {
   const L: string[] = [];
-  L.push(`<section class="doc-file" id="file-${idx}">`);
+  L.push(`<section class="doc-file" id="${idPrefix}file-${idx}">`);
   L.push(
     `<div class="file-head"><code>${escapeHtml(f.path)}</code>` +
       `<span class="badge badge-${f.status}">${f.status}</span>` +
@@ -352,7 +365,7 @@ function inline(s: string): string {
   return t;
 }
 
-function css(brand: BrandPalette): string {
+export function css(brand: BrandPalette): string {
   return `
 :root{--saffron:${brand.saffron};--bg:${brand.bg};--panel:#17151140;--surface:#1a1814;--line:#2a2620;--text:#ece7df;--dim:#9a9388;--add:#1f3a1f;--addbar:#3fae5a;--del:#3a1f1f;--delbar:#e0564e;}
 *{box-sizing:border-box}
@@ -376,7 +389,7 @@ main{max-width:1200px;margin:0 auto;padding:18px 22px}
 .stat strong{display:block;margin-top:2px;font-size:18px;font-weight:650;color:var(--text)}
 .view{display:none}
 .view.active{display:block}
-#view-code.active{display:grid;grid-template-columns:230px 1fr;gap:20px;align-items:start}
+.view-code.active{display:grid;grid-template-columns:230px 1fr;gap:20px;align-items:start}
 .sidebar{position:sticky;top:84px}
 .sidebar h2{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--dim);margin:0 0 8px}
 .filelist{list-style:none;margin:0;padding:0}
@@ -426,7 +439,7 @@ main{max-width:1200px;margin:0 auto;padding:18px 22px}
 .mermaid-wrap details{margin-top:6px;color:var(--dim)}
 .mermaid-wrap summary{cursor:pointer}
 .empty{color:var(--dim);font-style:italic;padding:10px 0}
-@media(max-width:760px){#view-code.active{grid-template-columns:1fr}.sidebar{position:static}}
+@media(max-width:760px){.view-code.active{grid-template-columns:1fr}.sidebar{position:static}}
 `;
 }
 
@@ -462,7 +475,7 @@ function clientJs(): string {
 `;
 }
 
-function mermaidScript(): string {
+export function mermaidScript(): string {
   // Loaded only when a mermaid block exists; the raw source stays in <details>
   // so the doc is still useful offline.
   return `<script type="module">

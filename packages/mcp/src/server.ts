@@ -10,6 +10,8 @@ import {
   open as openQuery,
   getContext,
   impactOf,
+  buildResolvePacket,
+  inferResolveKind,
   prepareEdit,
   resolveSymbol,
   testsForSymbol,
@@ -71,15 +73,27 @@ import {
   pruneNotes,
   resume,
   buildReviewQueue,
+  captureDocHistory,
+  fetchPr,
+  loadDocConfig,
+  resolveDefaultBase,
 } from "@invariance/gps-core";
-import { llmClassify } from "@invariance/gps-llm";
+import { llmClassify, GpsLlm, annotateDiff } from "@invariance/gps-llm";
 
 const OBSERVE = process.env.GPS_OBSERVE === "1";
 
 function symbolFor(args: unknown): string | undefined {
-  if (typeof args === "object" && args && "symbol" in args) {
-    const s = (args as { symbol: unknown }).symbol;
-    return typeof s === "string" ? s : undefined;
+  if (typeof args === "object" && args) {
+    if ("symbol" in args) {
+      const s = (args as { symbol: unknown }).symbol;
+      if (typeof s === "string") return s;
+    }
+    // `resolve` carries its symbol under `target` (only meaningful for symbol-kind
+    // targets, but observation is best-effort metadata so a path/PR is harmless).
+    if ("target" in args) {
+      const t = (args as { target: unknown }).target;
+      if (typeof t === "string") return t;
+    }
   }
   return undefined;
 }
@@ -169,6 +183,15 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       return getContext(args as Parameters<typeof getContext>[0], root);
     case "impact_of":
       return impactOf(args as Parameters<typeof impactOf>[0], root);
+    case "resolve": {
+      const a = args as { target?: string; kind?: ReturnType<typeof inferResolveKind>; hops?: number; depth?: number; history?: number };
+      const value = a.target ?? "";
+      const kind = a.kind ?? inferResolveKind(value);
+      return buildResolvePacket(
+        { target: { kind, value }, hops: a.hops, depth: a.depth, history: a.history },
+        root,
+      );
+    }
     case "tests_for": {
       const a = args as { symbol: string };
       const ctx = await openQuery(root);
@@ -595,6 +618,55 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
     }
     case "resume": {
       return resume(root);
+    }
+    case "doc_history": {
+      const a = args as {
+        pr?: number;
+        branch?: string;
+        base?: string;
+        event?: "commit" | "pr-regen" | "pr-merge";
+        out?: string;
+        llm?: boolean;
+        full_snapshots?: number;
+        max_diff_bytes?: number;
+      };
+      const head = a.branch ?? "HEAD";
+      let prTitle: string | undefined;
+      if (a.pr) {
+        const snap = await fetchPr(a.pr);
+        prTitle = snap?.title;
+      }
+      const cfg = await loadDocConfig(root);
+      const base = a.base ?? (await resolveDefaultBase(root, head));
+      if (!base) {
+        throw new Error(
+          "doc_history: could not determine a base ref. Pass `base` (e.g. \"origin/main\").",
+        );
+      }
+      const llmFill = a.llm !== false && cfg.llm_fill;
+      const haveKey = !!process.env.ANTHROPIC_API_KEY;
+      const llm = new GpsLlm({ dryRun: !llmFill || !haveKey });
+      const annotate = async (reqs: Parameters<typeof annotateDiff>[1]) =>
+        (await annotateDiff(llm, reqs)).annotations;
+      const result = await captureDocHistory(root, {
+        out_dir: a.out ?? cfg.out_dir,
+        base,
+        head,
+        pr: a.pr,
+        prTitle,
+        event: a.event,
+        annotate,
+        llmFill,
+        maxDiffBytes: a.max_diff_bytes,
+        fullSnapshots: a.full_snapshots,
+      });
+      return {
+        id: result.id,
+        added: result.added,
+        total: result.total,
+        history_dir: result.historyDir,
+        html_path: result.htmlPath,
+      };
     }
     default:
       throw new Error(`Tool ${name} dispatch not implemented`);

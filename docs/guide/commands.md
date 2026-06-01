@@ -465,6 +465,29 @@ doc [options]
 - `--json` — Emit the generated model as JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `doc-history`
+
+Capture a time-scrubbable history doc: a snapshot of code + annotations + PR comments/labels at each commit, PR regen, and PR merge
+
+```
+doc-history [options]
+```
+
+**Options:**
+
+- `--pr <number>` — Document a PR's history (pulls comments + labels via gh)
+- `--branch <name>` — Tip ref of the commit walk (default: current branch / HEAD)
+- `--base <ref>` — Base ref the walk starts from (default: merge-base with origin/HEAD)
+- `--event <kind>` — Tag the tip snapshot: commit | pr-regen | pr-merge (default: commit)
+- `--out <path>` — Output directory (default: doc out_dir, .gps/docs)
+- `--no-llm` — Skip LLM gap-fill (only the tip snapshot is ever gap-filled)
+- `--api-key <key>` — Anthropic API key (default: ANTHROPIC_API_KEY env)
+- `--model <id>` — Anthropic model ID
+- `--max-diff-bytes <n>` — Omit per-file bodies when a snapshot diff exceeds this
+- `--full-snapshots <k>` — Keep full diff bodies for only the latest K snapshots
+- `--json` — Emit the resulting DocHistory as JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `doctor`
 
 Check that gps is installed, indexed, and wired into your agent
@@ -1440,6 +1463,30 @@ remember [options] <fact>
 - `--evidence <ref>` — PR/commit/doc backing this fact
 - `--severity <level>` — low | medium | high
 - `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
+## `resolve`
+
+Bug-resolution packet for a target (symbol | file | commit | PR | working-tree diff): blast radius, tests, invariants, prior notes/decisions, and git/PR history in one payload
+
+```
+resolve [options] [target]
+```
+
+**Options:**
+
+- `--json` — Emit JSON (best for tool chaining)
+- `--markdown` — Emit budgeted markdown (best for piping into an LLM)
+- `--tokens <n>` — Markdown token budget (<=0 = unlimited) *(default: 6000)*
+- `--budget <n>` — Alias for --tokens
+- `--hops <n>` — Reverse caller depth *(default: 3)*
+- `--depth <n>` — Forward dependency depth *(default: 2)*
+- `--history <n>` — Git log entries per affected file *(default: 3)*
+- `--kind <k>` — Force target kind: symbol|file|commit|pr|diff
+- `--pr <n>` — Shortcut: target a PR number
+- `--commit <ref>` — Shortcut: target a commit
+- `--diff` — Shortcut: target the working-tree change set
+- `--base <ref>` — Diff base for --diff (default HEAD) *(default: "HEAD")*
 - `--root <path>` — Repo root (default: cwd)
 
 ## `resume`

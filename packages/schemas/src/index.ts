@@ -501,6 +501,102 @@ export const ImpactResult = z.object({
 });
 export type ImpactResult = z.infer<typeof ImpactResult>;
 
+/* ---------- Resolve packet (bug-resolution blast radius) ---------- */
+// One target (symbol | file | commit | PR | working-tree diff) composed into a
+// single decision-ready payload: forward+reverse closure, tests, applicable
+// invariants, prior notes/decisions, related memory, and git/PR history.
+// Kept in its own region so additive edits git-auto-merge cleanly.
+
+export const ResolveKind = z.enum(["symbol", "file", "commit", "pr", "diff"]);
+export type ResolveKind = z.infer<typeof ResolveKind>;
+
+export const ResolveTargetSchema = z.object({
+  kind: ResolveKind,
+  /** Raw target: symbol name, file path, commitish, PR number, or "" for the working-tree diff. */
+  value: z.string(),
+});
+export type ResolveTarget = z.infer<typeof ResolveTargetSchema>;
+
+/** An invariant that applies to the change, tagged by how it reaches the target. */
+export const AffectedInvariant = z.object({
+  invariant: Invariant,
+  /**
+   * direct     — applies to a seed (the symbol/file/diff you targeted).
+   * transitive — applies to a caller in the reverse blast radius.
+   * dependency — applies to a callee the seed depends on.
+   */
+  relation: z.enum(["direct", "transitive", "dependency"]),
+});
+export type AffectedInvariant = z.infer<typeof AffectedInvariant>;
+
+/** Recent commits that touched one affected file. */
+export const GitHistoryEntry = z.object({
+  file: z.string(),
+  commits: z.array(ProvenanceEntry),
+});
+export type GitHistoryEntry = z.infer<typeof GitHistoryEntry>;
+
+/** PR review context attached when the target is a PR (or an in-flight PR rides along). */
+export const ResolvePrContext = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  body: z.string(),
+  labels: z.array(z.string()).default([]),
+  reviews: z.array(z.object({ author: z.string(), body: z.string(), state: z.string() })).default([]),
+  comments: z.array(z.object({ author: z.string(), body: z.string() })).default([]),
+});
+export type ResolvePrContext = z.infer<typeof ResolvePrContext>;
+
+/** A topic-matched memory artifact surfaced by recall. */
+export const ResolveRecallHit = z.object({
+  kind: z.string(),
+  text: z.string(),
+  score: z.number(),
+});
+export type ResolveRecallHit = z.infer<typeof ResolveRecallHit>;
+
+export const ResolvePacketInput = z.object({
+  /** Raw target string; kind is inferred unless `kind` is set. */
+  target: z.string().default(""),
+  /** Force the target kind instead of inferring it. */
+  kind: ResolveKind.optional(),
+  /** Reverse caller depth for the blast radius. */
+  hops: z.number().int().min(1).max(5).default(3),
+  /** Forward dependency (callee) depth. */
+  depth: z.number().int().min(1).max(4).default(2),
+  /** Markdown token budget (<=0 = unlimited). JSON output is never truncated. */
+  budget: z.number().int().default(6000),
+  /** Git log entries per affected file (0 = skip git history). */
+  history: z.number().int().min(0).max(10).default(3),
+});
+export type ResolvePacketInput = z.infer<typeof ResolvePacketInput>;
+
+export const ResolvePacketResult = z.object({
+  target: ResolveTargetSchema,
+  /** Symbols the target resolved to (the change set). */
+  seeds: z.array(SymbolRef),
+  /** Reverse closure: symbols that could break if the seeds change. */
+  affected_symbols: z.array(SymbolRef),
+  affected_files: z.array(z.string()),
+  affected_tests: z.array(TestRef),
+  blast_radius: z.number().int().nonnegative(),
+  /** Forward closure: callees the seeds depend on. */
+  dependencies: z.array(SymbolRef),
+  invariants: z.array(AffectedInvariant),
+  notes: z.array(Note),
+  decisions: z.array(Decision),
+  recall: z.array(ResolveRecallHit),
+  git_history: z.array(GitHistoryEntry),
+  pr: ResolvePrContext.optional(),
+  /** Decision-ready brief for the primary seed (markdown). */
+  prepare_markdown: z.string().optional(),
+  /** Section headings dropped by the markdown budget (empty for JSON callers). */
+  truncated: z.array(z.string()).default([]),
+});
+export type ResolvePacketResult = z.infer<typeof ResolvePacketResult>;
+
+/* ---------- end resolve packet ---------- */
+
 export const TestsForInput = z.object({ symbol: z.string() });
 export type TestsForInput = z.infer<typeof TestsForInput>;
 export const TestsForResult = z.object({ symbol: SymbolRef, tests: z.array(TestRef) });
@@ -1666,6 +1762,31 @@ export const MemoryGraphResult = z.object({
 });
 export type MemoryGraphResult = z.infer<typeof MemoryGraphResult>;
 
+/** Input for the `doc_history` MCP tool / `gps doc-history` command. */
+export const DocHistoryToolInput = z.object({
+  pr: z.number().int().positive().optional().describe("PR number to document (pulls comments + labels via gh)"),
+  branch: z.string().optional().describe("Tip ref of the commit walk (default: HEAD)"),
+  base: z.string().optional().describe("Base ref the walk starts from (default: merge-base with origin/HEAD)"),
+  event: z
+    .enum(["commit", "pr-regen", "pr-merge"])
+    .optional()
+    .describe("Tag the tip snapshot (default: commit)"),
+  out: z.string().optional().describe("Output directory (default: doc out_dir)"),
+  llm: z.boolean().optional().describe("Enable LLM gap-fill on the tip snapshot (default: config)"),
+  full_snapshots: z.number().int().positive().optional().describe("Keep full diff bodies for only the latest K snapshots"),
+  max_diff_bytes: z.number().int().positive().optional().describe("Omit per-file bodies when a snapshot diff exceeds this"),
+});
+export type DocHistoryToolInput = z.infer<typeof DocHistoryToolInput>;
+
+export const DocHistoryToolResult = z.object({
+  id: z.string(),
+  added: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  history_dir: z.string(),
+  html_path: z.string(),
+});
+export type DocHistoryToolResult = z.infer<typeof DocHistoryToolResult>;
+
 export const TOOLS = {
   prepare_edit: {
     description:
@@ -1684,6 +1805,12 @@ export const TOOLS = {
       "Blast radius of changing a symbol: callers, transitively affected symbols, files, and tests. Call before any refactor that touches a function used elsewhere — saves a manual caller hunt.",
     input: ImpactInput,
     output: ImpactResult,
+  },
+  resolve: {
+    description:
+      "FIRST STEP for any bug fix, refactor, or non-trivial edit: returns one complete blast-radius packet for a target — a symbol name, file path, commit SHA, or PR number. In a single call you get the forward+reverse dependency closure (callers AND callees), the exact tests to run, every invariant that applies (blocking ones first — these MUST be respected), prior notes and decisions on the affected code, related repo memory, and recent git/PR history. Call this BEFORE reading or editing code: it replaces a manual hunt through callers, tests, and git blame, and surfaces constraints you would otherwise violate. Pass a symbol to scope to one function, a file path for a whole file, or a commit/PR to understand a change set. Then make your edit and run `gate`/`brief` before declaring done.",
+    input: ResolvePacketInput,
+    output: ResolvePacketResult,
   },
   tests_for: {
     description:
@@ -1952,6 +2079,12 @@ export const TOOLS = {
     input: ResumeInput,
     output: ResumeResult,
   },
+  doc_history: {
+    description:
+      "Capture or refresh a time-scrubbable history doc for a PR or branch: snapshots the code + annotations + PR comments/labels at each commit (and optionally a pr-regen/pr-merge event), writing a single self-contained HTML scrubber plus per-snapshot JSON under .gps/docs/history. Read-only on git — never touches the working tree. Use to review how a change and its rationale evolved over time, or to keep a living history doc for a PR.",
+    input: DocHistoryToolInput,
+    output: DocHistoryToolResult,
+  },
 } as const;
 
 export type ToolName = keyof typeof TOOLS;
@@ -2097,6 +2230,75 @@ export const DocManifest = z.object({
     .default([]),
 });
 export type DocManifest = z.infer<typeof DocManifest>;
+
+/** What caused a snapshot to be captured in a doc's history. */
+export const DocSnapshotEvent = z.enum(["commit", "pr-regen", "pr-merge"]);
+export type DocSnapshotEvent = z.infer<typeof DocSnapshotEvent>;
+
+/** One PR review or thread comment, captured alongside a snapshot. */
+export const DocPrComment = z.object({
+  author: z.string(),
+  body: z.string(),
+  /** "review" carries a state (APPROVED/…); "comment" is a plain thread comment. */
+  kind: z.enum(["review", "comment"]),
+  state: z.string().optional(),
+});
+export type DocPrComment = z.infer<typeof DocPrComment>;
+
+/**
+ * A single point in a doc's life: the full DocModel state at a commit/event,
+ * plus the PR-side context (comments, labels) as of that moment.
+ */
+export const DocSnapshot = z.object({
+  schema_version: z.literal(1).default(1),
+  /** Commit SHA for "commit" events; the tip SHA for regen/merge (best-effort). */
+  sha: z.string().optional(),
+  /** Short SHA / human label shown on the scrubber tick. */
+  ref: z.string().optional(),
+  event: DocSnapshotEvent,
+  captured_at: z.string(),
+  /** Commit metadata, present for "commit" events. */
+  commit: z
+    .object({ author: z.string(), date: z.string(), message: z.string() })
+    .optional(),
+  /** The full doc state at this point in time. */
+  model: DocModel,
+  /** PR comments/reviews as of this snapshot (empty for pure local commits). */
+  pr_comments: z.array(DocPrComment).default([]),
+  /** PR labels as of this snapshot. */
+  labels: z.array(z.string()).default([]),
+});
+export type DocSnapshot = z.infer<typeof DocSnapshot>;
+
+/** Ordered (oldest → newest) series of snapshots for one doc id. */
+export const DocHistory = z.object({
+  schema_version: z.literal(1).default(1),
+  id: z.string(),
+  kind: z.enum(["pr", "repo"]),
+  title: z.string(),
+  pr_number: z.number().optional(),
+  snapshots: z.array(DocSnapshot).default([]),
+});
+export type DocHistory = z.infer<typeof DocHistory>;
+
+/** Index of generated doc histories, at `<out_dir>/history/manifest.json`. */
+export const DocHistoryManifest = z.object({
+  version: z.literal(1).default(1),
+  histories: z
+    .array(
+      z.object({
+        id: z.string(),
+        kind: z.enum(["pr", "repo"]),
+        title: z.string(),
+        html_path: z.string(),
+        snapshot_count: z.number().int().nonnegative(),
+        updated_at: z.string(),
+        pr_number: z.number().optional(),
+      }),
+    )
+    .default([]),
+});
+export type DocHistoryManifest = z.infer<typeof DocHistoryManifest>;
 
 /** One un-annotated changed hunk handed to the LLM for a plain-english gloss. */
 export const DocAnnotateRequest = z.object({

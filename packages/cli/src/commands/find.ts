@@ -16,6 +16,9 @@ export function registerFind(program: Command): void {
         if (opts.rank && opts.rank !== "tiered" && opts.rank !== "bm25") {
           throw new Error('--rank must be "tiered" or "bm25"');
         }
+        if (!Number.isInteger(opts.limit) || opts.limit <= 0) {
+          throw new Error("--limit must be a positive integer");
+        }
         const index = await readIndex(root);
         const matches =
           opts.rank === "bm25"

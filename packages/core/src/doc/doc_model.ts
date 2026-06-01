@@ -63,7 +63,21 @@ export async function buildDiffDocModel(
   });
 }
 
-interface AssembleMeta {
+/**
+ * Build a DocModel from an already-computed unified diff. Used by the doc-history
+ * walker, which diffs arbitrary commit pairs (read-only) and feeds the result in
+ * directly — bypassing `diffText`'s base-vs-working-tree semantics.
+ */
+export async function buildDocModelFromDiff(
+  root: string,
+  diff: string,
+  meta: AssembleMeta,
+  opts: BuildDocOpts = {},
+): Promise<DocModelT> {
+  return assemble(root, diff, opts, meta);
+}
+
+export interface AssembleMeta {
   kind: "pr" | "repo";
   title: string;
   subtitle?: string;

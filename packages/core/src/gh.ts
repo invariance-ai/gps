@@ -78,6 +78,7 @@ export interface PrThread {
   files: string[];
   reviews: Array<{ author: string; body: string; state: string }>;
   comments: Array<{ author: string; body: string }>;
+  labels: string[];
 }
 
 export async function fetchPrThread(
@@ -92,7 +93,7 @@ export async function fetchPrThread(
         "view",
         String(prNumber),
         "--json",
-        "number,title,body,files,reviews,comments",
+        "number,title,body,files,reviews,comments,labels",
       ],
       { maxBuffer: 8 * 1024 * 1024 },
     );
@@ -103,6 +104,7 @@ export async function fetchPrThread(
       files: Array<{ path: string }>;
       reviews: Array<{ author: { login?: string }; body: string; state: string }>;
       comments: Array<{ author: { login?: string }; body: string }>;
+      labels?: Array<{ name: string }>;
     };
     return {
       number: m.number,
@@ -118,6 +120,7 @@ export async function fetchPrThread(
         author: c.author?.login ?? "unknown",
         body: c.body ?? "",
       })),
+      labels: (m.labels ?? []).map((l) => l.name),
     };
   } catch {
     return null;

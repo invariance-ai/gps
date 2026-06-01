@@ -23,20 +23,20 @@ export interface WriteDocResult {
   id: string;
 }
 
-async function atomicWrite(file: string, content: string): Promise<void> {
+export async function atomicWrite(file: string, content: string): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.tmp.${process.pid}.${Date.now()}`;
   await writeFile(tmp, content);
   await rename(tmp, file);
 }
 
-function docId(model: DocModel): string {
+export function docId(model: DocModel): string {
   if (model.kind === "pr" && model.pr) return `pr-${model.pr.number}`;
   const base = model.base ? slug(model.base) : "head";
   return `repo-${base}`;
 }
 
-function slug(s: string): string {
+export function slug(s: string): string {
   const clean = s.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return clean || "head";
 }

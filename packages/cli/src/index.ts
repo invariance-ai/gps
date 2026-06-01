@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { resolveRoot } from "./root.js";
 import { registerContext } from "./commands/context.js";
 import { registerImpact } from "./commands/impact.js";
+import { registerResolve } from "./commands/resolve.js";
 import { registerTests } from "./commands/tests.js";
 import { registerInvariants } from "./commands/invariants.js";
 import { registerInvariant } from "./commands/invariant.js";
@@ -68,6 +69,7 @@ import { registerVerifyIndex } from "./commands/verify-index.js";
 import { registerReviewDiff } from "./commands/review-diff.js";
 import { registerBrief } from "./commands/brief.js";
 import { registerDoc } from "./commands/doc.js";
+import { registerDocHistory } from "./commands/doc-history.js";
 import { registerValidateKnowledge } from "./commands/validate-knowledge.js";
 import { registerPulse } from "./commands/pulse.js";
 import { registerSeed } from "./commands/seed.js";
@@ -119,6 +121,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "attach", register: registerAttach },
   { name: "pr-intent", register: registerPrIntent },
   { name: "impact", register: registerImpact },
+  { name: "resolve", register: registerResolve, primary: true },
   { name: "tests", register: registerTests },
   { name: "invariants", register: registerInvariants },
   { name: "invariant", register: registerInvariant },
@@ -166,6 +169,7 @@ const COMMANDS: CommandRegistration[] = [
   { name: "todos", register: registerTodos },
   { name: "sync", register: registerSync },
   { name: "doc", register: registerDoc, primary: true },
+  { name: "doc-history", register: registerDocHistory },
   { name: "prune", register: registerPrune },
   { name: "resume", register: registerResume },
 ];

@@ -4,7 +4,9 @@ import type {
   Invariant,
   TestRef,
   ProvenanceEntry,
+  ResolvePacketResult,
 } from "@invariance/gps-schemas";
+import { packByBudget, type PackSection } from "./budget.js";
 
 // Auto-strip ANSI when piped (agents shelling out via Bash) or NO_COLOR is set.
 // Set GPS_FORCE_COLOR=1 to override.
@@ -203,6 +205,167 @@ export function formatImpactPretty(r: ImpactResult): string {
   if (r.affected_tests.length) {
     L.push(c.bold("Tests to run:"));
     for (const t of r.affected_tests) L.push(`  - ${t.file}  ${c.dim(`(${t.framework})`)}`);
+    L.push("");
+  }
+  return L.join("\n");
+}
+
+function targetHeadline(r: ResolvePacketResult): string {
+  const t = r.target;
+  const label =
+    t.kind === "diff" ? "working-tree diff" :
+    t.kind === "pr" ? `PR #${t.value}` :
+    t.kind === "commit" ? `commit ${t.value}` :
+    `${t.kind} ${t.value}`;
+  return label;
+}
+
+/**
+ * Render a resolve packet as budgeted markdown for piping into an agent.
+ * Sections are emitted in priority order (blocking invariants and tests first)
+ * and packed by `packByBudget`; sections dropped for budget are listed in a
+ * trailing `Truncated` note. budget <= 0 = unlimited.
+ */
+export function formatResolveMarkdown(r: ResolvePacketResult, budget = 0): string {
+  const head = [
+    `# Resolve: ${targetHeadline(r)}`,
+    "",
+    `**Blast radius:** ${r.blast_radius} symbol(s)` +
+      (r.seeds.length ? ` · **Seeds:** ${r.seeds.map((s) => s.name).join(", ")}` : ""),
+    "",
+  ].join("\n");
+
+  const sections: PackSection[] = [];
+
+  const blocking = r.invariants.filter((i) => i.invariant.severity === "block");
+  const otherInv = r.invariants.filter((i) => i.invariant.severity !== "block");
+  if (blocking.length) {
+    sections.push({
+      heading: "## Blocking invariants (MUST respect)",
+      items: blocking.map((i) => `- **${i.invariant.name}** [${i.relation}] — ${i.invariant.rule}`),
+    });
+  }
+  sections.push({
+    heading: "## Tests to run",
+    items: r.affected_tests.map((t) => `- \`${t.file}\` (${t.framework})`),
+  });
+  sections.push({
+    heading: "## Affected symbols",
+    items: r.affected_symbols.map((s) => `- \`${s.name}\` — ${s.file}:${s.line}`),
+  });
+  sections.push({
+    heading: "## Affected files",
+    items: r.affected_files.map((f) => `- \`${f}\``),
+  });
+  if (otherInv.length) {
+    sections.push({
+      heading: "## Other invariants",
+      items: otherInv.map((i) => `- ${i.invariant.name} [${i.invariant.severity}, ${i.relation}] — ${i.invariant.rule}`),
+    });
+  }
+  sections.push({
+    heading: "## Past decisions",
+    items: r.decisions.map((d) =>
+      `- ${d.decision}` + (d.rejected_alternative ? ` (rejected: ${d.rejected_alternative})` : ""),
+    ),
+  });
+  sections.push({
+    heading: "## Notes from previous edits",
+    items: r.notes.map((n) => `- [${n.severity}] ${n.lesson}`),
+  });
+  sections.push({
+    heading: "## Dependencies (callees)",
+    items: r.dependencies.map((s) => `- \`${s.name}\` — ${s.file}:${s.line}`),
+  });
+  if (r.pr) {
+    sections.push({
+      heading: `## PR #${r.pr.number} review`,
+      items: [
+        ...r.pr.reviews.map((rv) => `- ${rv.author} (${rv.state}): ${rv.body}`.trim()),
+        ...r.pr.comments.map((cm) => `- ${cm.author}: ${cm.body}`),
+      ].filter((s) => s.length > 4),
+    });
+  }
+  sections.push({
+    heading: "## Recent changes",
+    items: r.git_history.flatMap((g) =>
+      g.commits.slice(0, 3).map((cm) => `- \`${g.file}\` ${cm.commit} ${cm.date.slice(0, 10)} ${cm.author}: ${cm.message}`),
+    ),
+  });
+  sections.push({
+    heading: "## Related repo memory",
+    items: r.recall.map((h) => `- [${h.kind}] ${h.text}`),
+  });
+  if (r.prepare_markdown) {
+    sections.push({ heading: "## Prepare brief", items: [], trailing: r.prepare_markdown });
+  }
+
+  const packed = packByBudget(sections, budget);
+  const droppedForBudget = packed.dropped
+    .filter((d) => d.reason === "budget")
+    .map((d) => d.section.replace(/^##\s*/, ""));
+  const out = [head, packed.text];
+  if (droppedForBudget.length) {
+    out.push("", `> Truncated (budget): ${[...new Set(droppedForBudget)].join(", ")}`);
+  }
+  return out.join("\n").trimEnd() + "\n";
+}
+
+/** Terminal-colored resolve packet (blocking invariants in red, tests in bold). */
+export function formatResolvePretty(r: ResolvePacketResult): string {
+  const L: string[] = [];
+  L.push(c.bold(`Resolve ${targetHeadline(r)}`) + c.dim(`  (blast radius: ${r.blast_radius})`));
+  if (r.seeds.length) L.push(c.dim(`seeds: ${r.seeds.map((s) => s.name).join(", ")}`));
+  L.push("");
+
+  const blocking = r.invariants.filter((i) => i.invariant.severity === "block");
+  if (blocking.length) {
+    L.push(c.red(c.bold("Blocking invariants (MUST respect):")));
+    for (const i of blocking) {
+      L.push(c.red(`  - ${i.invariant.name} [${i.relation}]`));
+      L.push(`    ${i.invariant.rule}`);
+    }
+    L.push("");
+  }
+  if (r.affected_tests.length) {
+    L.push(c.bold("Tests to run:"));
+    for (const t of r.affected_tests) L.push(`  - ${t.file}  ${c.dim(`(${t.framework})`)}`);
+    L.push("");
+  }
+  if (r.affected_symbols.length) {
+    L.push(c.bold("Affected symbols:"));
+    for (const s of r.affected_symbols.slice(0, 15)) L.push(`  - ${s.name}  ${c.dim(`${s.file}:${s.line}`)}`);
+    if (r.affected_symbols.length > 15) L.push(c.dim(`  …and ${r.affected_symbols.length - 15} more`));
+    L.push("");
+  }
+  const otherInv = r.invariants.filter((i) => i.invariant.severity !== "block");
+  if (otherInv.length) {
+    L.push(c.bold("Other invariants:"));
+    for (const i of otherInv) L.push(`  - ${c.cyan(i.invariant.name)} ${c.dim(`[${i.invariant.severity}, ${i.relation}]`)}`);
+    L.push("");
+  }
+  if (r.decisions.length) {
+    L.push(c.bold("Past decisions:"));
+    for (const d of r.decisions) L.push(`  - ${d.decision}`);
+    L.push("");
+  }
+  if (r.notes.length) {
+    L.push(c.bold("Notes from previous edits:"));
+    for (const n of r.notes.slice(0, 8)) L.push(`  - ${c.dim(`[${n.severity}]`)} ${n.lesson}`);
+    L.push("");
+  }
+  if (r.pr) {
+    L.push(c.bold(`PR #${r.pr.number} review:`));
+    for (const rv of r.pr.reviews) L.push(`  - ${rv.author} (${rv.state}): ${c.dim(rv.body.slice(0, 120))}`);
+    for (const cm of r.pr.comments.slice(0, 5)) L.push(`  - ${cm.author}: ${c.dim(cm.body.slice(0, 120))}`);
+    L.push("");
+  }
+  if (r.git_history.length) {
+    L.push(c.bold("Recent changes:"));
+    for (const g of r.git_history.slice(0, 8)) {
+      const top = g.commits[0];
+      if (top) L.push(`  - ${c.dim(`${g.file}`)} ${top.commit} ${top.date.slice(0, 10)} ${top.author}: ${top.message}`);
+    }
     L.push("");
   }
   return L.join("\n");

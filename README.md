@@ -439,7 +439,7 @@ Methodology and raw numbers: [`bench/dogfood/2026-05-12-invariance-platform.md`]
 
 ## Experimental: live docs
 
-`gps doc` generates stable local HTML and Markdown docs for a PR or local diff. The live browser view is launch-labeled experimental and stays off unless you opt in explicitly:
+`gps doc` generates stable local HTML and Markdown docs for a PR or local diff. When `ANTHROPIC_API_KEY` is set, it also sends changed diff hunks to Anthropic to fill documentation gaps (on by default when a key is present) — pass `--no-llm` to keep it fully local. The live browser view is launch-labeled experimental and stays off unless you opt in explicitly:
 
 ```bash
 gps doc --experimental-live-docs                    # write .gps/docs/live.html
