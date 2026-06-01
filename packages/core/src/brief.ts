@@ -6,6 +6,7 @@ import { open as openQuery } from "./query.js";
 import { testsForSymbol } from "./tests.js";
 import { loadNotes, loadFileNotes, loadAreaNotes, rankNotes } from "./notes.js";
 import { loadQuestions } from "./questions.js";
+import { changeSummary, type ChangeSummary } from "./changes.js";
 
 export interface BriefInput {
   base?: string;
@@ -29,6 +30,7 @@ export interface BriefResult {
   base: string;
   changed_files: string[];
   changed_symbols: SymbolRef[];
+  changes: ChangeSummary;
   invariants: {
     hits: ReturnType<typeof toGateHit>[];
     blocking_count: number;
@@ -68,6 +70,7 @@ function toGateHit(h: GateHitShape): GateHitShape {
 export async function brief(root: string, input: BriefInput = {}): Promise<BriefResult> {
   const max = input.max_symbols ?? 20;
   const diff = await diffSymbols(root, input.base ?? "HEAD");
+  const changes = await changeSummary(root, { base: input.base ?? "HEAD" });
   const gate = await gateChanged(root, { base: input.base });
 
   const symbols = diff.symbols.slice(0, max);
@@ -126,6 +129,7 @@ export async function brief(root: string, input: BriefInput = {}): Promise<Brief
     base: diff.base,
     changed_files: diff.files,
     changed_symbols: symbols,
+    changes,
     invariants: {
       hits: gate.hits.map(toGateHit),
       blocking_count: gate.blocking.length,
@@ -151,6 +155,19 @@ export function formatBriefMarkdown(b: BriefResult): string {
 
   lines.push(`# Brief — ${b.changed_symbols.length} symbol(s) across ${b.changed_files.length} file(s) vs ${b.base}`);
   if (b.truncated) lines.push(`_(truncated to ${b.changed_symbols.length} symbols)_`);
+
+  lines.push(`\n## Change summary`);
+  lines.push(`- ${b.changed_files.length} file(s) changed`);
+  lines.push(`- ${b.changes.changed_symbols.length} indexed symbol(s) touched before display limits`);
+  if (b.changes.prs.length > 0) {
+    lines.push(`- PR references: ${b.changes.prs.map((n) => `#${n}`).join(", ")}`);
+  }
+  if (b.changes.commits.length > 0) {
+    for (const c of b.changes.commits.slice(-5)) {
+      const pr = c.pr ? ` (#${c.pr})` : "";
+      lines.push(`- \`${c.sha.slice(0, 7)}\`${pr} ${c.message}`);
+    }
+  }
 
   // Changed symbols (the headline content — what the agent touched).
   lines.push(`\n## Changed symbols`);

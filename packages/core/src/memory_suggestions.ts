@@ -1,6 +1,8 @@
 import type { SymbolRef } from "@invariance/gps-schemas";
 import path from "node:path";
+import { symbolsForPrSnapshot } from "./changes.js";
 import { diffSymbols } from "./diff_symbols.js";
+import { fetchPr } from "./gh.js";
 import { filterExpiredNotes, loadAreaNotes, loadFileNotes, loadNotes } from "./notes.js";
 import { filterExpiredDecisions, loadDecisions } from "./decisions.js";
 import { filterByStatus, loadQuestions } from "./questions.js";
@@ -67,12 +69,19 @@ export interface MemorySuggestionRememberAction {
 
 export interface MemorySuggestionOptions {
   base?: string;
+  pr?: number | string;
   limit?: number;
   evidence?: string;
 }
 
 export interface MemorySuggestionResult {
   base: string;
+  source: "diff" | "pr";
+  pr?: {
+    number: number;
+    title: string;
+    files: string[];
+  };
   changed_files: string[];
   changed_symbol_count: number;
   changed_symbols: string[];
@@ -93,6 +102,7 @@ export async function memorySuggestionsForDiff(
   root: string,
   opts: MemorySuggestionOptions = {},
 ): Promise<MemorySuggestionResult> {
+  if (opts.pr !== undefined) return memorySuggestionsForPr(root, opts.pr, opts);
   const diff = await diffSymbols(root, opts.base ?? "HEAD");
   const evidence = opts.evidence ?? `diff:${diff.base}`;
   const suggestions = await memorySuggestionsForSymbols(root, diff.symbols, {
@@ -101,9 +111,38 @@ export async function memorySuggestionsForDiff(
   });
   return {
     base: diff.base,
+    source: "diff",
     changed_files: diff.files,
     changed_symbol_count: diff.symbols.length,
     changed_symbols: diff.symbols.map(symbolName).slice(0, 50),
+    suggestions,
+  };
+}
+
+export async function memorySuggestionsForPr(
+  root: string,
+  pr: number | string,
+  opts: Pick<MemorySuggestionOptions, "limit" | "evidence"> = {},
+): Promise<MemorySuggestionResult> {
+  const snapshot = await fetchPr(pr);
+  if (!snapshot) throw new Error(`failed to fetch PR #${pr} via gh`);
+  const symbols = await symbolsForPrSnapshot(root, snapshot);
+  const evidence = opts.evidence ?? `pr:#${snapshot.number}`;
+  const suggestions = await memorySuggestionsForSymbols(root, symbols, {
+    limit: opts.limit,
+    evidence,
+  });
+  return {
+    base: `PR-${snapshot.number}`,
+    source: "pr",
+    pr: {
+      number: snapshot.number,
+      title: snapshot.title,
+      files: snapshot.files,
+    },
+    changed_files: snapshot.files,
+    changed_symbol_count: symbols.length,
+    changed_symbols: symbols.map(symbolName).slice(0, 50),
     suggestions,
   };
 }

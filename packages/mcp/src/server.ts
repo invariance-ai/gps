@@ -60,6 +60,7 @@ import {
   memoryHealth,
   memorySuggestionsForDiff,
   applyMemorySuggestions,
+  changeSummary,
   type RecallKind as RecallKindT,
   verifyIndex,
   readGateStream,
@@ -139,7 +140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
 });
 
-export async function dispatch(name: ToolName, args: unknown): Promise<unknown> {
+export async function dispatch(name: string, args: unknown): Promise<unknown> {
   const root = process.cwd();
   switch (name) {
     case "prepare_edit": {
@@ -408,15 +409,25 @@ export async function dispatch(name: ToolName, args: unknown): Promise<unknown> 
       });
     }
     case "memory_suggestions": {
-      const a = args as { base?: string; limit?: number; evidence?: string; apply?: boolean };
+      const a = args as { base?: string; pr?: number | string; limit?: number; evidence?: string; apply?: boolean };
       const result = await memorySuggestionsForDiff(root, {
         base: a.base,
+        pr: a.pr,
         limit: a.limit,
         evidence: a.evidence,
       });
       if (!a.apply) return result;
       const application = await applyMemorySuggestions(root, result.suggestions);
       return { ...result, application };
+    }
+    case "change_summary": {
+      const a = args as { base?: string; head?: string; pr?: number | string; max_commits?: number };
+      return changeSummary(root, {
+        base: a.base,
+        head: a.head,
+        pr: a.pr,
+        max_commits: a.max_commits,
+      });
     }
     case "list_todos": {
       const a = args as { file?: string; symbol?: string; include_resolved?: boolean };

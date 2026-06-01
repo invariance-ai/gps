@@ -1368,6 +1368,45 @@ export const BriefSymbolEntry = z.object({
   questions: z.array(Question),
 });
 
+export const ChangeCommit = z.object({
+  sha: z.string(),
+  author: z.string(),
+  date: z.string(),
+  message: z.string(),
+  pr: z.number().int().positive().optional(),
+});
+export type ChangeCommit = z.infer<typeof ChangeCommit>;
+
+export const ChangeFileEntry = z.object({
+  file: z.string(),
+  symbols: z.array(SymbolRef),
+});
+export type ChangeFileEntry = z.infer<typeof ChangeFileEntry>;
+
+export const ChangeSummary = z.object({
+  base: z.string(),
+  source: z.enum(["diff", "pr"]),
+  pr: z.object({
+    number: z.number().int().positive(),
+    title: z.string(),
+    body: z.string(),
+  }).optional(),
+  changed_files: z.array(z.string()),
+  changed_symbols: z.array(SymbolRef),
+  files: z.array(ChangeFileEntry),
+  commits: z.array(ChangeCommit),
+  prs: z.array(z.number().int().positive()),
+});
+export type ChangeSummary = z.infer<typeof ChangeSummary>;
+
+export const ChangeSummaryInput = z.object({
+  base: z.string().optional().describe("Git base ref to diff against (default: HEAD)."),
+  head: z.string().optional().describe("Commit-range head for provenance (default: HEAD)."),
+  pr: z.union([z.number().int().positive(), z.string()]).optional().describe("GitHub PR number to summarize instead of the working tree."),
+  max_commits: z.number().int().min(1).max(100).optional(),
+});
+export type ChangeSummaryInput = z.infer<typeof ChangeSummaryInput>;
+
 export const AgentFrictionSuggestion = z.object({
   kind: z.enum(["hard_search"]),
   symbol: z.string().optional(),
@@ -1384,6 +1423,7 @@ export const BriefResult = z.object({
   base: z.string(),
   changed_files: z.array(z.string()),
   changed_symbols: z.array(SymbolRef),
+  changes: ChangeSummary,
   invariants: z.object({
     hits: z.array(BriefGateHit),
     blocking_count: z.number().int().nonnegative(),
@@ -1455,6 +1495,7 @@ export type MemorySuggestion = z.infer<typeof MemorySuggestion>;
 
 export const MemorySuggestionsInput = z.object({
   base: z.string().optional(),
+  pr: z.union([z.number().int().positive(), z.string()]).optional(),
   limit: z.number().int().positive().optional(),
   evidence: z.string().optional(),
   apply: z.boolean().optional(),
@@ -1482,6 +1523,12 @@ export type ApplyMemorySuggestionsResult = z.infer<typeof ApplyMemorySuggestions
 
 export const MemorySuggestionsResult = z.object({
   base: z.string(),
+  source: z.enum(["diff", "pr"]),
+  pr: z.object({
+    number: z.number().int().positive(),
+    title: z.string(),
+    files: z.array(z.string()),
+  }).optional(),
   changed_files: z.array(z.string()),
   changed_symbol_count: z.number().int().nonnegative(),
   changed_symbols: z.array(z.string()),
@@ -1853,6 +1900,12 @@ export const TOOLS = {
       "Closeout memory queue for the current diff. Lists changed symbols that need durable memory, unresolved questions, unverified assumptions, or open TODOs before an agent declares work done.",
     input: MemorySuggestionsInput,
     output: MemorySuggestionsResult,
+  },
+  change_summary: {
+    description:
+      "Summarize the current change set as changed files, touched indexed symbols, commits, and PR references. Use for PR/change understanding without generating a full doc.",
+    input: ChangeSummaryInput,
+    output: ChangeSummary,
   },
   record_learning: {
     description:

@@ -256,6 +256,23 @@ capture-preference [options]
 - `--json` — Emit JSON
 - `--root <path>` — Repo root (default: cwd)
 
+## `changes`
+
+Summarize the current diff as files, touched symbols, commits, and PR references
+
+```
+changes [options]
+```
+
+**Options:**
+
+- `--base <ref>` — Diff base (default HEAD) *(default: "HEAD")*
+- `--head <ref>` — Commit-range head for provenance (default HEAD) *(default: "HEAD")*
+- `--pr <number>` — Summarize a GitHub PR diff instead of the working tree
+- `--max-commits <n>` — Max commits to include (default 20)
+- `--json` — Emit JSON
+- `--root <path>` — Repo root (default: cwd)
+
 ## `check-proposal`
 
 Detect when a proposal matches a previously rejected alternative
@@ -1149,6 +1166,7 @@ memory-suggestions [options]
 **Options:**
 
 - `--base <ref>` — Diff base *(default: "HEAD")*
+- `--pr <number>` — Build suggestions from a GitHub PR diff instead of the working tree
 - `--limit <n>` — Max suggestions *(default: 20)*
 - `--evidence <ref>` — Evidence tag for generated remember commands (default: diff:<base>)
 - `--apply` — Persist safe record-memory suggestions

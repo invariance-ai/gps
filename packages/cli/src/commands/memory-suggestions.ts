@@ -5,6 +5,7 @@ import { addRootOption, resolveRoot, type RootOption } from "../root.js";
 
 interface Opts extends RootOption {
   base?: string;
+  pr?: string;
   limit?: number;
   evidence?: string;
   apply?: boolean;
@@ -17,6 +18,7 @@ export function registerMemorySuggestions(program: Command): void {
       .command("memory-suggestions")
       .description("Closeout memory queue for changed symbols")
       .option("--base <ref>", "Diff base", "HEAD")
+      .option("--pr <number>", "Build suggestions from a GitHub PR diff instead of the working tree")
       .option("--limit <n>", "Max suggestions", (v) => parseInt(v, 10), 20)
       .option("--evidence <ref>", "Evidence tag for generated remember commands (default: diff:<base>)")
       .option("--apply", "Persist safe record-memory suggestions")
@@ -25,6 +27,7 @@ export function registerMemorySuggestions(program: Command): void {
     const root = resolveRoot(opts);
     const result = await memorySuggestionsForDiff(root, {
       base: opts.base,
+      pr: opts.pr,
       limit: opts.limit,
       evidence: opts.evidence,
     });
@@ -35,9 +38,12 @@ export function registerMemorySuggestions(program: Command): void {
     }
 
     console.log(kleur.bold("memory suggestions"));
+    if (result.pr) {
+      console.log(kleur.dim(`PR #${result.pr.number}: ${result.pr.title}`));
+    }
     console.log(
       kleur.dim(
-        `${result.changed_symbol_count} changed symbol(s), ${result.changed_files.length} changed file(s) vs ${result.base}`,
+        `${result.changed_symbol_count} changed symbol(s), ${result.changed_files.length} changed file(s) from ${result.source}:${result.base}`,
       ),
     );
     if (result.suggestions.length === 0) {
